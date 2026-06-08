@@ -139,15 +139,7 @@
             </div>
           </div>
           <div class="code-editor-wrap">
-            <textarea
-              id="responseEditor"
-              class="code-editor"
-              spellcheck="false"
-              autocomplete="off"
-              autocorrect="off"
-              autocapitalize="off"
-              wrap="off"
-            ></textarea>
+            <div id="responseEditorHost" class="code-editor"></div>
           </div>
           <div class="editor-meta">
             <span class="mono" id="lineCount">0 lines</span>
@@ -241,6 +233,7 @@
     </div>
   </div>
 
+  <script src="editor.js" type="module"></script>
   <script src="app.js" type="module"></script>
 </body>
 </html>

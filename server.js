@@ -23,6 +23,10 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
   const mockEngine = new MockEngine({ logBuffer });
 
   const app = createApi({ storagePath: finalStoragePath, configStore, logBuffer, mockEngine });
+  // Serve CodeMirror ESM modules from node_modules
+  for (const pkg of ['view', 'state', 'lang-json', 'lint', 'commands', 'language']) {
+    app.use(`/vendor/codemirror/${pkg}`, express.static(path.join(__dirname, 'node_modules', `@codemirror/${pkg}`)));
+  }
   app.use(express.static(finalPublicPath));
   app.get('*', (_req, res) => {
     res.sendFile(path.join(finalPublicPath, 'index.html'));

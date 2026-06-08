@@ -1,6 +1,8 @@
 // Mock//Server — production UI
 // Talks to /api/* and /events.
 
+import { mountEditor, getValue, setValue } from './editor.js';
+
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 
@@ -61,7 +63,7 @@ const els = {
   port: $('#port'),
   path: $('#path'),
   status: $('#status'),
-  responseEditor: $('#responseEditor'),
+  responseEditor: { value: '' }, // legacy ref; replaced by CodeMirror getters
   validationStatus: $('#validationStatus'),
   formatBtn: $('#formatBtn'),
   validateBtn: $('#validateBtn'),
@@ -139,6 +141,7 @@ function renderEditor() {
     els.path.value = ep.path;
     els.status.value = ep.statusCode || 200;
     els.responseEditor.value = formatJSON(ep.response);
+    if (window.__editorMounted) setValue(formatJSON(ep.response));
     els.lastSaved.textContent = 'saved';
     els.lastSaved.style.color = '';
   }
@@ -251,7 +254,7 @@ async function saveEndpoint() {
     port: Number(els.port.value),
     path: els.path.value.trim(),
     statusCode: Number(els.status.value) || 200,
-    response: els.responseEditor.value ? JSON.parse(els.responseEditor.value) : null,
+    response: (() => { const v = getValue(); return v ? JSON.parse(v) : null; })(),
     enabled: ep.enabled !== false,
   };
   try {
@@ -302,10 +305,10 @@ function formatJSON(value) {
 }
 
 function tryFormat() {
-  const text = els.responseEditor.value;
+  const text = getValue();
   if (!text.trim()) return;
   try {
-    els.responseEditor.value = JSON.stringify(JSON.parse(text), null, 2);
+    setValue(JSON.stringify(JSON.parse(text), null, 2));
     setValidation('valid', 'formatted');
     markDirty();
   } catch (e) {
@@ -314,7 +317,7 @@ function tryFormat() {
 }
 
 function validateJSON() {
-  const text = els.responseEditor.value.trim();
+  const text = getValue().trim();
   if (!text) return setValidation('empty', 'empty');
   try { JSON.parse(text); setValidation('valid', 'valid'); }
   catch { setValidation('invalid', 'invalid JSON'); }
@@ -327,7 +330,7 @@ function setValidation(state_, text) {
 }
 
 function updateEditorMeta() {
-  const text = els.responseEditor.value;
+  const text = getValue();
   const lines = text === '' ? 0 : text.split('\n').length;
   els.lineCount.textContent = `${lines} line${lines === 1 ? '' : 's'}`;
   els.charCount.textContent = `${text.length} char${text.length === 1 ? '' : 's'}`;
@@ -392,16 +395,7 @@ els.settingsSave.addEventListener('click', saveSettings);
 for (const f of [els.method, els.port, els.path, els.status]) {
   f.addEventListener('input', markDirty);
 }
-els.responseEditor.addEventListener('input', () => { markDirty(); validateJSON(); updateEditorMeta(); });
-els.responseEditor.addEventListener('keydown', (e) => {
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    const s = els.responseEditor.selectionStart, t = els.responseEditor.selectionEnd;
-    els.responseEditor.value = els.responseEditor.value.substring(0, s) + '  ' + els.responseEditor.value.substring(t);
-    els.responseEditor.selectionStart = els.responseEditor.selectionEnd = s + 2;
-    markDirty(); validateJSON(); updateEditorMeta();
-  }
-});
+// CodeMirror handles its own input; onChange is wired in boot.
 
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -415,5 +409,12 @@ document.addEventListener('keydown', (e) => {
 // Boot
 // ============================================================
 loadAll().then(() => {
+  // Mount CodeMirror after the editor form is rendered.
+  const ep = state.endpoints.find((e) => e.id === state.selectedId);
+  mountEditor({
+    initialValue: ep ? formatJSON(ep.response) : '',
+    onChange: () => { markDirty(); validateJSON(); updateEditorMeta(); },
+  });
+  window.__editorMounted = true;
   connectSSE();
 });
