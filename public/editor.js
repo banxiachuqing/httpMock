@@ -1,10 +1,10 @@
 // CodeMirror 6 bootstrap
-import { EditorView, keymap, lineNumbers, highlightActiveLine } from '/vendor/codemirror/view/dist/index.js';
-import { EditorState } from '/vendor/codemirror/state/dist/index.js';
-import { defaultKeymap, history, historyKeymap } from '/vendor/codemirror/commands/dist/index.js';
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from '/vendor/codemirror/language/dist/index.js';
-import { json, jsonParseLinter } from '/vendor/codemirror/lang-json/dist/index.js';
-import { linter, lintGutter } from '/vendor/codemirror/lint/dist/index.js';
+import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
+import { EditorState } from '@codemirror/state';
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from '@codemirror/language';
+import { json, jsonParseLinter } from '@codemirror/lang-json';
+import { linter, lintGutter } from '@codemirror/lint';
 
 const host = document.getElementById('responseEditorHost');
 let view = null;

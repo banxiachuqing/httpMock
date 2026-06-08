@@ -27,6 +27,20 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
   for (const pkg of ['view', 'state', 'lang-json', 'lint', 'commands', 'language']) {
     app.use(`/vendor/codemirror/${pkg}`, express.static(path.join(__dirname, 'node_modules', `@codemirror/${pkg}`)));
   }
+  // Serve CodeMirror transitive deps
+  const transitiveMap = {
+    'crelt': 'crelt',
+    'style-mod': 'style-mod',
+    'w3c-keyname': 'w3c-keyname',
+    '@marijn/find-cluster-break': '@marijn/find-cluster-break',
+    '@lezer/common': '@lezer/common',
+    '@lezer/highlight': '@lezer/highlight',
+    '@lezer/json': '@lezer/json',
+    '@lezer/lr': '@lezer/lr',
+  };
+  for (const [route, pkg] of Object.entries(transitiveMap)) {
+    app.use(`/vendor/${route}`, express.static(path.join(__dirname, 'node_modules', pkg)));
+  }
   // Static files
   app.use(express.static(finalPublicPath));
   // 404 for everything else (non-/api unmatched, non-static)
