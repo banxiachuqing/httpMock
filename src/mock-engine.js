@@ -29,8 +29,9 @@ function readBody(req) {
 }
 
 export class MockEngine {
-  constructor({ logBuffer }) {
+  constructor({ logBuffer, bindHost = '127.0.0.1' }) {
     this.logBuffer = logBuffer;
+    this.bindHost = bindHost;
     this.servers = new Map();
     this.statuses = new Map();
   }
@@ -88,7 +89,7 @@ export class MockEngine {
           const onListening = () => { server.removeListener('error', onError); resolve(); };
           server.once('error', onError);
           server.once('listening', onListening);
-          server.listen(port, '127.0.0.1');
+          server.listen(port, this.bindHost);
         });
         this.servers.set(port, { server, router });
         this.statuses.set(port, { state: 'running' });

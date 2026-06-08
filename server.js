@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 import express from 'express';
 import open from 'open';
 import { ConfigStore } from './src/config-store.js';
@@ -10,7 +11,22 @@ import { defaultStoragePath, ensureDir } from './src/paths.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export async function startServer({ storagePath, uiPort, openBrowser = true, host = '127.0.0.1', publicPath } = {}) {
+// Detect non-loopback IPv4 addresses for LAN access hints
+function listLocalIPv4s() {
+  const ifaces = os.networkInterfaces();
+  const out = [];
+  for (const [name, list] of Object.entries(ifaces)) {
+    for (const i of list || []) {
+      if (i.family === 'IPv4' && !i.internal) out.push({ name, address: i.address });
+    }
+  }
+  return out;
+}
+
+export async function startServer({ storagePath, uiPort, openBrowser = true, host, publicPath } = {}) {
+  // Resolve bind host: param > MOCK_HOST env > 127.0.0.1
+  const finalHost = host || process.env.MOCK_HOST || '127.0.0.1';
+
   const finalStoragePath = storagePath || defaultStoragePath();
   ensureDir(finalStoragePath);
 
@@ -20,7 +36,8 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
   await configStore.load();
 
   const logBuffer = new LogBuffer(500);
-  const mockEngine = new MockEngine({ logBuffer });
+  // Pass the same host to MockEngine so mock ports bind identically
+  const mockEngine = new MockEngine({ logBuffer, bindHost: finalHost });
 
   const app = createApi({ storagePath: finalStoragePath, configStore, logBuffer, mockEngine });
   // Serve CodeMirror ESM modules from node_modules
@@ -55,10 +72,31 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
   });
 
   const desired = uiPort ?? configStore.config.settings.uiPort ?? 5050;
-  const server = await listenWithFallback(app, desired, host);
+  const server = await listenWithFallback(app, desired, finalHost);
+  const port = server.address().port;
+
+  // Print connection hints
+  console.log(`[mock-server] WebUI bound to http://${finalHost}:${port}`);
+  if (finalHost === '127.0.0.1') {
+    console.log('[mock-server]   → accessible at: http://127.0.0.1:' + port);
+    const ips = listLocalIPv4s();
+    if (ips.length > 0) {
+      console.log('[mock-server]   → other devices on your LAN cannot reach 127.0.0.1.');
+      console.log('[mock-server]   → to allow LAN access, restart with: MOCK_HOST=0.0.0.0 pnpm start');
+      for (const { name, address } of ips) {
+        console.log(`[mock-server]     (your ${name}: ${address})`);
+      }
+    }
+  } else {
+    console.log('[mock-server]   → accessible at: http://' + finalHost + ':' + port);
+    for (const { name, address } of listLocalIPv4s()) {
+      console.log(`[mock-server]     also: http://${address}:${port}  (${name})`);
+    }
+  }
 
   if (openBrowser) {
-    const url = `http://${host === '127.0.0.1' ? 'localhost' : host}:${server.address().port}`;
+    const displayHost = finalHost === '127.0.0.1' ? 'localhost' : finalHost;
+    const url = `http://${displayHost}:${port}`;
     open(url).catch(() => {});
   }
 
@@ -67,7 +105,8 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
     logBuffer,
     mockEngine,
     server,
-    port: server.address().port,
+    port,
+    host: finalHost,
     async close() {
       await mockEngine.stop();
       await new Promise((r) => server.close(r));
