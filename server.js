@@ -27,9 +27,17 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
   for (const pkg of ['view', 'state', 'lang-json', 'lint', 'commands', 'language']) {
     app.use(`/vendor/codemirror/${pkg}`, express.static(path.join(__dirname, 'node_modules', `@codemirror/${pkg}`)));
   }
+  // Static files
   app.use(express.static(finalPublicPath));
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(finalPublicPath, 'index.html'));
+  // 404 for everything else (non-/api unmatched, non-static)
+  app.use((req, res) => {
+    if (req.path.startsWith('/api/')) {
+      res.status(404).json({ error: 'not found', code: 'NOT_FOUND' });
+    } else {
+      res.sendFile(path.join(finalPublicPath, 'index.html'), (err) => {
+        if (err) res.status(404).end();
+      });
+    }
   });
 
   const desired = uiPort ?? configStore.config.settings.uiPort ?? 5050;

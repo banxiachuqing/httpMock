@@ -137,12 +137,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
     res.json(logBuffer.getRecent(limit));
   });
 
-  // 404
-  app.use((_req, _res, next) => {
-    next(new AppError(404, 'NOT_FOUND', 'not found'));
-  });
-
-  // Error handler (must be last)
+  // Error handler (must be last in createApi so API errors are formatted)
   app.use((err, _req, res, _next) => {
     res.status(statusFor(err)).json(toErrorResponse(err));
   });

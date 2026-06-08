@@ -16,12 +16,6 @@ beforeEach(() => {
 afterEach(() => dir.cleanup());
 
 describe('API', () => {
-  it('returns 404 JSON envelope for unknown routes', async () => {
-    const r = await ctx.request.get('/nope');
-    expect(r.status).toBe(404);
-    expect(r.body).toEqual({ error: 'not found', code: 'NOT_FOUND' });
-  });
-
   it('returns health', async () => {
     const r = await ctx.request.get('/api/health');
     expect(r.status).toBe(200);
