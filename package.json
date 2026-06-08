@@ -1,0 +1,23 @@
+{
+  "name": "mock-server-webui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "open": "^10.1.0"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0",
+    "supertest": "^7.0.0",
+    "@playwright/test": "^1.44.0"
+  }
+}

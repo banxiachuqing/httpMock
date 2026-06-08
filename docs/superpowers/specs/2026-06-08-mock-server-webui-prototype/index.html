@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mock//Server — Local HTTP Mock Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="grid-canvas" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar" data-reveal="0">
+    <div class="brand">
+      <span class="brand-mark">
+        <span class="brand-mock">MOCK</span><span class="brand-slash">//</span><span class="brand-srv">SERVER</span>
+      </span>
+      <span class="brand-meta">
+        <span class="brand-meta-dot"></span>
+        v0.1 · local dev tool
+      </span>
+    </div>
+
+    <div class="topbar-actions">
+      <div class="status-pill" id="globalStatus" data-state="stopped">
+        <span class="led" aria-hidden="true"></span>
+        <span class="status-text">STOPPED</span>
+        <span class="status-detail" id="statusDetail">all ports idle</span>
+      </div>
+      <button class="btn btn-primary" id="startStopBtn" data-state="stopped">
+        <span class="btn-led" aria-hidden="true"></span>
+        <span class="btn-label">ARM</span>
+      </button>
+      <button class="btn btn-icon" id="settingsBtn" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar" data-reveal="1">
+      <div class="sidebar-header">
+        <h2 class="section-label">Endpoints</h2>
+        <span class="sidebar-count" id="endpointCount">0</span>
+        <button class="btn btn-ghost btn-sm" id="newEndpointBtn">
+          <span class="plus">+</span> NEW
+        </button>
+      </div>
+      <ul class="endpoint-list" id="endpointList" role="listbox" aria-label="Endpoints">
+        <!-- populated by JS -->
+      </ul>
+      <div class="sidebar-footer">
+        <div class="port-summary" id="portSummary">
+          <span class="port-summary-label">Ports</span>
+          <span class="port-summary-list" id="portSummaryList">—</span>
+        </div>
+      </div>
+    </aside>
+
+    <section class="editor" data-reveal="2" id="editor">
+      <!-- Empty state -->
+      <div class="editor-empty" id="editorEmpty">
+        <div class="editor-empty-inner">
+          <div class="editor-empty-mark">//</div>
+          <h3 class="editor-empty-title">No endpoint selected</h3>
+          <p class="editor-empty-text">Pick one from the left, or create a new mock to begin.</p>
+          <button class="btn btn-ghost" id="emptyNewBtn">
+            <span class="plus">+</span> CREATE FIRST ENDPOINT
+          </button>
+        </div>
+      </div>
+
+      <!-- Form -->
+      <div class="editor-form" id="editorForm" hidden>
+        <div class="editor-header">
+          <div class="editor-header-left">
+            <h2 class="section-label">Editing</h2>
+            <span class="endpoint-id mono" id="endpointId">id: —</span>
+          </div>
+          <div class="editor-header-right">
+            <span class="last-saved mono" id="lastSaved">unsaved</span>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="method">Method</label>
+            <div class="select-wrap">
+              <select id="method" class="select">
+                <option>GET</option>
+                <option>POST</option>
+                <option>PUT</option>
+                <option>PATCH</option>
+                <option>DELETE</option>
+                <option>HEAD</option>
+                <option>OPTIONS</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="port">Port</label>
+            <input type="number" id="port" class="input mono" min="1" max="65535" />
+          </div>
+
+          <div class="field field-wide">
+            <label for="path">Path</label>
+            <input type="text" id="path" class="input mono" placeholder="/api/example" autocomplete="off" spellcheck="false" />
+          </div>
+
+          <div class="field">
+            <label for="status">Status</label>
+            <input type="number" id="status" class="input mono" min="200" max="599" value="200" />
+          </div>
+        </div>
+
+        <div class="editor-body">
+          <div class="editor-toolbar">
+            <div class="toolbar-left">
+              <span class="section-label">Response</span>
+              <span class="format-hint mono">JSON</span>
+            </div>
+            <div class="toolbar-right">
+              <span class="validation-status" id="validationStatus">
+                <span class="val-mark">·</span>
+                <span class="val-text">empty</span>
+              </span>
+              <button class="btn btn-ghost btn-sm" id="formatBtn">FORMAT</button>
+              <button class="btn btn-ghost btn-sm" id="validateBtn">VALIDATE</button>
+            </div>
+          </div>
+          <div class="code-editor-wrap">
+            <textarea
+              id="responseEditor"
+              class="code-editor"
+              spellcheck="false"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              wrap="off"
+            ></textarea>
+          </div>
+          <div class="editor-meta">
+            <span class="mono" id="lineCount">0 lines</span>
+            <span class="meta-sep">·</span>
+            <span class="mono" id="charCount">0 chars</span>
+            <span class="meta-sep">·</span>
+            <span class="mono">tab → 2 spaces</span>
+          </div>
+        </div>
+
+        <div class="editor-footer">
+          <button class="btn btn-danger" id="deleteBtn">DELETE</button>
+          <div class="spacer"></div>
+          <button class="btn btn-ghost" id="revertBtn">REVERT</button>
+          <button class="btn btn-primary" id="saveBtn">SAVE</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section class="logs" data-reveal="3">
+    <div class="logs-header">
+      <div class="logs-header-left">
+        <h2 class="section-label">Request Log</h2>
+        <span class="logs-status mono" id="logsStatus">
+          <span class="led led-mini" data-state="stopped"></span>
+          <span>idle</span>
+        </span>
+      </div>
+      <div class="logs-header-right">
+        <span class="logs-count mono" id="logsCount">0 entries · max 500</span>
+        <label class="toggle">
+          <input type="checkbox" id="autoScrollToggle" checked />
+          <span class="toggle-label">AUTO-SCROLL</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="simulateToggle" />
+          <span class="toggle-label">SIMULATE</span>
+        </label>
+        <button class="btn btn-ghost btn-sm" id="clearLogsBtn">CLEAR</button>
+      </div>
+    </div>
+
+    <div class="logs-table" id="logsTable">
+      <div class="logs-row logs-head">
+        <span class="col-time">Time</span>
+        <span class="col-method">Method</span>
+        <span class="col-path">Path</span>
+        <span class="col-port">Port</span>
+        <span class="col-status">Status</span>
+        <span class="col-duration">Duration</span>
+        <span class="col-result">Result</span>
+      </div>
+      <div class="logs-body" id="logsBody">
+        <div class="logs-empty" id="logsEmpty">
+          <span class="logs-empty-mark">//</span>
+          <span>No requests yet. Click <strong>ARM</strong> to start the mock engine.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Settings dialog -->
+  <div class="modal" id="settingsModal" hidden>
+    <div class="modal-backdrop" id="settingsBackdrop"></div>
+    <div class="modal-panel" role="dialog" aria-labelledby="settingsTitle" aria-modal="true">
+      <div class="modal-header">
+        <h2 class="section-label" id="settingsTitle">Settings</h2>
+        <button class="btn btn-icon" id="settingsClose" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="field field-wide">
+          <label for="storagePath">Storage Path</label>
+          <input type="text" id="storagePath" class="input mono" />
+          <p class="field-hint">Default: <span class="mono">~/Documents/MockServer</span></p>
+        </div>
+        <div class="field">
+          <label for="uiPort">UI Port</label>
+          <input type="number" id="uiPort" class="input mono" min="1" max="65535" />
+          <p class="field-hint">Takes effect on next restart.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="settingsCancel">CANCEL</button>
+        <button class="btn btn-primary" id="settingsSave">SAVE</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>

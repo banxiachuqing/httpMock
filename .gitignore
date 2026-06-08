@@ -1,0 +1,8 @@
+node_modules/
+.superpowers/
+*.log
+.DS_Store
+playwright-report/
+test-results/
+playwright/.cache/
+coverage/
