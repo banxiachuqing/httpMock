@@ -39,6 +39,7 @@ const state = {
   selectedId: null,
   dirty: false,
   runtime: 'stopped',
+  runtimeStatus: {}, // port -> { state, reason? }
   logs: [],
   autoScroll: true,
 };
@@ -108,7 +109,21 @@ function renderEndpointList() {
     li.dataset.id = ep.id;
     li.setAttribute('role', 'option');
     li.setAttribute('aria-selected', ep.id === state.selectedId ? 'true' : 'false');
-    const isRunning = state.runtime === 'running';
+
+    // Per-port status indicator: failed > running > stopped
+    const portStatus = state.runtimeStatus[String(ep.port)];
+    let ledState = 'stopped';
+    let ledTitle = '';
+    if (portStatus?.state === 'failed') {
+      ledState = 'failed';
+      ledTitle = `端口 ${ep.port} 启动失败：${portStatus.reason || '未知原因'}`;
+    } else if (portStatus?.state === 'running') {
+      ledState = 'running';
+      ledTitle = `端口 ${ep.port} 运行中`;
+    } else {
+      ledTitle = `端口 ${ep.port} 未启动`;
+    }
+
     li.innerHTML = `
       <span class="endpoint-method" data-method="${ep.method}">${ep.method}</span>
       <div class="endpoint-main">
@@ -116,7 +131,7 @@ function renderEndpointList() {
         <div class="endpoint-port">${ep.port}</div>
       </div>
       <div class="endpoint-status">
-        <span class="led led-mini" data-state="${isRunning ? 'running' : 'stopped'}"></span>
+        <span class="led led-mini" data-state="${ledState}" title="${ledTitle}"></span>
       </div>
       <button class="endpoint-delete" type="button" aria-label="删除" title="删除">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -357,6 +372,14 @@ async function toggleRuntime() {
     state.runtime = result.failed && result.failed.length > 0 ? 'failed' : 'running';
     render();
   }
+  await refreshRuntimeStatus();
+  renderEndpointList();
+}
+
+async function refreshRuntimeStatus() {
+  try {
+    state.runtimeStatus = await api.runtimeStatus();
+  } catch {}
   renderEndpointList();
 }
 
@@ -481,4 +504,8 @@ loadAll().then(() => {
   });
   window.__editorMounted = true;
   connectSSE();
+  // Fetch initial runtime status so list LEDs reflect failed/running per port
+  refreshRuntimeStatus();
+  // Poll every 5s to catch external changes (e.g. someone else binds the port)
+  setInterval(refreshRuntimeStatus, 5000);
 });
