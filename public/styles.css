@@ -502,9 +502,9 @@ button {
 
 .endpoint-item {
   display: grid;
-  grid-template-columns: 64px 1fr auto;
+  grid-template-columns: 56px 1fr auto auto;
   align-items: center;
-  gap: var(--s-3);
+  gap: var(--s-2);
   padding: var(--s-3);
   border: 1px solid transparent;
   border-radius: var(--r-1);
