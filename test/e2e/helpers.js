@@ -6,7 +6,7 @@ import http from 'node:http';
 
 export async function bootServer() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mock-e2e-'));
-  const handle = await startServer({ storagePath: dir.path, uiPort: 0, openBrowser: false });
+  const handle = await startServer({ storagePath: dir, uiPort: 0, openBrowser: false });
   return {
     handle,
     dir,

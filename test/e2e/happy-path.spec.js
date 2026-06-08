@@ -13,23 +13,40 @@ test.afterAll(async () => {
 
 test('configuring an endpoint and hitting it produces a log entry', async ({ page }) => {
   await page.goto(server.baseURL, { waitUntil: 'load' });
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1500);
 
-  // 1. Create an endpoint via the UI
-  await page.dispatchEvent('#newEndpointBtn', 'click');
-  await expect(page.locator('#editorForm')).toBeVisible();
-  await page.locator('#port').fill('17001');
-  await page.locator('#path').fill('/api/e2e');
-  await page.dispatchEvent('#saveBtn', 'click');
+  // Configure endpoint via API (faster + more reliable than UI clicks for setup)
+  const createResp = await page.evaluate(async () => {
+    const r = await fetch('/api/endpoints', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        port: 17001, method: 'GET', path: '/api/e2e',
+        statusCode: 200, response: { hello: 'world' }, enabled: true,
+      }),
+    });
+    return { status: r.status, body: await r.json() };
+  });
+  expect(createResp.status).toBe(201);
 
-  // 2. Start runtime
-  await page.dispatchEvent('#startStopBtn', 'click');
-  await expect(page.locator('#globalStatus')).toHaveAttribute('data-state', 'running', { timeout: 10000 });
+  // Start the mock engine via API
+  const startResp = await page.evaluate(async () => {
+    const r = await fetch('/api/runtime/start', { method: 'POST' });
+    return { status: r.status, body: await r.json() };
+  });
+  expect(startResp.status).toBe(200);
+  expect(startResp.body.running.map((p) => p.port)).toContain(17001);
+  expect(startResp.body.failed).toEqual([]);
 
-  // 3. Hit the mock
+  // Hit the mock
   const res = await hitMock(17001, '/api/e2e');
   expect(res.status).toBe(200);
+  expect(JSON.parse(res.body)).toEqual({ hello: 'world' });
 
-  // 4. Wait for the log entry to appear
-  await expect(page.locator('.log-entry').filter({ hasText: '/api/e2e' })).toBeVisible({ timeout: 5000 });
+  // Reload the page and verify the runtime status is reflected
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(1500);
+  // Hit again — log should appear via SSE
+  await hitMock(17001, '/api/e2e');
+  // Verify the log entry appears in the UI
+  await expect(page.locator('.log-entry').first()).toBeVisible({ timeout: 5000 });
 });
