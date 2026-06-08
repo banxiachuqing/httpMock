@@ -54,7 +54,7 @@
   --glow-cyan: 0 0 12px rgba(107, 213, 255, 0.4);
 
   /* Typography */
-  --font-sans: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Bricolage Grotesque', 'Noto Sans SC', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* Spacing */

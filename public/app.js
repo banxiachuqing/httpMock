@@ -156,10 +156,10 @@ function renderStatus() {
   btn.dataset.state = state.runtime;
   pill.querySelector('.led').dataset.state = state.runtime;
   const map = {
-    stopped: { text: 'STOPPED', label: 'ARM', detail: 'all ports idle' },
-    starting: { text: 'STARTING', label: 'STARTING…', detail: 'binding sockets' },
-    running: { text: 'RUNNING', label: 'STOP', detail: `${new Set(state.endpoints.map((e) => e.port)).size} port(s) live` },
-    failed: { text: 'FAILED', label: 'RETRY', detail: 'see endpoint list' },
+    stopped: { text: '已停止', label: '启动', detail: '所有端口空闲' },
+    starting: { text: '启动中', label: '启动中…', detail: '正在绑定端口' },
+    running: { text: '运行中', label: '停止', detail: `${new Set(state.endpoints.map((e) => e.port)).size} 个端口已上线` },
+    failed: { text: '启动失败', label: '重试', detail: '见接口列表' },
   };
   const m = map[state.runtime];
   pill.querySelector('.status-text').textContent = m.text;
@@ -171,7 +171,7 @@ function renderLogEntry(entry) {
   const row = document.createElement('div');
   row.className = `log-entry ${entry.matched ? 'matched' : 'missed'}`;
   const range = `${Math.floor(entry.status / 100)}xx`;
-  const time = new Date(entry.timestamp).toLocaleTimeString('en-GB', { hour12: false });
+  const time = new Date(entry.timestamp).toLocaleTimeString('zh-CN', { hour12: false });
   row.innerHTML = `
     <span class="log-time">${time}</span>
     <span class="log-method" style="color: var(--method-${entry.method.toLowerCase()})">${entry.method}</span>
@@ -179,7 +179,7 @@ function renderLogEntry(entry) {
     <span class="log-port">${entry.port}</span>
     <span class="log-status" data-range="${range}">${entry.status}</span>
     <span class="log-duration">${entry.durationMs}</span>
-    <span class="log-result">${entry.matched ? 'match' : 'no route'}</span>
+    <span class="log-result">${entry.matched ? '匹配' : '无路由'}</span>
   `;
   row.querySelector('.log-path').textContent = entry.path;
   return row;
@@ -190,12 +190,12 @@ function renderLogsInitial() {
   if (state.logs.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'logs-empty';
-    empty.innerHTML = `<span class="logs-empty-mark">//</span><span>No requests yet.</span>`;
+    empty.innerHTML = `<span class="logs-empty-mark">//</span><span>暂无请求。</span>`;
     els.logsBody.appendChild(empty);
   } else {
     for (const e of state.logs) els.logsBody.appendChild(renderLogEntry(e));
   }
-  els.logsCount.textContent = `${state.logs.length} entries · max 500`;
+  els.logsCount.textContent = `${state.logs.length} 条 · 最多 500`;
   if (state.autoScroll) els.logsBody.scrollTop = els.logsBody.scrollHeight;
 }
 
@@ -203,7 +203,7 @@ function appendLog(entry) {
   state.logs.push(entry);
   if (state.logs.length > 500) state.logs.splice(0, state.logs.length - 500);
   els.logsBody.appendChild(renderLogEntry(entry));
-  els.logsCount.textContent = `${state.logs.length} entries · max 500`;
+  els.logsCount.textContent = `${state.logs.length} 条 · 最多 500`;
   if (state.autoScroll) els.logsBody.scrollTop = els.logsBody.scrollHeight;
 }
 
@@ -220,7 +220,7 @@ async function loadAll() {
 }
 
 function selectEndpoint(id) {
-  if (state.dirty && !confirm('Discard unsaved changes?')) return;
+  if (state.dirty && !confirm('有未保存的修改，是否放弃？')) return;
   state.selectedId = id;
   state.dirty = false;
   renderEndpointList();
@@ -230,7 +230,7 @@ function selectEndpoint(id) {
 function markDirty() {
   if (state.dirty) return;
   state.dirty = true;
-  els.lastSaved.textContent = 'unsaved';
+  els.lastSaved.textContent = '未保存';
   els.lastSaved.style.color = 'var(--amber)';
 }
 
@@ -262,16 +262,16 @@ async function saveEndpoint() {
     Object.assign(ep, updated);
     state.dirty = false;
     renderEndpointList();
-    flash('saved', 'green');
+    flash('已保存', 'green');
   } catch (e) {
-    flash('✗ save failed', 'red');
+    flash('✗ 保存失败', 'red');
   }
 }
 
 async function deleteEndpoint() {
   const ep = state.endpoints.find((e) => e.id === state.selectedId);
   if (!ep) return;
-  if (!confirm(`Delete ${ep.method} ${ep.path}?`)) return;
+  if (!confirm(`确认删除 ${ep.method} ${ep.path}？`)) return;
   await api.deleteEndpoint(ep.id);
   state.endpoints = state.endpoints.filter((e) => e.id !== ep.id);
   state.selectedId = state.endpoints[0]?.id || null;
@@ -309,7 +309,7 @@ function tryFormat() {
   if (!text.trim()) return;
   try {
     setValue(JSON.stringify(JSON.parse(text), null, 2));
-    setValidation('valid', 'formatted');
+    setValidation('valid', '已格式化');
     markDirty();
   } catch (e) {
     setValidation('invalid', e.message);
@@ -318,9 +318,9 @@ function tryFormat() {
 
 function validateJSON() {
   const text = getValue().trim();
-  if (!text) return setValidation('empty', 'empty');
-  try { JSON.parse(text); setValidation('valid', 'valid'); }
-  catch { setValidation('invalid', 'invalid JSON'); }
+  if (!text) return setValidation('empty', '空');
+  try { JSON.parse(text); setValidation('valid', '合法'); }
+  catch { setValidation('invalid', 'JSON 不合法'); }
 }
 
 function setValidation(state_, text) {
@@ -332,8 +332,8 @@ function setValidation(state_, text) {
 function updateEditorMeta() {
   const text = getValue();
   const lines = text === '' ? 0 : text.split('\n').length;
-  els.lineCount.textContent = `${lines} line${lines === 1 ? '' : 's'}`;
-  els.charCount.textContent = `${text.length} char${text.length === 1 ? '' : 's'}`;
+  els.lineCount.textContent = `${lines} 行`;
+  els.charCount.textContent = `${text.length} 字符`;
 }
 
 function flash(text, color) {
@@ -341,7 +341,7 @@ function flash(text, color) {
   els.lastSaved.style.color = `var(--${color})`;
   setTimeout(() => {
     els.lastSaved.style.color = state.dirty ? 'var(--amber)' : '';
-    els.lastSaved.textContent = state.dirty ? 'unsaved' : 'saved';
+    els.lastSaved.textContent = state.dirty ? '未保存' : '已保存';
   }, 1600);
 }
 
@@ -370,7 +370,7 @@ async function saveSettings() {
   await api.patchConfig({ storagePath: els.storagePath.value.trim(), uiPort: Number(els.uiPort.value) });
   state.config = await api.getConfig();
   closeSettings();
-  flash('saved — restart to apply', 'green');
+  flash('已保存 · 重启后生效', 'green');
 }
 
 // ============================================================
