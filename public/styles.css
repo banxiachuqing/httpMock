@@ -435,12 +435,7 @@ button {
    Layout — sidebar / editor / logs
    ============================================================ */
 .layout {
-  grid-area: sidebar / editor;
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  position: relative;
-  z-index: 2;
-  min-height: 0;
+  display: contents;
 }
 
 /* ============================================================
@@ -454,6 +449,7 @@ button {
   border-right: 1px solid var(--border);
   min-height: 0;
   position: relative;
+  height: 100%;
 }
 
 .sidebar-header {
@@ -615,6 +611,7 @@ button {
   min-height: 0;
   position: relative;
   overflow: hidden;
+  height: 100%;
 }
 
 .editor-empty {
