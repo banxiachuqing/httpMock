@@ -235,15 +235,45 @@ function markDirty() {
 }
 
 async function createEndpoint() {
+  // Pick an unused-looking port and a clear placeholder path so the user
+  // can tell the editor has been reset (not just "looks the same as before").
+  const usedPorts = new Set(state.endpoints.map((e) => e.port));
+  let port = 8080;
+  while (usedPorts.has(port)) port++;
   const ep = await api.createEndpoint({
-    method: 'GET', port: 8080, path: '/api/new',
-    statusCode: 200, response: { ok: true }, enabled: true,
+    method: 'GET',
+    port,
+    path: '/api/new',
+    statusCode: 200,
+    response: { ok: true },
+    enabled: true,
   });
   state.endpoints.push(ep);
   state.selectedId = ep.id;
-  state.dirty = false;
+  // Force the form to fully reset, ignoring the !state.dirty guard.
   renderEndpointList();
-  renderEditor();
+  renderEditorForCreate(ep);
+}
+
+function renderEditorForCreate(ep) {
+  els.editorEmpty.hidden = true;
+  els.editorForm.hidden = false;
+  els.endpointId.textContent = `id: ${ep.id.slice(0, 8)}…`;
+  // Always write new values, regardless of dirty state
+  els.method.value = ep.method;
+  els.port.value = ep.port;
+  els.path.value = ep.path;
+  els.status.value = ep.statusCode || 200;
+  els.responseEditor.value = formatJSON(ep.response);
+  if (window.__editorMounted) setValue(formatJSON(ep.response));
+  els.lastSaved.textContent = '已保存';
+  els.lastSaved.style.color = '';
+  state.dirty = false;
+  updateEditorMeta();
+  validateJSON();
+  // Focus the path field so the user can immediately type a new path
+  els.path.focus();
+  els.path.select();
 }
 
 async function saveEndpoint() {

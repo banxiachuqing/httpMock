@@ -12,7 +12,7 @@ let view = null;
 export function mountEditor({ initialValue = '', onChange } = {}) {
   if (view) return view;
   const updateListener = EditorView.updateListener.of((u) => {
-    if (u.docChanged) onChange?.(u.state.doc.toString());
+    if (u.docChanged && !window.__editorProgrammatic) onChange?.(u.state.doc.toString());
   });
 
   const state = EditorState.create({
@@ -52,7 +52,15 @@ export function getValue() {
 
 export function setValue(text) {
   if (!view) return;
-  view.dispatch({
-    changes: { from: 0, to: view.state.doc.length, insert: text },
-  });
+  // Suppress onChange callbacks during programmatic updates
+  window.__editorProgrammatic = true;
+  try {
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: text },
+    });
+  } finally {
+    // Release in a microtask so the onChange listener that fires from the
+    // dispatch sees the flag set
+    queueMicrotask(() => { window.__editorProgrammatic = false; });
+  }
 }
