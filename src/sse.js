@@ -17,14 +17,14 @@ export function sseMiddleware() {
   const clients = new Set();
   return {
     clients,
-    handler(req, res, next) {
+    handler(req, res) {
       sseResponse(res);
       clients.add(res);
       const cleanup = () => clients.delete(res);
       res.on('close', cleanup);
       res.on('error', cleanup);
       res.write(':ok\n\n');
-      next();
+      // Do NOT call next() — keep the connection open
     },
   };
 }

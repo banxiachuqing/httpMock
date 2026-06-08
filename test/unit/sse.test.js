@@ -40,8 +40,7 @@ describe('sseMiddleware', () => {
   it('tracks clients and cleans up on close', () => {
     const mw = sseMiddleware();
     const res = mockRes();
-    const next = vi.fn();
-    mw.handler({}, res, next);
+    mw.handler({}, res);
     expect(mw.clients.has(res)).toBe(true);
     // Simulate the 'close' event
     const closeHandler = res.on.mock.calls.find((c) => c[0] === 'close')?.[1];
