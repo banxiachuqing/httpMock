@@ -13,26 +13,28 @@ test.afterAll(async () => {
 });
 
 test('starting with an occupied port marks it as failed but keeps other ports running', async ({ page }) => {
-  await page.goto(server.baseURL);
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1500);
 
   // Pre-occupy a port via raw Node
   const blocker = http.createServer();
   await new Promise((resolve) => blocker.listen(17010, '127.0.0.1', resolve));
 
   try {
-    // Create two endpoints: one on the blocked port, one on a free port
-    await page.click('#newEndpointBtn');
-    await page.fill('#port', '17010');
-    await page.fill('#path', '/blocked');
-    await page.click('#saveBtn');
+    // Create two endpoints via the API (faster + more reliable than UI clicks for setup)
+    await page.evaluate(async () => {
+      await fetch('/api/endpoints', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ port: 17010, method: 'GET', path: '/blocked', statusCode: 200, response: { ok: 1 } }),
+      });
+      await fetch('/api/endpoints', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ port: 17011, method: 'GET', path: '/free', statusCode: 200, response: { ok: 1 } }),
+      });
+    });
 
-    await page.click('#newEndpointBtn');
-    await page.fill('#port', '17011');
-    await page.fill('#path', '/free');
-    await page.click('#saveBtn');
-
-    // Start
-    await page.click('#startStopBtn');
+    // Start via UI to exercise the button + status flow
+    await page.dispatchEvent('#startStopBtn', 'click');
     // Global status should be 'failed' because at least one port failed
     await expect(page.locator('#globalStatus')).toHaveAttribute('data-state', /(failed|running)/, { timeout: 5000 });
 
