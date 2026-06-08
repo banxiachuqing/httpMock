@@ -576,6 +576,34 @@ button {
   align-items: center;
 }
 
+.endpoint-delete {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-faint);
+  border: 1px solid transparent;
+  border-radius: var(--r-1);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--d-fast) var(--ease), background var(--d-fast) var(--ease), color var(--d-fast) var(--ease), border-color var(--d-fast) var(--ease);
+  flex-shrink: 0;
+}
+.endpoint-item:hover .endpoint-delete,
+.endpoint-item:focus-within .endpoint-delete { opacity: 1; }
+.endpoint-delete:hover {
+  background: rgba(200, 48, 42, 0.1);
+  color: var(--red);
+  border-color: var(--red-dim);
+}
+.endpoint-delete:focus-visible {
+  opacity: 1;
+  outline: none;
+  border-color: var(--red);
+}
+
 .sidebar-footer {
   border-top: 1px solid var(--border-soft);
   padding: var(--s-3) var(--s-4);

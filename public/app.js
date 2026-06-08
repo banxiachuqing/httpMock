@@ -118,11 +118,45 @@ function renderEndpointList() {
       <div class="endpoint-status">
         <span class="led led-mini" data-state="${isRunning ? 'running' : 'stopped'}"></span>
       </div>
+      <button class="endpoint-delete" type="button" aria-label="删除" title="删除">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
     `;
     li.querySelector('.endpoint-path').textContent = ep.path;
-    li.addEventListener('click', () => selectEndpoint(ep.id));
+    li.addEventListener('click', (e) => {
+      // Ignore clicks on the delete button
+      if (e.target.closest('.endpoint-delete')) return;
+      selectEndpoint(ep.id);
+    });
+    li.querySelector('.endpoint-delete').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteEndpointById(ep.id);
+    });
     els.endpointList.appendChild(li);
   }
+}
+
+async function deleteEndpointById(id) {
+  const ep = state.endpoints.find((e) => e.id === id);
+  if (!ep) return;
+  if (!confirm(`确认删除 ${ep.method} ${ep.path}？`)) return;
+  try {
+    await api.deleteEndpoint(id);
+  } catch (e) {
+    alert('删除失败：' + (e?.message || '未知错误'));
+    return;
+  }
+  const wasSelected = state.selectedId === id;
+  state.endpoints = state.endpoints.filter((e) => e.id !== id);
+  if (wasSelected) {
+    state.selectedId = state.endpoints[0]?.id || null;
+    state.dirty = false;
+  }
+  renderEndpointList();
+  renderEditor();
+  renderStatus();
 }
 
 function renderEditor() {
