@@ -1,8 +1,10 @@
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
 import { AppError } from './errors.js';
 
 const FILE_NAME = 'data.json';
+const MAX_BACKUPS = 5;
 
 export class ConfigStore {
   constructor({ storagePath }) {
@@ -25,6 +27,17 @@ export class ConfigStore {
       if (e.code !== 'ENOENT') {
         const backup = `${file}.broken-${Date.now()}`;
         try { await fs.rename(file, backup); } catch {}
+        // Keep only the most recent MAX_BACKUPS broken files
+        try {
+          const dir = path.dirname(file);
+          const all = fsSync.readdirSync(dir)
+            .filter((f) => f.startsWith(`${FILE_NAME}.broken-`))
+            .sort(); // ISO-ish ts prefix → lexicographic == chronological
+          const excess = all.length - MAX_BACKUPS;
+          for (let i = 0; i < excess; i++) {
+            try { await fs.unlink(path.join(dir, all[i])); } catch {}
+          }
+        } catch {}
       }
       this.config = {
         version: 1,

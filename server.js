@@ -37,7 +37,8 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
 
   const logBuffer = new LogBuffer(500);
   // Pass the same host to MockEngine so mock ports bind identically
-  const mockEngine = new MockEngine({ logBuffer, bindHost: finalHost });
+  const maxBodyPreview = parseInt(process.env.MOCK_MAX_BODY_PREVIEW, 10) || 2048;
+  const mockEngine = new MockEngine({ logBuffer, bindHost: finalHost, maxBodyPreview });
 
   const app = createApi({ storagePath: finalStoragePath, configStore, logBuffer, mockEngine });
   // Serve CodeMirror ESM modules from node_modules

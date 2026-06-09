@@ -1,7 +1,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 
-const MAX_BODY_PREVIEW = 2048;
+const DEFAULT_MAX_BODY_PREVIEW = 2048;
 
 function buildRouter(endpoints) {
   const map = new Map();
@@ -13,13 +13,13 @@ function buildRouter(endpoints) {
   return map;
 }
 
-function readBody(req) {
+function readBody(req, maxBytes) {
   return new Promise((resolve) => {
     let size = 0;
     const chunks = [];
     req.on('data', (c) => {
       size += c.length;
-      if (size <= MAX_BODY_PREVIEW) chunks.push(c);
+      if (size <= maxBytes) chunks.push(c);
     });
     req.on('end', () => {
       resolve(Buffer.concat(chunks).toString('utf8'));
@@ -29,9 +29,10 @@ function readBody(req) {
 }
 
 export class MockEngine {
-  constructor({ logBuffer, bindHost = '127.0.0.1' }) {
+  constructor({ logBuffer, bindHost = '127.0.0.1', maxBodyPreview = DEFAULT_MAX_BODY_PREVIEW }) {
     this.logBuffer = logBuffer;
     this.bindHost = bindHost;
+    this.maxBodyPreview = maxBodyPreview;
     this.servers = new Map();
     this.statuses = new Map();
   }
@@ -55,7 +56,7 @@ export class MockEngine {
         const url = req.url || '/';
         const [pathOnly, queryStr = ''] = url.split('?');
         const matched = router.get(`${port}|${req.method}|${pathOnly}`);
-        const body = await readBody(req);
+        const body = await readBody(req, this.maxBodyPreview);
 
         if (matched) {
           res.statusCode = matched.statusCode || 200;
