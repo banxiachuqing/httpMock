@@ -957,7 +957,7 @@ button {
 
 .logs-row {
   display: grid;
-  grid-template-columns: 80px 60px 1fr 60px 60px 80px 90px;
+  grid-template-columns: 80px 60px 1fr 50px 60px 70px 130px 80px;
   gap: var(--s-3);
   padding: var(--s-2) var(--s-4);
   align-items: center;
@@ -1038,6 +1038,7 @@ button {
 .log-status[data-range="5xx"] { color: var(--red); }
 .log-duration { color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 .log-duration::after { content: "ms"; margin-left: 2px; opacity: 0.6; font-size: 9.5px; }
+.log-ip { color: var(--text-tertiary); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .log-result {
   font-size: 10px;
   letter-spacing: 0.1em;

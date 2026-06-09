@@ -80,6 +80,10 @@ export class MockEngine {
           endpointId: matched?.id || null,
           requestHeaders: req.headers,
           requestBodyPreview: body,
+          // Prefer X-Forwarded-For if behind a proxy, else socket remote address
+          ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+              || req.socket.remoteAddress
+              || '',
         });
       });
 

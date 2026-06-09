@@ -28,6 +28,7 @@ const api = {
   async runtimeStop() { return (await fetch('/api/runtime/stop', { method: 'POST' })).json(); },
   async runtimeStatus() { return (await fetch('/api/runtime/status')).json(); },
   async recentLogs(limit = 500) { return (await fetch(`/api/logs?limit=${limit}`)).json(); },
+  async clearLogs() { await fetch('/api/logs', { method: 'DELETE' }); },
 };
 
 // ============================================================
@@ -221,6 +222,7 @@ function renderLogEntry(entry) {
   row.className = `log-entry ${entry.matched ? 'matched' : 'missed'}`;
   const range = `${Math.floor(entry.status / 100)}xx`;
   const time = new Date(entry.timestamp).toLocaleTimeString('zh-CN', { hour12: false });
+  const ip = (entry.ip || '').replace(/^::ffff:/, ''); // strip IPv6-mapped prefix
   row.innerHTML = `
     <span class="log-time">${time}</span>
     <span class="log-method" style="color: var(--method-${entry.method.toLowerCase()})">${entry.method}</span>
@@ -228,6 +230,7 @@ function renderLogEntry(entry) {
     <span class="log-port">${entry.port}</span>
     <span class="log-status" data-range="${range}">${entry.status}</span>
     <span class="log-duration">${entry.durationMs}</span>
+    <span class="log-ip mono">${ip || '—'}</span>
     <span class="log-result">${entry.matched ? '匹配' : '无路由'}</span>
   `;
   row.querySelector('.log-path').textContent = entry.path;
@@ -490,7 +493,12 @@ els.revertBtn.addEventListener('click', () => { state.dirty = false; renderEdito
 els.deleteBtn.addEventListener('click', deleteEndpoint);
 els.formatBtn.addEventListener('click', tryFormat);
 els.validateBtn.addEventListener('click', validateJSON);
-els.clearLogsBtn.addEventListener('click', () => { state.logs = []; renderLogsInitial(); });
+els.clearLogsBtn.addEventListener('click', async () => {
+  state.logs = [];
+  renderLogsInitial();
+  // Persist the clear to the server so it survives a page refresh
+  try { await api.clearLogs(); } catch {}
+});
 els.autoScrollToggle.addEventListener('change', (e) => { state.autoScroll = e.target.checked; });
 els.settingsBtn.addEventListener('click', openSettings);
 els.settingsBackdrop.addEventListener('click', closeSettings);

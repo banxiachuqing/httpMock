@@ -137,6 +137,11 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
     res.json(logBuffer.getRecent(limit));
   });
 
+  app.delete('/api/logs', (_req, res) => {
+    logBuffer.clear();
+    res.status(204).end();
+  });
+
   // Error handler (must be last in createApi so API errors are formatted)
   app.use((err, _req, res, _next) => {
     res.status(statusFor(err)).json(toErrorResponse(err));
