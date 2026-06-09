@@ -251,6 +251,10 @@ function renderLogsInitial() {
 function appendLog(entry) {
   state.logs.push(entry);
   if (state.logs.length > 500) state.logs.splice(0, state.logs.length - 500);
+  // Remove the empty-state placeholder if it's still there so the new entry
+  // appears at the top of the log list rather than below a 200px-tall gap.
+  const empty = els.logsBody.querySelector('.logs-empty');
+  if (empty) empty.remove();
   els.logsBody.appendChild(renderLogEntry(entry));
   els.logsCount.textContent = `${state.logs.length} 条 · 最多 500`;
   if (state.autoScroll) els.logsBody.scrollTop = els.logsBody.scrollHeight;
