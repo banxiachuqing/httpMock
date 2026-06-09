@@ -264,8 +264,23 @@ async function loadAll() {
   state.endpoints = await api.listEndpoints();
   state.selectedId = state.endpoints[0]?.id || null;
   state.logs = await api.recentLogs(500);
+  // Also fetch runtime status so the global toggle reflects the real state
+  // after a page refresh (the mock servers may still be bound to their ports).
+  try {
+    state.runtimeStatus = await api.runtimeStatus();
+    deriveGlobalRuntime();
+  } catch {}
   renderLogsInitial();
   render();
+}
+
+// Derive the global state.runtime (button label) from per-port statuses.
+// Priority: any failed → "failed"; any running → "running"; else → "stopped".
+function deriveGlobalRuntime() {
+  const ports = Object.values(state.runtimeStatus);
+  if (ports.some((p) => p.state === 'failed')) state.runtime = 'failed';
+  else if (ports.some((p) => p.state === 'running')) state.runtime = 'running';
+  else state.runtime = 'stopped';
 }
 
 function selectEndpoint(id) {
