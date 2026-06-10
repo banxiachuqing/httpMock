@@ -9,7 +9,7 @@ import { MockEngine } from './src/mock-engine.js';
 import { createApi } from './src/api.js';
 import { defaultStoragePath, ensureDir } from './src/paths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = process.env.MOCK_SERVER_DIR || path.dirname(fileURLToPath(import.meta.url));
 
 // Detect non-loopback IPv4 addresses for LAN access hints
 function listLocalIPv4s() {
@@ -132,7 +132,7 @@ function listenWithFallback(app, startPort, host) {
   });
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+const isMain = import.meta.url === `file://${process.argv[1]}` || !!process.env.MOCK_SERVER_DIR;
 if (isMain) {
   startServer({ openBrowser: true }).catch((e) => {
     console.error('Failed to start:', e.message);
