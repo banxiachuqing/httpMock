@@ -548,7 +548,7 @@ loadAll().then(() => {
       updateEditorMeta();
       schedulePreviewRefresh();
     },
-    onSelectionChange: (state) => updateFloatingButton(state),
+    onSelectionChange: (state) => updateDynamicValueBtnState(state),
   });
   // onChange 在 initial mount 时不触发；手动跑一次预览刷新
   if (ep) setTimeout(refreshPreview, 100);
@@ -561,7 +561,7 @@ loadAll().then(() => {
 });
 
 // ============================================================
-// Preview pane (right) + Floating dynamic-value button
+// Preview pane (right) + Dynamic-value toolbar button
 // ============================================================
 const previewPane = $('#previewPane');
 const previewBanner = $('#previewBanner');
@@ -570,7 +570,7 @@ const previewMetaLabel = $('#previewMetaLabel');
 const previewExprStat = $('#previewExprStat');
 const previewErrStat = $('#previewErrStat');
 const previewRefreshBtn = $('#previewRefreshBtn');
-const dynamicValueBtn = $('#dynamicValueBtn');
+const dynamicValueToolbarBtn = $('#dynamicValueToolbarBtn');
 const editorWrap = $('#editorWrap');
 
 let previewDebounceTimer = null;
@@ -732,116 +732,81 @@ function appendJsonColored(text) {
 
 previewRefreshBtn.addEventListener('click', refreshPreview);
 
-function updateFloatingButton(state) {
-  const doc = state.doc;
-  const head = state.selection.main.head;
-  const text = doc.toString();
-  const anchor = findValueAnchorAt(text, head);
+function updateDynamicValueBtnState(state) {
+  // 选区在 string value 内 → 按钮可点；否则禁用
+  const text = state.doc.toString();
+  const sel = state.selection.main;
+  const anchor = findStringAnchorAt(text, sel.from, sel.to);
   if (!anchor) {
-    dynamicValueBtn.hidden = true;
+    dynamicValueToolbarBtn.disabled = true;
+    dynamicValueToolbarBtn.title = '先在编辑器里选中一个字段值（双击字符串即可选中）';
+  } else {
+    dynamicValueToolbarBtn.disabled = false;
+    const inner = text.slice(anchor.from, anchor.to);
+    const hasExpr = /\{\{\$[a-zA-Z_]/.test(inner);
+    dynamicValueToolbarBtn.title = hasExpr ? '编辑选中值的动态表达式' : '把选中的字段值替换为动态表达式';
+    dynamicValueToolbarBtn.textContent = hasExpr ? '编辑表达式' : '动态值';
+  }
+}
+
+/**
+ * 找选区所在的 string literal 锚点 —— 在 from..to 范围内必须完整包含一个字符串字面量
+ * 返回 { from, to, hasQuotes }：
+ *   - hasQuotes=true：from/to 是引号之间的字符范围（不含引号）
+ *   - hasQuotes=false：选区本身就是 `"..."` 引号包含的内容（即将被替换为表达式时不需要再加引号）
+ */
+function findStringAnchorAt(text, from, to) {
+  if (from === to) return null; // 无选区
+  const selected = text.slice(from, to);
+  // 选区两端或单端是否被引号包围
+  const left = from > 0 ? text[from - 1] : '';
+  const right = to < text.length ? text[to] : '';
+  if (left === '"' && right === '"') {
+    return { from, to, hasQuotes: true };
+  }
+  // 选区本身就是完整字符串字面量（含引号）
+  if (selected.length >= 2 && selected.startsWith('"') && selected.endsWith('"')) {
+    return { from: from + 1, to: to - 1, hasQuotes: true };
+  }
+  return null;
+}
+
+dynamicValueToolbarBtn.addEventListener('click', () => {
+  const view = getEditorView();
+  if (!view) return;
+  const state = view.state;
+  const sel = state.selection.main;
+  const text = state.doc.toString();
+  const anchor = findStringAnchorAt(text, sel.from, sel.to);
+  if (!anchor) {
+    flashToolbarHint(dynamicValueToolbarBtn, '先选中字段值');
     return;
   }
   const inner = text.slice(anchor.from, anchor.to);
   const hasExpr = /\{\{\$[a-zA-Z_]/.test(inner);
-  dynamicValueBtn.textContent = hasExpr ? '编辑表达式' : '动态值';
-  const coords = coordsAtPosForRange({ from: anchor.from, to: anchor.to });
-  if (!coords) {
-    dynamicValueBtn.hidden = true;
-    return;
-  }
-  dynamicValueBtn.style.top = `${coords.top}px`;
-  dynamicValueBtn.style.left = `${coords.right + 4}px`;
-  dynamicValueBtn.hidden = false;
-  dynamicValueBtn.onclick = () => window.__openGeneratorModal?.({
+  window.__openGeneratorModal?.({
     from: anchor.from,
     to: anchor.to,
     currentValue: inner,
     initialExpr: hasExpr ? extractFirstExpr(inner) : null,
+    hasQuotes: anchor.hasQuotes,
   });
-}
-
-/**
- * 找光标所在的 value 锚点 —— 触发规则：
- *   1. 当前行最近一个 `:` 之后只有空白/换行/收尾标点（, } ]），且光标在它后面
- *   2. 该 value 已经包含 `"..."` 引号 → 在引号之间定位
- *   3. 该 value 还没有引号 → 锚点就是 `:` 之后第一个非空白字符的位置（insert 时包引号）
- * 返回 { from, to, hasQuotes } —— from/to 是当前 value 的字符范围（含或不含引号取决于 hasQuotes）
- */
-function findValueAnchorAt(text, pos) {
-  const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
-  const lineEndRaw = text.indexOf('\n', pos);
-  const lineEnd = lineEndRaw < 0 ? text.length : lineEndRaw;
-  const line = text.slice(lineStart, lineEnd);
-  const col = pos - lineStart;
-  // 在当前行找最近的 `:`（光标之前）
-  let colonCol = -1;
-  for (let i = col - 1; i >= 0; i--) {
-    const ch = line[i];
-    if (ch === ':') { colonCol = i; break; }
-    if (ch === ',' || ch === '{' || ch === '[' || ch === '}') break;
-  }
-  if (colonCol < 0) return null;
-  // `:` 之后到光标只允许空白
-  for (let i = colonCol + 1; i < col; i++) {
-    if (!/\s/.test(line[i])) return null;
-  }
-  // 找 value 起点（`: 之后的第一个非空白）
-  const valueStart = (() => {
-    for (let i = colonCol + 1; i < line.length; i++) {
-      if (!/\s/.test(line[i])) return i;
-    }
-    return line.length;
-  })();
-  // 没引号 → 锚点 = `:` 之后到行尾（不含 , } ] 标点）
-  // 有引号 → 锚点 = 引号之间
-  if (valueStart >= line.length || line[valueStart] !== '"') {
-    // 无引号：value 范围是空白之后到第一个 , } ] 或行尾
-    let valueEnd = valueStart;
-    while (valueEnd < line.length && !/[,}\]]/.test(line[valueEnd])) valueEnd++;
-    if (valueStart === valueEnd) return null; // 完全空
-    return {
-      from: lineStart + valueStart,
-      to: lineStart + valueEnd,
-      hasQuotes: false,
-    };
-  }
-  // 有引号：找配对右引号
-  let j = valueStart + 1;
-  while (j < line.length) {
-    if (line[j] === '"' && line[j - 1] !== '\\') break;
-    j++;
-  }
-  if (j >= line.length) return null; // 引号未闭合
-  // 光标必须在 value 范围内
-  if (col < valueStart || col > j) return null;
-  return {
-    from: lineStart + valueStart + 1,
-    to: lineStart + j,
-    hasQuotes: true,
-  };
-}
+});
 
 function extractFirstExpr(s) {
   const m = /\{\{\$[a-zA-Z_][a-zA-Z0-9_.]*(?::[^}]*)?\}\}/.exec(s);
   return m ? m[0] : null;
 }
 
-function coordsAtPosForRange(range) {
-  const view = getEditorView();
-  if (!view) return null;
-  try {
-    const startCoords = view.coordsAtPos(range.from);
-    const line = view.state.doc.lineAt(range.from);
-    const endCoords = view.coordsAtPos(line.to);
-    if (!startCoords || !endCoords) return null;
-    const wrapRect = editorWrap.getBoundingClientRect();
-    return {
-      top: startCoords.top - wrapRect.top,
-      right: endCoords.left - wrapRect.left,
-    };
-  } catch {
-    return null;
-  }
+/** 工具栏按钮短暂高亮提示（用于「先选中字段值」之类的反馈） */
+function flashToolbarHint(btn, hint) {
+  const original = btn.textContent;
+  btn.textContent = hint;
+  btn.classList.add('is-hint');
+  setTimeout(() => {
+    btn.textContent = original;
+    btn.classList.remove('is-hint');
+  }, 1400);
 }
 
 // ============================================================
