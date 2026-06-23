@@ -9,10 +9,14 @@ import { linter, lintGutter } from '@codemirror/lint';
 const host = document.getElementById('responseEditorHost');
 let view = null;
 
-export function mountEditor({ initialValue = '', onChange } = {}) {
+/**
+ * @param {{ initialValue?: string, onChange?: (text: string) => void, onSelectionChange?: (state: any) => void }} opts
+ */
+export function mountEditor({ initialValue = '', onChange, onSelectionChange } = {}) {
   if (view) return view;
   const updateListener = EditorView.updateListener.of((u) => {
     if (u.docChanged && !window.__editorProgrammatic) onChange?.(u.state.doc.toString());
+    if (u.selectionSet || u.docChanged) onSelectionChange?.(u.state);
   });
 
   const state = EditorState.create({
@@ -52,15 +56,16 @@ export function getValue() {
 
 export function setValue(text) {
   if (!view) return;
-  // Suppress onChange callbacks during programmatic updates
   window.__editorProgrammatic = true;
   try {
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: text },
     });
   } finally {
-    // Release in a microtask so the onChange listener that fires from the
-    // dispatch sees the flag set
     queueMicrotask(() => { window.__editorProgrammatic = false; });
   }
+}
+
+export function getEditorView() {
+  return view;
 }
