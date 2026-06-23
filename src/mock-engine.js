@@ -1,5 +1,6 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
+import { resolve } from './expression-resolver.js';
 
 const DEFAULT_MAX_BODY_PREVIEW = 2048;
 
@@ -61,7 +62,23 @@ export class MockEngine {
         if (matched) {
           res.statusCode = matched.statusCode || 200;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
-          res.end(JSON.stringify(matched.response ?? null));
+          let body;
+          try {
+            const { value } = resolve(matched.response);
+            body = JSON.stringify(value);
+          } catch (err) {
+            // resolver 永不抛（软失败），但兜底：发原始 + warn
+            this.logBuffer?.push({
+              id: crypto.randomUUID(),
+              timestamp: Date.now(),
+              level: 'warn',
+              source: 'resolver',
+              message: `resolver failed: ${err.message}`,
+              endpointId: matched.id,
+            });
+            body = JSON.stringify(matched.response ?? null);
+          }
+          res.end(body);
         } else {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');

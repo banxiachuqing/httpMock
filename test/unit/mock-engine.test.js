@@ -117,3 +117,61 @@ describe('MockEngine', () => {
     expect(pushedLogs[0].matched).toBe(true);
   });
 });
+
+describe('mock-engine with dynamic response', () => {
+  it('resolves {{$uuid}} at serve time and returns different values per request', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'dyn-uuid', port: 18101, method: 'GET', path: '/uuid',
+        statusCode: 200, response: { id: '{{$uuid}}' }, enabled: true },
+    ]);
+    const r1 = await get(18101, '/uuid');
+    const r2 = await get(18101, '/uuid');
+    const b1 = JSON.parse(r1.body);
+    const b2 = JSON.parse(r2.body);
+    expect(b1.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(b2.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(b1.id).not.toBe(b2.id);
+  });
+
+  it('preserves type for pure number expression (no quotes around int)', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'dyn-int', port: 18102, method: 'GET', path: '/n',
+        statusCode: 200, response: { age: '{{$int:42:42}}' }, enabled: true },
+    ]);
+    const r = await get(18102, '/n');
+    expect(r.body).toBe('{"age":42}');
+    expect(JSON.parse(r.body).age).toBe(42);
+  });
+
+  it('soft-fail: bad generator in pure expression → null at serve time', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'dyn-bad', port: 18103, method: 'GET', path: '/bad',
+        statusCode: 200, response: { x: '{{$int:notanumber:10}}' }, enabled: true },
+    ]);
+    const r = await get(18103, '/bad');
+    expect(r.body).toBe('{"x":null}');
+  });
+
+  it('soft-fail: bad generator in mixed expression → keeps original string', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'dyn-mixed-bad', port: 18104, method: 'GET', path: '/mb',
+        statusCode: 200, response: { x: 'pre-{{$nonexistent}}' }, enabled: true },
+    ]);
+    const r = await get(18104, '/mb');
+    expect(r.body).toBe('{"x":"pre-{{$nonexistent}}"}');
+  });
+
+  it('mixed expression stringifies resolved values', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'dyn-mixed', port: 18105, method: 'GET', path: '/m',
+        statusCode: 200, response: { x: 'id-{{$int:7:7}}' }, enabled: true },
+    ]);
+    const r = await get(18105, '/m');
+    expect(r.body).toBe('{"x":"id-7"}');
+  });
+});
