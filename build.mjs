@@ -40,6 +40,11 @@ const outfile = process.argv[3] || 'mockserver';
 const files = scan('./embed-assets');
 console.log(`Embedding ${files.length} files...`);
 
+// 读 package.json 的版本号，注入到带 {{VERSION}} 占位符的文件
+const pkg = JSON.parse(await Bun.file('./package.json').text());
+const VERSION = pkg.version;
+console.log(`Version: ${VERSION}`);
+
 const STAGING = './embed-staging';
 if (existsSync(STAGING)) rmSync(STAGING, { recursive: true });
 mkdirSync(STAGING, { recursive: true });
@@ -47,7 +52,14 @@ mkdirSync(STAGING, { recursive: true });
 for (const f of files) {
   const stagedPath = join(STAGING, f.rel + '.txt');
   mkdirSync(join(stagedPath, '..'), { recursive: true });
-  copyFileSync(f.abs, stagedPath);
+  if (f.rel.endsWith('.html') || f.rel.endsWith('.json')) {
+    // 替换 {{VERSION}} 占位符
+    let content = await Bun.file(f.abs).text();
+    content = content.replaceAll('{{VERSION}}', VERSION);
+    await Bun.write(stagedPath, content);
+  } else {
+    copyFileSync(f.abs, stagedPath);
+  }
 }
 
 const lines = files.map((f) => {
