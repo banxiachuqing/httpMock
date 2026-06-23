@@ -770,8 +770,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--s-3) 0;
-  margin-bottom: var(--s-3);
+  padding: 5px;
+  margin-bottom: 5px;
   border-bottom: 1px solid var(--border-soft);
 }
 .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: var(--s-3); }
@@ -1159,8 +1159,8 @@ button {
 
 .preview-toolbar {
   /* 与 .editor-toolbar 同高 —— 上下 padding + 下边框分隔 */
-  padding: var(--s-3) 0;
-  margin-bottom: var(--s-3);
+  padding: 5px;
+  margin-bottom: 5px;
   display: flex;
   align-items: center;
   justify-content: space-between;
