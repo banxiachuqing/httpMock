@@ -770,7 +770,9 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--s-2);
+  padding: var(--s-3) 0;
+  margin-bottom: var(--s-3);
+  border-bottom: 1px solid var(--border-soft);
 }
 .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: var(--s-3); }
 .format-hint {
@@ -1156,12 +1158,14 @@ button {
 }
 
 .preview-toolbar {
-  /* 与 .editor-toolbar 同高 —— 通过 .editor-body 的 padding 提供纵向空间 */
-  margin-bottom: var(--s-2);
+  /* 与 .editor-toolbar 同高 —— 上下 padding + 下边框分隔 */
+  padding: var(--s-3) 0;
+  margin-bottom: var(--s-3);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--s-3);
+  border-bottom: 1px solid var(--border-soft);
 }
 .preview-toolbar .meta {
   font-family: var(--font-mono);
