@@ -736,15 +736,15 @@ function updateFloatingButton(state) {
   const doc = state.doc;
   const head = state.selection.main.head;
   const text = doc.toString();
-  const range = findStringRangeAt(text, head);
-  if (!range) {
+  const anchor = findValueAnchorAt(text, head);
+  if (!anchor) {
     dynamicValueBtn.hidden = true;
     return;
   }
-  const inner = text.slice(range.from, range.to);
+  const inner = text.slice(anchor.from, anchor.to);
   const hasExpr = /\{\{\$[a-zA-Z_]/.test(inner);
   dynamicValueBtn.textContent = hasExpr ? '编辑表达式' : '动态值';
-  const coords = coordsAtPosForRange(range);
+  const coords = coordsAtPosForRange({ from: anchor.from, to: anchor.to });
   if (!coords) {
     dynamicValueBtn.hidden = true;
     return;
@@ -753,29 +753,72 @@ function updateFloatingButton(state) {
   dynamicValueBtn.style.left = `${coords.right + 4}px`;
   dynamicValueBtn.hidden = false;
   dynamicValueBtn.onclick = () => window.__openGeneratorModal?.({
-    from: range.from,
-    to: range.to,
+    from: anchor.from,
+    to: anchor.to,
     currentValue: inner,
     initialExpr: hasExpr ? extractFirstExpr(inner) : null,
   });
 }
 
-function findStringRangeAt(text, pos) {
-  let left = -1;
-  for (let i = pos - 1; i >= 0; i--) {
-    if (text[i] === '"') {
-      let bs = 0;
-      for (let j = i - 1; j >= 0 && text[j] === '\\'; j--) bs++;
-      if (bs % 2 === 0) { left = i; break; }
+/**
+ * 找光标所在的 value 锚点 —— 触发规则：
+ *   1. 当前行最近一个 `:` 之后只有空白/换行/收尾标点（, } ]），且光标在它后面
+ *   2. 该 value 已经包含 `"..."` 引号 → 在引号之间定位
+ *   3. 该 value 还没有引号 → 锚点就是 `:` 之后第一个非空白字符的位置（insert 时包引号）
+ * 返回 { from, to, hasQuotes } —— from/to 是当前 value 的字符范围（含或不含引号取决于 hasQuotes）
+ */
+function findValueAnchorAt(text, pos) {
+  const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+  const lineEndRaw = text.indexOf('\n', pos);
+  const lineEnd = lineEndRaw < 0 ? text.length : lineEndRaw;
+  const line = text.slice(lineStart, lineEnd);
+  const col = pos - lineStart;
+  // 在当前行找最近的 `:`（光标之前）
+  let colonCol = -1;
+  for (let i = col - 1; i >= 0; i--) {
+    const ch = line[i];
+    if (ch === ':') { colonCol = i; break; }
+    if (ch === ',' || ch === '{' || ch === '[' || ch === '}') break;
+  }
+  if (colonCol < 0) return null;
+  // `:` 之后到光标只允许空白
+  for (let i = colonCol + 1; i < col; i++) {
+    if (!/\s/.test(line[i])) return null;
+  }
+  // 找 value 起点（`: 之后的第一个非空白）
+  const valueStart = (() => {
+    for (let i = colonCol + 1; i < line.length; i++) {
+      if (!/\s/.test(line[i])) return i;
     }
+    return line.length;
+  })();
+  // 没引号 → 锚点 = `:` 之后到行尾（不含 , } ] 标点）
+  // 有引号 → 锚点 = 引号之间
+  if (valueStart >= line.length || line[valueStart] !== '"') {
+    // 无引号：value 范围是空白之后到第一个 , } ] 或行尾
+    let valueEnd = valueStart;
+    while (valueEnd < line.length && !/[,}\]]/.test(line[valueEnd])) valueEnd++;
+    if (valueStart === valueEnd) return null; // 完全空
+    return {
+      from: lineStart + valueStart,
+      to: lineStart + valueEnd,
+      hasQuotes: false,
+    };
   }
-  if (left < 0) return null;
-  let right = -1;
-  for (let i = left + 1; i < text.length; i++) {
-    if (text[i] === '"' && text[i - 1] !== '\\') { right = i; break; }
+  // 有引号：找配对右引号
+  let j = valueStart + 1;
+  while (j < line.length) {
+    if (line[j] === '"' && line[j - 1] !== '\\') break;
+    j++;
   }
-  if (right < 0 || pos < left || pos > right) return null;
-  return { from: left + 1, to: right };
+  if (j >= line.length) return null; // 引号未闭合
+  // 光标必须在 value 范围内
+  if (col < valueStart || col > j) return null;
+  return {
+    from: lineStart + valueStart + 1,
+    to: lineStart + j,
+    hasQuotes: true,
+  };
 }
 
 function extractFirstExpr(s) {
@@ -823,8 +866,8 @@ const generatorState = {
   filterText: '',
 };
 
-async function openGeneratorModal({ from, to, currentValue, initialExpr }) {
-  generatorState.pendingRange = { from, to };
+async function openGeneratorModal({ from, to, currentValue, initialExpr, hasQuotes }) {
+  generatorState.pendingRange = { from, to, hasQuotes: hasQuotes !== false };
   if (!generatorCatalog) {
     generatorCatalog = await api.getGenerators();
   }
@@ -1009,11 +1052,12 @@ generatorInsertBtn.addEventListener('click', () => {
   if (!id || !generatorState.pendingRange) return;
   const expr = buildExprText(id, generatorState.args);
   const view = getEditorView();
-  const { from, to } = generatorState.pendingRange;
-  const replacement = `"${expr}"`;
+  const { from, to, hasQuotes } = generatorState.pendingRange;
+  const replacement = hasQuotes ? expr : `"${expr}"`;
+  const newCursor = from + (hasQuotes ? 0 : 1);
   view.dispatch({
     changes: { from, to, insert: replacement },
-    selection: { anchor: from + 1, head: from + 1 + expr.length },
+    selection: { anchor: newCursor, head: newCursor + expr.length },
   });
   closeGeneratorModal();
 });
