@@ -1119,3 +1119,79 @@ button {
    Utility
    ============================================================ */
 [hidden] { display: none !important; }
+
+/* ============================================================
+   Response body: two-pane split (editor | preview)
+   ============================================================ */
+.editor-split {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 1px;
+  background: var(--border, #d8d8d2);
+  border: 1px solid var(--border, #d8d8d2);
+  border-radius: 6px;
+  overflow: hidden;
+  min-height: 360px;
+  height: 100%;
+}
+
+.editor-pane {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface, #fafaf7);
+  min-height: 0;
+}
+
+.editor-pane-edit .code-editor-wrap { flex: 1; min-height: 0; position: relative; }
+.editor-pane-edit .code-editor { height: 100%; min-height: 280px; }
+
+.editor-pane-preview { background: var(--surface-2, #f4f4ef); }
+
+.preview-banner {
+  padding: 8px 12px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  background: rgba(255, 92, 92, 0.12);
+  color: #b22a2a;
+  border-bottom: 1px solid rgba(255, 92, 92, 0.3);
+}
+.preview-banner.is-neutral {
+  background: rgba(120, 120, 120, 0.1);
+  color: var(--text-secondary, #555);
+}
+
+.preview-pane {
+  flex: 1;
+  margin: 0;
+  padding: 12px 16px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-primary, #1a1a1a);
+}
+.preview-pane .expr-error {
+  background: rgba(255, 92, 92, 0.18);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Floating action button inside the editor */
+.floating-btn {
+  position: absolute;
+  z-index: 10;
+  padding: 3px 9px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: var(--accent, #1a6fa8);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: transform 120ms ease, background 120ms ease;
+}
+.floating-btn:hover { background: var(--accent-hover, #155a8a); transform: translateY(-1px); }

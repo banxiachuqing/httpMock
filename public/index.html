@@ -146,29 +146,49 @@
         </div>
 
         <div class="editor-body">
-          <div class="editor-toolbar">
-            <div class="toolbar-left">
-              <span class="section-label">响应体</span>
-              <span class="format-hint mono">JSON</span>
+          <div class="editor-split">
+            <div class="editor-pane editor-pane-edit">
+              <div class="editor-toolbar">
+                <div class="toolbar-left">
+                  <span class="section-label">响应体</span>
+                  <span class="format-hint mono">JSON</span>
+                </div>
+                <div class="toolbar-right">
+                  <span class="validation-status" id="validationStatus">
+                    <span class="val-mark">·</span>
+                    <span class="val-text">空</span>
+                  </span>
+                  <button class="btn btn-ghost btn-sm" id="formatBtn">格式化</button>
+                  <button class="btn btn-ghost btn-sm" id="validateBtn">校验</button>
+                </div>
+              </div>
+              <div class="code-editor-wrap" id="editorWrap">
+                <div id="responseEditorHost" class="code-editor"></div>
+                <button class="floating-btn" id="dynamicValueBtn" hidden type="button">动态值</button>
+              </div>
+              <div class="editor-meta">
+                <span class="mono" id="lineCount">0 行</span>
+                <span class="meta-sep">·</span>
+                <span class="mono" id="charCount">0 字符</span>
+                <span class="meta-sep">·</span>
+                <span class="mono">Tab 插入 2 空格</span>
+              </div>
             </div>
-            <div class="toolbar-right">
-              <span class="validation-status" id="validationStatus">
-                <span class="val-mark">·</span>
-                <span class="val-text">空</span>
-              </span>
-              <button class="btn btn-ghost btn-sm" id="formatBtn">格式化</button>
-              <button class="btn btn-ghost btn-sm" id="validateBtn">校验</button>
+
+            <div class="editor-pane editor-pane-preview">
+              <div class="editor-toolbar">
+                <div class="toolbar-left">
+                  <span class="section-label">预览</span>
+                  <span class="format-hint mono">已解析</span>
+                </div>
+                <div class="toolbar-right">
+                  <span class="mono" id="previewStats">表达式: 0 · 错误: 0</span>
+                  <button class="btn btn-ghost btn-sm" id="previewRefreshBtn" aria-label="刷新预览">↻</button>
+                </div>
+              </div>
+              <div class="preview-banner" id="previewBanner" hidden></div>
+              <pre class="preview-pane mono" id="previewPane">// 在左侧编辑响应体，此处显示解析结果</pre>
             </div>
-          </div>
-          <div class="code-editor-wrap">
-            <div id="responseEditorHost" class="code-editor"></div>
-          </div>
-          <div class="editor-meta">
-            <span class="mono" id="lineCount">0 行</span>
-            <span class="meta-sep">·</span>
-            <span class="mono" id="charCount">0 字符</span>
-            <span class="meta-sep">·</span>
-            <span class="mono">Tab 插入 2 空格</span>
           </div>
         </div>
 
@@ -224,6 +244,9 @@
       </div>
     </div>
   </section>
+
+  <!-- Generator modal placeholder (Task 9 fills in the markup; current commit ships empty div so Task 8's openGeneratorModal stub can be tested) -->
+  <div class="modal" id="generatorModal" hidden></div>
 
   <!-- Settings dialog -->
   <div class="modal" id="settingsModal" hidden>
