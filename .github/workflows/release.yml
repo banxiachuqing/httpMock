@@ -71,11 +71,15 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -n "${{ inputs.version }}" ]]; then
-            # 手动触发 + 输入版本号
+            # 手动触发 + 输入版本号（跳过 auto-bump）
             VER="${{ inputs.version }}"
           else
-            # 自动：日期 + 运行号
-            VER="$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
+            # 自动：读 package.json → bump patch
+            CUR=$(node -p "require('./package.json').version")
+            MAJOR=$(echo "$CUR" | cut -d. -f1)
+            MINOR=$(echo "$CUR" | cut -d. -f2)
+            PATCH=$(echo "$CUR" | cut -d. -f3)
+            VER="${MAJOR}.${MINOR}.$((PATCH + 1))"
           fi
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "tag=v${VER}" >> "$GITHUB_OUTPUT"
