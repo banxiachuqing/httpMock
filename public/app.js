@@ -704,10 +704,221 @@ function coordsAtPosForRange(range) {
   }
 }
 
-// Task 10 实现 openGeneratorModal —— 此处为中间态占位符（Task 10 整段替换）
-window.__openGeneratorModal = (opts) => {
-  // 占位：Task 10 替换。允许 console.warn 因为这是 dev-only 临时态，
-  // 最终代码（Task 10）不出现 console 输出。
-  // eslint-disable-next-line no-console
-  console.warn('openGeneratorModal not implemented yet', opts);
+// ============================================================
+// Generator modal behavior
+// ============================================================
+const generatorModal = $('#generatorModal');
+const generatorBackdrop = $('#generatorBackdrop');
+const generatorCloseBtn = $('#generatorClose');
+const generatorBackBtn = $('#generatorBack');
+const generatorLocaleSelect = $('#generatorLocale');
+const generatorSearchInput = $('#generatorSearch');
+const generatorCategoriesEl = $('#generatorCategories');
+const generatorExprText = $('#generatorExprText');
+const generatorSampleText = $('#generatorSampleText');
+const generatorInsertBtn = $('#generatorInsertBtn');
+
+let generatorCatalog = null;
+const generatorState = {
+  selectedId: null,
+  args: {},
+  pendingRange: null,
+  filterText: '',
 };
+
+async function openGeneratorModal({ from, to, currentValue, initialExpr }) {
+  generatorState.pendingRange = { from, to };
+  if (!generatorCatalog) {
+    generatorCatalog = await api.getGenerators();
+  }
+  if (initialExpr) {
+    const parsed = parseInlineExpression(initialExpr);
+    if (parsed) {
+      generatorState.selectedId = parsed.id;
+      const def = findGeneratorDef(parsed.id);
+      generatorState.args = {};
+      if (def) for (const a of def.args) generatorState.args[a.name] = parsed.args[Object.keys(parsed.args)[def.args.indexOf(a)]] ?? a.default;
+    }
+  } else {
+    generatorState.selectedId = null;
+    generatorState.args = {};
+  }
+  generatorSearchInput.value = '';
+  generatorState.filterText = '';
+  renderGeneratorCategories();
+  updateGeneratorExprAndSample();
+  generatorModal.hidden = false;
+}
+
+function parseInlineExpression(s) {
+  const m = /^\{\{\$([a-zA-Z_][a-zA-Z0-9_.]*)(?::([^}]*))?\}\}$/.exec(s.trim());
+  if (!m) return null;
+  const args = {};
+  if (m[2]) m[2].split(':').forEach((p, i) => { args[i] = p; });
+  return { id: m[1], args };
+}
+
+function findGeneratorDef(id) {
+  if (!generatorCatalog) return null;
+  for (const cat of generatorCatalog.categories) {
+    const g = cat.generators.find((x) => x.id === id);
+    if (g) return g;
+  }
+  return null;
+}
+
+function renderGeneratorCategories() {
+  if (!generatorCatalog) return;
+  generatorCategoriesEl.innerHTML = '';
+  const filter = generatorState.filterText.toLowerCase();
+  for (const cat of generatorCatalog.categories) {
+    const filtered = cat.generators.filter((g) => {
+      if (!filter) return true;
+      return g.label.toLowerCase().includes(filter) || g.id.toLowerCase().includes(filter);
+    });
+    if (filtered.length === 0) continue;
+    const catEl = document.createElement('div');
+    catEl.className = 'gen-cat';
+    const header = document.createElement('div');
+    header.className = 'gen-cat-header';
+    header.innerHTML = `<span>› ${cat.label}</span>`;
+    catEl.appendChild(header);
+    const list = document.createElement('div');
+    list.className = 'gen-cat-list';
+    for (const g of filtered) {
+      const item = document.createElement('div');
+      item.className = 'gen-item' + (g.id === generatorState.selectedId ? ' is-selected' : '');
+      item.innerHTML = `<span class="gen-item-label">${g.label}</span><span class="gen-item-type">$${g.id}</span>`;
+      item.addEventListener('click', () => {
+        generatorState.selectedId = g.id;
+        const def = findGeneratorDef(g.id);
+        generatorState.args = {};
+        if (def) for (const a of def.args) generatorState.args[a.name] = a.default;
+        renderGeneratorCategories();
+        updateGeneratorExprAndSample();
+      });
+      list.appendChild(item);
+      if (g.id === generatorState.selectedId) {
+        const def = findGeneratorDef(g.id);
+        if (def && def.args.length > 0) {
+          const argsEl = document.createElement('div');
+          argsEl.className = 'gen-args';
+          for (const a of def.args) {
+            const label = document.createElement('label');
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = a.name;
+            label.appendChild(nameSpan);
+            let input;
+            if (a.type === 'locale') {
+              input = document.createElement('select');
+              for (const loc of ['zh_CN', 'en']) {
+                const opt = document.createElement('option');
+                opt.value = loc;
+                opt.textContent = loc;
+                if (loc === (generatorState.args[a.name] || a.default)) opt.selected = true;
+                input.appendChild(opt);
+              }
+              input.addEventListener('change', () => {
+                generatorState.args[a.name] = input.value;
+                updateGeneratorExprAndSample();
+              });
+            } else {
+              input = document.createElement('input');
+              input.type = (a.type === 'int' || a.type === 'float') ? 'number' : 'text';
+              const cur = generatorState.args[a.name] ?? a.default;
+              input.value = (cur === undefined || cur === null) ? '' : cur;
+              input.addEventListener('input', () => {
+                generatorState.args[a.name] = input.value;
+                updateGeneratorExprAndSample();
+              });
+            }
+            label.appendChild(input);
+            argsEl.appendChild(label);
+          }
+          list.appendChild(argsEl);
+        }
+      }
+    }
+    catEl.appendChild(list);
+    generatorCategoriesEl.appendChild(catEl);
+  }
+}
+
+function buildExprText(id, args) {
+  const def = findGeneratorDef(id);
+  if (!def) return '';
+  const argVals = def.args.map((a) => args[a.name] ?? a.default);
+  const allFilled = argVals.every((v) => v !== undefined && v !== '');
+  if (!allFilled) return `{{$${id}}}`;
+  return `{{$${id}:${argVals.join(':')}}}`;
+}
+
+let sampleTimer = null;
+function updateGeneratorExprAndSample() {
+  const id = generatorState.selectedId;
+  if (!id) {
+    generatorExprText.textContent = '—';
+    generatorSampleText.textContent = '—';
+    generatorInsertBtn.disabled = true;
+    return;
+  }
+  generatorInsertBtn.disabled = false;
+  const expr = buildExprText(id, generatorState.args);
+  generatorExprText.textContent = expr;
+  if (sampleTimer) clearTimeout(sampleTimer);
+  sampleTimer = setTimeout(async () => {
+    const res = await api.getGeneratorSample(id, normalizeArgs(id, generatorState.args));
+    generatorSampleText.textContent = res.ok ? String(res.sample) : (res.error || '生成失败');
+  }, 200);
+}
+
+function normalizeArgs(id, args) {
+  const def = findGeneratorDef(id);
+  if (!def) return {};
+  const out = {};
+  for (const a of def.args) {
+    const v = args[a.name];
+    if (v === undefined || v === '') continue;
+    if (a.type === 'int') {
+      const n = parseInt(v, 10);
+      if (!Number.isNaN(n)) out[a.name] = n;
+    } else if (a.type === 'float') {
+      const n = parseFloat(v);
+      if (!Number.isNaN(n)) out[a.name] = n;
+    } else {
+      out[a.name] = String(v);
+    }
+  }
+  return out;
+}
+
+function closeGeneratorModal() {
+  generatorModal.hidden = true;
+}
+
+generatorCloseBtn.addEventListener('click', closeGeneratorModal);
+generatorBackdrop.addEventListener('click', closeGeneratorModal);
+generatorBackBtn.addEventListener('click', closeGeneratorModal);
+generatorSearchInput.addEventListener('input', () => {
+  generatorState.filterText = generatorSearchInput.value;
+  renderGeneratorCategories();
+});
+generatorLocaleSelect.addEventListener('change', () => {
+  // v1: locale 切换仅影响 person/location 类生成器显示的 label 提示
+});
+
+generatorInsertBtn.addEventListener('click', () => {
+  const id = generatorState.selectedId;
+  if (!id || !generatorState.pendingRange) return;
+  const expr = buildExprText(id, generatorState.args);
+  const view = getEditorView();
+  const { from, to } = generatorState.pendingRange;
+  const replacement = `"${expr}"`;
+  view.dispatch({
+    changes: { from, to, insert: replacement },
+    selection: { anchor: from + 1, head: from + 1 + expr.length },
+  });
+  closeGeneratorModal();
+});
+
+window.__openGeneratorModal = openGeneratorModal;
