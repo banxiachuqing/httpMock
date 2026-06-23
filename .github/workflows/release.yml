@@ -1,28 +1,25 @@
 # 自动构建并发布 release
 #
-# 触发方式：
-#   1. 推送 tag 形如 v* （如 v1.0.1）     → 正式 stable release
-#   2. PR 合并到 main                    → 自动 prerelease（nightly-{日期}-{短 sha}）
-#   3. GitHub Actions 页手动 Run workflow → 显式指定版本号
+# 触发：PR 合并到 main（每次合并都出新 release）
+# 跳过：tag push（v* 不再触发，避免与 main 重复）
+# 手动：Actions 页 Run workflow + 输入版本号可发指定版本
 #
-# 产物：4 个平台二进制 + SHA256SUMS
+# 版本：默认 v{YYYYMMDD}-{run}（如 v20260623-5），也可手动指定
 name: Build & Release
 
 on:
   push:
-    tags:
-      - 'v*'
     branches:
       - main
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号（如 1.0.1；留空则用日期+运行号）'
+        description: '版本号（如 1.0.3，留空用日期+运行号）'
         required: false
         default: ''
 
 permissions:
-  contents: write   # 创建 / 更新 release
+  contents: write
 
 jobs:
   build:
@@ -69,31 +66,20 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: 决定 tag / 版本 / 是否预发布
+      - name: 决定版本号
         id: meta
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            # 1) tag 触发 → 正式 release
-            VER="${GITHUB_REF_NAME#v}"
-            PRERELEASE="false"
-          elif [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            # 2) main push → nightly prerelease
-            VER="nightly-$(date -u +%Y%m%d)-${GITHUB_SHA::7}"
-            PRERELEASE="true"
-          elif [[ -n "${{ inputs.version }}" ]]; then
-            # 3) 手动触发 + 输入版本号 → 正式
+          if [[ -n "${{ inputs.version }}" ]]; then
+            # 手动触发 + 输入版本号
             VER="${{ inputs.version }}"
-            PRERELEASE="false"
           else
-            # 4) 手动触发无版本号 → 用日期+运行号作为 prerelease
-            VER="nightly-$(date -u +%Y%m%d)-r${GITHUB_RUN_NUMBER}"
-            PRERELEASE="true"
+            # 自动：日期 + 运行号
+            VER="$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
           fi
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "tag=v${VER}" >> "$GITHUB_OUTPUT"
-          echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
-          echo "Resolved: tag=${VER} prerelease=${PRERELEASE}"
+          echo "Resolved: tag=v${VER}"
 
       - name: 下载所有构建产物
         uses: actions/download-artifact@v4
@@ -107,14 +93,13 @@ jobs:
           sha256sum mockserver-* > SHA256SUMS
           cat SHA256SUMS
 
-      - name: 创建 / 更新 Release
+      - name: 创建 Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.tag }}
           generate_release_notes: true
           fail_on_unmatched_files: true
-          prerelease: ${{ steps.meta.outputs.prerelease }}
           files: |
             artifacts/mockserver-mac-arm64
             artifacts/mockserver-mac-x64
