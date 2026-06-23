@@ -733,42 +733,67 @@ function appendJsonColored(text) {
 previewRefreshBtn.addEventListener('click', refreshPreview);
 
 function updateDynamicValueBtnState(state) {
-  // 选区在 string value 内 → 按钮可点；否则禁用
   const text = state.doc.toString();
   const sel = state.selection.main;
   const anchor = findStringAnchorAt(text, sel.from, sel.to);
   if (!anchor) {
     dynamicValueToolbarBtn.disabled = true;
-    dynamicValueToolbarBtn.title = '先在编辑器里选中一个字段值（双击字符串即可选中）';
+    dynamicValueToolbarBtn.title = '把光标放进字段值里，或先选中字段值（双击字符串即可）';
   } else {
     dynamicValueToolbarBtn.disabled = false;
     const inner = text.slice(anchor.from, anchor.to);
     const hasExpr = /\{\{\$[a-zA-Z_]/.test(inner);
-    dynamicValueToolbarBtn.title = hasExpr ? '编辑选中值的动态表达式' : '把选中的字段值替换为动态表达式';
+    const mode = sel.from !== sel.to ? '选中的' : '光标所在';
+    dynamicValueToolbarBtn.title = hasExpr ? `编辑${mode}字符串的动态表达式` : `把${mode}字符串替换为动态表达式`;
     dynamicValueToolbarBtn.textContent = hasExpr ? '编辑表达式' : '动态值';
   }
 }
 
 /**
- * 找选区所在的 string literal 锚点 —— 在 from..to 范围内必须完整包含一个字符串字面量
- * 返回 { from, to, hasQuotes }：
- *   - hasQuotes=true：from/to 是引号之间的字符范围（不含引号）
- *   - hasQuotes=false：选区本身就是 `"..."` 引号包含的内容（即将被替换为表达式时不需要再加引号）
+ * 找选区或光标所在的 string literal 锚点
+ * 两种情况：
+ *   A) 选区 (from !== to)：
+ *      - 选区两端被引号包围 → from/to 在引号之间，hasQuotes=true
+ *      - 选区本身是完整字符串字面量 → from+1 / to-1，hasQuotes=true
+ *      - 其他情况 → null
+ *   B) 光标 (from === to)：
+ *      - 光标在某个 string token 内（开闭引号之间）→ 返回该 token 的字符范围，hasQuotes=true
+ *      - 否则 → null
  */
 function findStringAnchorAt(text, from, to) {
-  if (from === to) return null; // 无选区
-  const selected = text.slice(from, to);
-  // 选区两端或单端是否被引号包围
-  const left = from > 0 ? text[from - 1] : '';
-  const right = to < text.length ? text[to] : '';
-  if (left === '"' && right === '"') {
-    return { from, to, hasQuotes: true };
+  if (from !== to) {
+    const selected = text.slice(from, to);
+    const left = from > 0 ? text[from - 1] : '';
+    const right = to < text.length ? text[to] : '';
+    if (left === '"' && right === '"') {
+      return { from, to, hasQuotes: true };
+    }
+    if (selected.length >= 2 && selected.startsWith('"') && selected.endsWith('"')) {
+      return { from: from + 1, to: to - 1, hasQuotes: true };
+    }
+    return null;
   }
-  // 选区本身就是完整字符串字面量（含引号）
-  if (selected.length >= 2 && selected.startsWith('"') && selected.endsWith('"')) {
-    return { from: from + 1, to: to - 1, hasQuotes: true };
+  // 无选区 —— 光标是否在 string token 内
+  return findStringAtCursor(text, from);
+}
+
+function findStringAtCursor(text, pos) {
+  let left = -1;
+  for (let i = pos - 1; i >= 0; i--) {
+    if (text[i] === '"') {
+      let bs = 0;
+      for (let j = i - 1; j >= 0 && text[j] === '\\'; j--) bs++;
+      if (bs % 2 === 0) { left = i; break; }
+    }
   }
-  return null;
+  if (left < 0) return null;
+  let right = -1;
+  for (let i = left + 1; i < text.length; i++) {
+    if (text[i] === '"' && text[i - 1] !== '\\') { right = i; break; }
+  }
+  if (right < 0) return null;
+  if (pos < left || pos > right) return null;
+  return { from: left + 1, to: right, hasQuotes: true };
 }
 
 dynamicValueToolbarBtn.addEventListener('click', () => {
@@ -779,7 +804,7 @@ dynamicValueToolbarBtn.addEventListener('click', () => {
   const text = state.doc.toString();
   const anchor = findStringAnchorAt(text, sel.from, sel.to);
   if (!anchor) {
-    flashToolbarHint(dynamicValueToolbarBtn, '先选中字段值');
+    flashToolbarHint(dynamicValueToolbarBtn, '先放进字段值');
     return;
   }
   const inner = text.slice(anchor.from, anchor.to);
