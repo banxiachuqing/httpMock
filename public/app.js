@@ -1,7 +1,7 @@
 // Mock//Server — production UI
 // Talks to /api/* and /events.
 
-import { mountEditor, getValue, setValue } from './editor.js';
+import { mountEditor, getValue, setValue, getEditorView } from './editor.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -29,6 +29,21 @@ const api = {
   async runtimeStatus() { return (await fetch('/api/runtime/status')).json(); },
   async recentLogs(limit = 500) { return (await fetch(`/api/logs?limit=${limit}`)).json(); },
   async clearLogs() { await fetch('/api/logs', { method: 'DELETE' }); },
+  async getGenerators() { return (await fetch('/api/generators')).json(); },
+  async getGeneratorSample(id, args) {
+    return (await fetch('/api/generators/sample', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id, args }),
+    })).json();
+  },
+  async preview(text) {
+    return (await fetch('/api/preview', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })).json();
+  },
 };
 
 // ============================================================
@@ -527,7 +542,13 @@ loadAll().then(() => {
   const ep = state.endpoints.find((e) => e.id === state.selectedId);
   mountEditor({
     initialValue: ep ? formatJSON(ep.response) : '',
-    onChange: () => { markDirty(); validateJSON(); updateEditorMeta(); },
+    onChange: () => {
+      markDirty();
+      validateJSON();
+      updateEditorMeta();
+      schedulePreviewRefresh();
+    },
+    onSelectionChange: (state) => updateFloatingButton(state),
   });
   window.__editorMounted = true;
   connectSSE();
@@ -536,3 +557,157 @@ loadAll().then(() => {
   // Poll every 5s to catch external changes (e.g. someone else binds the port)
   setInterval(refreshRuntimeStatus, 5000);
 });
+
+// ============================================================
+// Preview pane (right) + Floating dynamic-value button
+// ============================================================
+const previewPane = $('#previewPane');
+const previewBanner = $('#previewBanner');
+const previewStats = $('#previewStats');
+const previewRefreshBtn = $('#previewRefreshBtn');
+const dynamicValueBtn = $('#dynamicValueBtn');
+const editorWrap = $('#editorWrap');
+
+let previewDebounceTimer = null;
+let lastGoodPreview = null;
+
+function schedulePreviewRefresh() {
+  if (previewDebounceTimer) clearTimeout(previewDebounceTimer);
+  previewDebounceTimer = setTimeout(refreshPreview, 300);
+}
+
+async function refreshPreview() {
+  const text = getValue();
+  if (!text.trim()) {
+    previewPane.textContent = '// 在左侧编辑响应体，此处显示解析结果';
+    previewStats.textContent = '表达式: 0 · 错误: 0';
+    previewBanner.hidden = true;
+    return;
+  }
+  let res;
+  try {
+    res = await api.preview(text);
+  } catch (e) {
+    previewBanner.textContent = '预览暂不可用';
+    previewBanner.className = 'preview-banner';
+    previewBanner.hidden = false;
+    return;
+  }
+  if (!res.ok) {
+    previewBanner.textContent = res.error || 'JSON 解析失败';
+    previewBanner.className = 'preview-banner';
+    previewBanner.hidden = false;
+    if (lastGoodPreview !== null) renderPreview(lastGoodPreview, []);
+    return;
+  }
+  previewBanner.hidden = true;
+  renderPreview(res.resolved, res.errors);
+  lastGoodPreview = res.resolved;
+  previewStats.textContent = `表达式: ${res.exprCount} · 错误: ${res.errors.length}`;
+}
+
+function renderPreview(value, errors) {
+  const json = JSON.stringify(value, null, 2);
+  const hasError = errors.length > 0;
+  previewPane.textContent = '';
+  if (hasError && json.includes('{{')) {
+    const re = /\{\{[^}]*\}\}/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(json)) !== null) {
+      if (m.index > last) previewPane.appendChild(document.createTextNode(json.slice(last, m.index)));
+      const span = document.createElement('span');
+      span.className = 'expr-error';
+      span.textContent = m[0];
+      previewPane.appendChild(span);
+      last = m.index + m[0].length;
+    }
+    if (last < json.length) previewPane.appendChild(document.createTextNode(json.slice(last)));
+  } else {
+    previewPane.textContent = json;
+  }
+  if (hasError) {
+    let errText = '\n\n';
+    for (const e of errors) errText += `⚠ ${e.message}\n`;
+    previewPane.appendChild(document.createTextNode(errText));
+  }
+}
+
+previewRefreshBtn.addEventListener('click', refreshPreview);
+
+function updateFloatingButton(state) {
+  const doc = state.doc;
+  const head = state.selection.main.head;
+  const text = doc.toString();
+  const range = findStringRangeAt(text, head);
+  if (!range) {
+    dynamicValueBtn.hidden = true;
+    return;
+  }
+  const inner = text.slice(range.from, range.to);
+  const hasExpr = /\{\{\$[a-zA-Z_]/.test(inner);
+  dynamicValueBtn.textContent = hasExpr ? '编辑表达式' : '动态值';
+  const coords = coordsAtPosForRange(range);
+  if (!coords) {
+    dynamicValueBtn.hidden = true;
+    return;
+  }
+  dynamicValueBtn.style.top = `${coords.top}px`;
+  dynamicValueBtn.style.left = `${coords.right + 4}px`;
+  dynamicValueBtn.hidden = false;
+  dynamicValueBtn.onclick = () => window.__openGeneratorModal?.({
+    from: range.from,
+    to: range.to,
+    currentValue: inner,
+    initialExpr: hasExpr ? extractFirstExpr(inner) : null,
+  });
+}
+
+function findStringRangeAt(text, pos) {
+  let left = -1;
+  for (let i = pos - 1; i >= 0; i--) {
+    if (text[i] === '"') {
+      let bs = 0;
+      for (let j = i - 1; j >= 0 && text[j] === '\\'; j--) bs++;
+      if (bs % 2 === 0) { left = i; break; }
+    }
+  }
+  if (left < 0) return null;
+  let right = -1;
+  for (let i = left + 1; i < text.length; i++) {
+    if (text[i] === '"' && text[i - 1] !== '\\') { right = i; break; }
+  }
+  if (right < 0 || pos < left || pos > right) return null;
+  return { from: left + 1, to: right };
+}
+
+function extractFirstExpr(s) {
+  const m = /\{\{\$[a-zA-Z_][a-zA-Z0-9_.]*(?::[^}]*)?\}\}/.exec(s);
+  return m ? m[0] : null;
+}
+
+function coordsAtPosForRange(range) {
+  const view = getEditorView();
+  if (!view) return null;
+  try {
+    const startCoords = view.coordsAtPos(range.from);
+    const line = view.state.doc.lineAt(range.from);
+    const endCoords = view.coordsAtPos(line.to);
+    if (!startCoords || !endCoords) return null;
+    const wrapRect = editorWrap.getBoundingClientRect();
+    return {
+      top: startCoords.top - wrapRect.top,
+      right: endCoords.left - wrapRect.left,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Task 10 实现 openGeneratorModal —— 此处为中间态占位符（Task 10 整段替换）
+window.__openGeneratorModal = (opts) => {
+  // 占位：Task 10 替换。允许 console.warn 因为这是 dev-only 临时态，
+  // 最终代码（Task 10）不出现 console 输出。
+  // eslint-disable-next-line no-console
+  console.warn('openGeneratorModal not implemented yet', opts);
+};
