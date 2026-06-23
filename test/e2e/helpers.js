@@ -29,3 +29,15 @@ export function hitMock(port, path, method = 'GET') {
     req.end();
   });
 }
+
+export async function newEndpoint(page, { method = 'GET', port, path }) {
+  return await page.evaluate(async ({ method, port, path }) => {
+    const r = await fetch('/api/endpoints', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ method, port, path, response: {} }),
+    });
+    const ep = await r.json();
+    return ep.id;
+  }, { method, port, path });
+}
