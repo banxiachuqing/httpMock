@@ -1122,176 +1122,377 @@ button {
 
 /* ============================================================
    Response body: two-pane split (editor | preview)
+
+   设计意图：右栏作为「解析信号面板」，与编辑器的「源文本」并列。
+   - 视觉重量：纸面 surface-2 背景 + ink 主色
+   - 类型语义：数值 / boolean 用 signal-amber 着色（resolver 注入的非字符串值）
+   - 错误表达：左侧 6px 信号灯 + 虚线下划线，不刺眼
+   - 不引入新颜色，全用现有 token
    ============================================================ */
 .editor-split {
   display: grid;
   grid-template-columns: 3fr 2fr;
-  gap: 1px;
-  background: var(--border, #d8d8d2);
-  border: 1px solid var(--border, #d8d8d2);
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
   overflow: hidden;
   min-height: 360px;
   height: 100%;
+  background: var(--bg);
 }
 
 .editor-pane {
   display: flex;
   flex-direction: column;
-  background: var(--surface, #fafaf7);
+  background: var(--surface-1);
   min-height: 0;
 }
+
+.editor-pane + .editor-pane { border-left: 1px solid var(--border); }
 
 .editor-pane-edit .code-editor-wrap { flex: 1; min-height: 0; position: relative; }
 .editor-pane-edit .code-editor { height: 100%; min-height: 280px; }
 
-.editor-pane-preview { background: var(--surface-2, #f4f4ef); }
+.editor-pane-preview {
+  background: var(--surface-2);
+  position: relative;
+}
+
+.preview-toolbar {
+  padding: var(--s-3) var(--s-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.preview-toolbar .meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.preview-toolbar .meta .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  display: inline-block;
+}
+.preview-toolbar .meta.is-resolved .dot {
+  background: var(--green);
+  box-shadow: 0 0 0 2px rgba(26, 135, 84, 0.18);
+}
+.preview-toolbar .meta.has-errors .dot {
+  background: var(--red);
+  box-shadow: 0 0 0 2px rgba(200, 48, 42, 0.18);
+}
+.preview-toolbar .meta .sep {
+  width: 1px;
+  height: 10px;
+  background: var(--border);
+  display: inline-block;
+}
+.preview-toolbar .meta strong {
+  color: var(--ink);
+  font-weight: 600;
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.preview-toolbar .meta.has-errors strong { color: var(--red); }
 
 .preview-banner {
-  padding: 8px 12px;
+  padding: 8px var(--s-4);
   font-family: var(--font-sans);
   font-size: 12px;
-  background: rgba(255, 92, 92, 0.12);
-  color: #b22a2a;
-  border-bottom: 1px solid rgba(255, 92, 92, 0.3);
+  background: rgba(200, 48, 42, 0.05);
+  color: var(--red);
+  border-bottom: 1px solid rgba(200, 48, 42, 0.18);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.preview-banner::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 3px rgba(200, 48, 42, 0.18);
+  flex-shrink: 0;
 }
 .preview-banner.is-neutral {
-  background: rgba(120, 120, 120, 0.1);
-  color: var(--text-secondary, #555);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  border-bottom-color: var(--border-soft);
 }
+.preview-banner.is-neutral::before { display: none; }
 
 .preview-pane {
   flex: 1;
   margin: 0;
-  padding: 12px 16px;
+  padding: var(--s-4) var(--s-5);
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-all;
   font-size: 13px;
-  line-height: 1.65;
-  color: var(--text-primary, #1a1a1a);
+  line-height: 1.7;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
 }
+/* 类型语义着色 —— signature：数值/boolean 用 signal-amber，跳出来提示「这是 generator 注入的」 */
+.preview-pane .v-num,
+.preview-pane .v-bool { color: var(--amber); font-weight: 500; }
+.preview-pane .v-null { color: var(--red-dim); font-style: italic; }
+.preview-pane .v-str { color: var(--ink); }
+.preview-pane .v-key { color: var(--pencil); }
+.preview-pane .v-punct { color: var(--text-faint); }
+/* 表达式错误占位（mixed-fail 保留的 {{...}}）—— 虚线下划线 + 极淡红底 */
 .preview-pane .expr-error {
-  background: rgba(255, 92, 92, 0.18);
+  background: rgba(200, 48, 42, 0.08);
+  border-bottom: 1px dashed var(--red-dim);
   border-radius: 2px;
   padding: 0 2px;
+  color: var(--red);
+}
+/* 解析后追加的错误清单 */
+.preview-pane .err-list {
+  margin-top: var(--s-4);
+  padding-top: var(--s-3);
+  border-top: 1px dashed var(--border);
+  white-space: pre-wrap;
+  color: var(--red);
+  font-size: 11px;
+  line-height: 1.6;
 }
 
-/* Floating action button inside the editor */
+/* Floating action button —— 用 {{ 作为图标，直接表达「这里处理表达式」 */
 .floating-btn {
   position: absolute;
   z-index: 10;
-  padding: 3px 9px;
-  font-family: var(--font-sans);
+  padding: 3px 9px 3px 7px;
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: #fff;
-  background: var(--accent, #1a6fa8);
-  border: none;
-  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--amber);
+  background: var(--surface-1);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--r-1);
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-  transition: transform 120ms ease, background 120ms ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background var(--d-fast) var(--ease), border-color var(--d-fast) var(--ease), transform var(--d-fast) var(--ease);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
-.floating-btn:hover { background: var(--accent-hover, #155a8a); transform: translateY(-1px); }
+.floating-btn::before {
+  content: '{{';
+  font-weight: 700;
+  margin-right: 3px;
+  color: var(--amber);
+}
+.floating-btn::after {
+  content: '}}';
+  font-weight: 700;
+  margin-left: 1px;
+  color: var(--amber);
+}
+.floating-btn:hover {
+  background: var(--surface-3);
+  border-color: var(--amber-dim);
+  transform: translateY(-1px);
+}
 
 /* ============================================================
-   Generator modal
+   Generator modal —— 「目录抽屉」风格
+
+   - 复用 .modal-panel 的形状 / 阴影
+   - 顶部 locale + search 条：bg-deep 灰带 + 现有 .input 风格
+   - 类别表：signal-amber 边条作选中指示（与现有 LED amber 呼应）
+   - 底部 expression/preview 灰带 + 全宽 .btn-primary 插入按钮
    ============================================================ */
 .generator-panel {
   width: min(560px, 92vw);
   max-height: 80vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .generator-locale {
-  padding: 12px 16px;
+  padding: var(--s-3) var(--s-5);
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--border, #d8d8d2);
+  gap: var(--s-3);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-deep);
+}
+.generator-locale .meta-label { margin-right: auto; }
+.generator-locale .select {
+  font-size: 12px;
+  padding: 3px var(--s-2);
+  min-width: 92px;
 }
 
 .generator-search {
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border, #d8d8d2);
+  padding: var(--s-3) var(--s-5);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-1);
+}
+.generator-search .input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border);
+  border-radius: var(--r-1);
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+.generator-search .input::placeholder { color: var(--text-faint); }
+.generator-search .input:focus {
+  outline: none;
+  border-color: var(--text-faint);
+  box-shadow: 0 0 0 3px var(--surface-3);
 }
 
 .generator-categories {
   flex: 1;
   overflow: auto;
-  padding: 4px 0;
+  padding: 0;
+  background: var(--surface-1);
 }
 
-.gen-cat {
-  border-bottom: 1px solid var(--border, #d8d8d2);
-}
+.gen-cat + .gen-cat { border-top: 1px solid var(--border-soft); }
 .gen-cat-header {
-  padding: 8px 16px;
+  padding: var(--s-2) var(--s-5);
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-tertiary, #888);
-  cursor: default;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  background: var(--surface-2);
   user-select: none;
 }
-.gen-cat-list { padding: 0 0 8px 0; }
+.gen-cat-header .gen-cat-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-faint);
+}
+
+.gen-cat-list { padding: 0; }
 .gen-item {
-  padding: 6px 16px 6px 32px;
+  padding: 9px var(--s-5) 9px calc(var(--s-5) + var(--s-3));
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   font-size: 13px;
   cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background var(--d-fast) var(--ease), border-color var(--d-fast) var(--ease);
 }
-.gen-item:hover { background: rgba(26, 111, 168, 0.06); }
-.gen-item.is-selected { background: rgba(26, 111, 168, 0.14); color: var(--accent, #1a6fa8); }
-.gen-item-label { font-family: var(--font-sans); }
+.gen-item:hover {
+  background: var(--surface-2);
+}
+.gen-item.is-selected {
+  background: var(--surface-3);
+  border-left-color: var(--amber);
+}
+.gen-item-label {
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+}
+.gen-item.is-selected .gen-item-label { font-weight: 500; }
 .gen-item-type {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-tertiary, #888);
+  color: var(--text-faint);
+  letter-spacing: 0.02em;
 }
+.gen-item.is-selected .gen-item-type { color: var(--amber); }
 
 .gen-args {
-  padding: 6px 16px 10px 32px;
+  padding: var(--s-3) var(--s-5) var(--s-3) calc(var(--s-5) + var(--s-3));
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--s-3);
   font-size: 12px;
-  background: rgba(26, 111, 168, 0.04);
+  background: var(--surface-inset);
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
 }
-.gen-args label { display: flex; flex-direction: column; gap: 2px; }
-.gen-args input, .gen-args select {
-  width: 80px;
-  padding: 3px 6px;
-  border: 1px solid var(--border, #d8d8d2);
-  border-radius: 3px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  background: var(--surface, #fafaf7);
-  color: inherit;
-}
-
-.generator-expr, .generator-preview {
-  padding: 8px 16px;
-  font-size: 12px;
-  border-top: 1px solid var(--border, #d8d8d2);
+.gen-args label {
   display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.generator-expr code, .generator-preview code { flex: 1; word-break: break-all; }
-.meta-label {
+  flex-direction: column;
+  gap: 4px;
   font-family: var(--font-sans);
   font-size: 10px;
   font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.gen-args input, .gen-args select {
+  width: 96px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.gen-args input:focus, .gen-args select:focus {
+  outline: none;
+  border-color: var(--amber-dim);
+  box-shadow: 0 0 0 2px rgba(184, 120, 10, 0.15);
+}
+
+.generator-expr, .generator-preview {
+  padding: var(--s-3) var(--s-5);
+  font-size: 12px;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  background: var(--bg-deep);
+}
+.generator-expr code, .generator-preview code {
+  flex: 1;
+  word-break: break-all;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.generator-preview code {
+  color: var(--amber);
+  font-weight: 500;
+}
+
+.meta-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--text-tertiary, #888);
+  color: var(--text-tertiary);
 }
 
 .btn-wide { width: 100%; }
 
-.select-sm { padding: 2px 8px; font-size: 12px; }
+.select-sm { padding: 3px var(--s-2); font-size: 12px; }

@@ -565,7 +565,10 @@ loadAll().then(() => {
 // ============================================================
 const previewPane = $('#previewPane');
 const previewBanner = $('#previewBanner');
-const previewStats = $('#previewStats');
+const previewMeta = $('#previewMeta');
+const previewMetaLabel = $('#previewMetaLabel');
+const previewExprStat = $('#previewExprStat');
+const previewErrStat = $('#previewErrStat');
 const previewRefreshBtn = $('#previewRefreshBtn');
 const dynamicValueBtn = $('#dynamicValueBtn');
 const editorWrap = $('#editorWrap');
@@ -578,11 +581,19 @@ function schedulePreviewRefresh() {
   previewDebounceTimer = setTimeout(refreshPreview, 300);
 }
 
+function setPreviewMeta(state, label, exprCount, errCount) {
+  previewMeta.className = 'meta ' + state;
+  previewMetaLabel.textContent = label;
+  previewExprStat.innerHTML = `表达式 <strong>${exprCount}</strong>`;
+  previewErrStat.innerHTML = `错误 <strong>${errCount}</strong>`;
+  previewErrStat.style.display = errCount > 0 ? '' : 'none';
+}
+
 async function refreshPreview() {
   const text = getValue();
   if (!text.trim()) {
     previewPane.textContent = '// 在左侧编辑响应体，此处显示解析结果';
-    previewStats.textContent = '表达式: 0 · 错误: 0';
+    setPreviewMeta('', '就绪', 0, 0);
     previewBanner.hidden = true;
     return;
   }
@@ -593,6 +604,7 @@ async function refreshPreview() {
     previewBanner.textContent = '预览暂不可用';
     previewBanner.className = 'preview-banner';
     previewBanner.hidden = false;
+    setPreviewMeta('has-errors', '离线', 0, 1);
     return;
   }
   if (!res.ok) {
@@ -600,38 +612,121 @@ async function refreshPreview() {
     previewBanner.className = 'preview-banner';
     previewBanner.hidden = false;
     if (lastGoodPreview !== null) renderPreview(lastGoodPreview, []);
+    setPreviewMeta('has-errors', 'JSON 语法错', 0, 1);
     return;
   }
   previewBanner.hidden = true;
   renderPreview(res.resolved, res.errors);
   lastGoodPreview = res.resolved;
-  previewStats.textContent = `表达式: ${res.exprCount} · 错误: ${res.errors.length}`;
+  const state = res.errors.length > 0 ? 'has-errors' : 'is-resolved';
+  const label = res.errors.length > 0 ? '部分解析' : '已解析';
+  setPreviewMeta(state, label, res.exprCount, res.errors.length);
 }
 
+/**
+ * 用 DOM 节点重建 JSON 输出 —— 实现类型语义着色：
+ * - 数值 / boolean / null 用 v-num / v-bool / v-null span（signal-amber / red-dim）
+ * - 字符串用 v-str
+ * - 键名用 v-key（pencil 灰）
+ * - 标点 { } [ ] , : 用 v-punct（faint 极淡）
+ * - mixed-fail 的 {{...}} 残留用 expr-error span（红虚线）
+ */
 function renderPreview(value, errors) {
-  const json = JSON.stringify(value, null, 2);
-  const hasError = errors.length > 0;
   previewPane.textContent = '';
-  if (hasError && json.includes('{{')) {
-    const re = /\{\{[^}]*\}\}/g;
-    let last = 0;
-    let m;
-    while ((m = re.exec(json)) !== null) {
-      if (m.index > last) previewPane.appendChild(document.createTextNode(json.slice(last, m.index)));
-      const span = document.createElement('span');
-      span.className = 'expr-error';
-      span.textContent = m[0];
-      previewPane.appendChild(span);
-      last = m.index + m[0].length;
+  const errorPositions = new Set();
+  for (const e of errors) {
+    if (typeof e.from === 'number' && typeof e.to === 'number') {
+      for (let i = e.from; i < e.to; i++) errorPositions.add(i);
     }
-    if (last < json.length) previewPane.appendChild(document.createTextNode(json.slice(last)));
-  } else {
-    previewPane.textContent = json;
   }
-  if (hasError) {
-    let errText = '\n\n';
-    for (const e of errors) errText += `⚠ ${e.message}\n`;
-    previewPane.appendChild(document.createTextNode(errText));
+  const json = JSON.stringify(value, null, 2);
+  // mixed-fail 残留的 {{...}} 高亮（在字符串内部）
+  const re = /\{\{[^}]*\}\}/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(json)) !== null) {
+    if (m.index > last) appendJsonColored(json.slice(last, m.index));
+    const span = document.createElement('span');
+    span.className = 'expr-error';
+    span.textContent = m[0];
+    previewPane.appendChild(span);
+    last = m.index + m[0].length;
+  }
+  if (last < json.length) appendJsonColored(json.slice(last));
+
+  if (errors.length > 0) {
+    const errList = document.createElement('div');
+    errList.className = 'err-list';
+    for (const e of errors) {
+      const line = document.createElement('div');
+      line.textContent = `⚠ ${e.message}${e.from !== undefined ? `  (col ${e.from}–${e.to})` : ''}`;
+      errList.appendChild(line);
+    }
+    previewPane.appendChild(errList);
+  }
+  void errorPositions; // 保留供后续按位置染色用
+}
+
+/**
+ * 把 JSON 文本片段按字符类型染色后插入 previewPane
+ * - "  → 切字符串
+ * - 数字 → v-num
+ * - true/false/null → v-bool / v-null
+ * - 字母（键名）→ v-key（连续字母段）
+ * - 其余标点 → v-punct
+ */
+function appendJsonColored(text) {
+  let i = 0;
+  const n = text.length;
+  while (i < n) {
+    const c = text[i];
+    if (c === '"') {
+      // 找下一个未转义的 "
+      let j = i + 1;
+      while (j < n) {
+        if (text[j] === '"' && text[j - 1] !== '\\') break;
+        j++;
+      }
+      const lit = document.createElement('span');
+      // 判断是 key 还是 str：往前看，跳过空白，看前一个非空字符
+      let k = i - 1;
+      while (k >= 0 && /\s/.test(text[k])) k--;
+      const isKey = k >= 0 && text[k] === ':';
+      lit.className = isKey ? 'v-key' : 'v-str';
+      lit.textContent = text.slice(i, j + 1);
+      previewPane.appendChild(lit);
+      i = j + 1;
+    } else if (/[0-9-]/.test(c) && (i === 0 || /[\s,:\[]/.test(text[i - 1]))) {
+      // 数字
+      let j = i;
+      while (j < n && /[0-9.eE+\-]/.test(text[j])) j++;
+      const span = document.createElement('span');
+      span.className = 'v-num';
+      span.textContent = text.slice(i, j);
+      previewPane.appendChild(span);
+      i = j;
+    } else if (text.startsWith('true', i) || text.startsWith('false', i)) {
+      const span = document.createElement('span');
+      span.className = 'v-bool';
+      span.textContent = text.slice(i, i + (text.startsWith('true', i) ? 4 : 5));
+      previewPane.appendChild(span);
+      i += text.startsWith('true', i) ? 4 : 5;
+    } else if (text.startsWith('null', i)) {
+      const span = document.createElement('span');
+      span.className = 'v-null';
+      span.textContent = 'null';
+      previewPane.appendChild(span);
+      i += 4;
+    } else if (/[{}\[\],:]/.test(c)) {
+      const span = document.createElement('span');
+      span.className = 'v-punct';
+      span.textContent = c;
+      previewPane.appendChild(span);
+      i++;
+    } else {
+      previewPane.appendChild(document.createTextNode(c));
+      i++;
+    }
   }
 }
 
