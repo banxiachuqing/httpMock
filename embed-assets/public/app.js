@@ -743,22 +743,27 @@ function updateDynamicValueBtnState(state) {
     dynamicValueToolbarBtn.disabled = false;
     const inner = text.slice(anchor.from, anchor.to);
     const hasExpr = /\{\{\$[a-zA-Z_]/.test(inner);
-    const mode = sel.from !== sel.to ? '选中的' : '光标所在';
-    dynamicValueToolbarBtn.title = hasExpr ? `编辑${mode}字符串的动态表达式` : `把${mode}字符串替换为动态表达式`;
+    let mode;
+    if (sel.from !== sel.to) mode = '选中的';
+    else if (anchor.hasQuotes) mode = '光标所在的';
+    else mode = '即将填入的';
+    dynamicValueToolbarBtn.title = hasExpr
+      ? `编辑${mode}字段值的动态表达式`
+      : `把${mode}字段值替换为动态表达式`;
     dynamicValueToolbarBtn.textContent = hasExpr ? '编辑表达式' : '动态值';
   }
 }
 
 /**
  * 找选区或光标所在的 string literal 锚点
- * 两种情况：
+ * 三种情况（按优先级）：
  *   A) 选区 (from !== to)：
  *      - 选区两端被引号包围 → from/to 在引号之间，hasQuotes=true
  *      - 选区本身是完整字符串字面量 → from+1 / to-1，hasQuotes=true
  *      - 其他情况 → null
- *   B) 光标 (from === to)：
- *      - 光标在某个 string token 内（开闭引号之间）→ 返回该 token 的字符范围，hasQuotes=true
- *      - 否则 → null
+ *   B) 光标 (from === to) 在某个 string token 内（开闭引号之间）→ hasQuotes=true
+ *   C) 光标在 `:` 之后只有空白的位置（如刚打了 `"key": `）→ hasQuotes=false（插入时自动包引号）
+ *   否则 → null
  */
 function findStringAnchorAt(text, from, to) {
   if (from !== to) {
@@ -773,10 +778,10 @@ function findStringAnchorAt(text, from, to) {
     }
     return null;
   }
-  // 无选区 —— 光标是否在 string token 内
-  return findStringAtCursor(text, from);
+  return findStringAtCursor(text, from) || findEmptyValueAtCursor(text, from);
 }
 
+/** 光标是否在 string token 内（开闭引号之间） */
 function findStringAtCursor(text, pos) {
   let left = -1;
   for (let i = pos - 1; i >= 0; i--) {
@@ -794,6 +799,36 @@ function findStringAtCursor(text, pos) {
   if (right < 0) return null;
   if (pos < left || pos > right) return null;
   return { from: left + 1, to: right, hasQuotes: true };
+}
+
+/**
+ * 光标是否在「`: ` 之后只有空白」的位置 —— 即刚打完 key + colon + space 还没填 value 的状态。
+ * 返回 hasQuotes=false 的空范围，插入时由模态框自动包引号。
+ */
+function findEmptyValueAtCursor(text, pos) {
+  const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+  const lineEndRaw = text.indexOf('\n', pos);
+  const lineEnd = lineEndRaw < 0 ? text.length : lineEndRaw;
+  const line = text.slice(lineStart, lineEnd);
+  const col = pos - lineStart;
+  // 找当前行最近的一个 `:`（光标之前）
+  let colonCol = -1;
+  for (let i = col - 1; i >= 0; i--) {
+    const ch = line[i];
+    if (ch === ':') { colonCol = i; break; }
+    if (ch === ',' || ch === '{' || ch === '[' || ch === '}') break;
+  }
+  if (colonCol < 0) return null;
+  // `:` 之后到光标必须只允许空白
+  for (let i = colonCol + 1; i < col; i++) {
+    if (!/\s/.test(line[i])) return null;
+  }
+  // 光标之后不是 `"` 开头（否则属于 string 内的情况，让 findStringAtCursor 处理）
+  const after = line.slice(col);
+  if (after.startsWith('"')) return null;
+  // 光标之后也不能紧接 , } ]（否则这是上一个值的尾部，不算 value 起点）
+  if (/^[,}\]]/.test(after)) return null;
+  return { from: pos, to: pos, hasQuotes: false };
 }
 
 dynamicValueToolbarBtn.addEventListener('click', () => {
