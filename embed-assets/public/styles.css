@@ -1132,22 +1132,20 @@ button {
 .editor-split {
   display: grid;
   grid-template-columns: 3fr 2fr;
-  border: 1px solid var(--border);
-  border-radius: var(--r-2);
-  overflow: hidden;
+  gap: var(--s-3); /* 10px 分隔两栏 */
   min-height: 360px;
   height: 100%;
-  background: var(--bg);
 }
 
 .editor-pane {
   display: flex;
   flex-direction: column;
   background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
   min-height: 0;
+  overflow: hidden;
 }
-
-.editor-pane + .editor-pane { border-left: 1px solid var(--border); }
 
 .editor-pane-edit .code-editor-wrap { flex: 1; min-height: 0; position: relative; }
 .editor-pane-edit .code-editor { height: 100%; min-height: 280px; }
@@ -1158,13 +1156,12 @@ button {
 }
 
 .preview-toolbar {
-  padding: var(--s-3) var(--s-4);
+  /* 与 .editor-toolbar 同高 —— 通过 .editor-body 的 padding 提供纵向空间 */
+  margin-bottom: var(--s-2);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--s-3);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-1);
 }
 .preview-toolbar .meta {
   font-family: var(--font-mono);
