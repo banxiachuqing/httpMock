@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mock//Server — 本地 HTTP 模拟工具</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="styles.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "@codemirror/view": "/vendor/codemirror/view/dist/index.js",
+      "@codemirror/state": "/vendor/codemirror/state/dist/index.js",
+      "@codemirror/lang-json": "/vendor/codemirror/lang-json/dist/index.js",
+      "@codemirror/lint": "/vendor/codemirror/lint/dist/index.js",
+      "@codemirror/commands": "/vendor/codemirror/commands/dist/index.js",
+      "@codemirror/language": "/vendor/codemirror/language/dist/index.js",
+      "@codemirror/autocomplete": "/vendor/codemirror/autocomplete/dist/index.js",
+      "crelt": "/vendor/crelt/index.js",
+      "style-mod": "/vendor/style-mod/src/style-mod.js",
+      "w3c-keyname": "/vendor/w3c-keyname/index.js",
+      "@marijn/find-cluster-break": "/vendor/@marijn/find-cluster-break/src/index.js",
+      "@lezer/common": "/vendor/@lezer/common/dist/index.js",
+      "@lezer/highlight": "/vendor/@lezer/highlight/dist/index.js",
+      "@lezer/json": "/vendor/@lezer/json/dist/index.js",
+      "@lezer/lr": "/vendor/@lezer/lr/dist/index.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="grid-canvas" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar" data-reveal="0">
+    <div class="brand">
+      <span class="brand-mark">
+        <span class="brand-mock">MOCK</span><span class="brand-slash">//</span><span class="brand-srv">SERVER</span>
+      </span>
+      <span class="brand-meta">
+        <span class="brand-meta-dot"></span>
+        v0.1 · 本地开发工具
+      </span>
+    </div>
+
+    <div class="topbar-actions">
+      <div class="status-pill" id="globalStatus" data-state="stopped">
+        <span class="led" aria-hidden="true"></span>
+        <span class="status-text">已停止</span>
+        <span class="status-detail" id="statusDetail">所有端口空闲</span>
+      </div>
+      <button class="btn btn-primary" id="startStopBtn" data-state="stopped">
+        <span class="btn-led" aria-hidden="true"></span>
+        <span class="btn-label">启动</span>
+      </button>
+      <button class="btn btn-icon" id="settingsBtn" aria-label="设置">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar" data-reveal="1">
+      <div class="sidebar-header">
+        <h2 class="section-label">接口列表</h2>
+        <span class="sidebar-count" id="endpointCount">0</span>
+        <button class="btn btn-ghost btn-sm" id="newEndpointBtn">
+          <span class="plus">+</span> 新建
+        </button>
+      </div>
+      <ul class="endpoint-list" id="endpointList" role="listbox" aria-label="接口列表">
+        <!-- populated by JS -->
+      </ul>
+      <div class="sidebar-footer">
+        <div class="port-summary" id="portSummary">
+          <span class="port-summary-label">端口</span>
+          <span class="port-summary-list" id="portSummaryList">—</span>
+        </div>
+      </div>
+    </aside>
+
+    <section class="editor" data-reveal="2" id="editor">
+      <!-- Empty state -->
+      <div class="editor-empty" id="editorEmpty">
+        <div class="editor-empty-inner">
+          <div class="editor-empty-mark">//</div>
+          <h3 class="editor-empty-title">尚未选择接口</h3>
+          <p class="editor-empty-text">从左侧选择一个，或新建一个 mock 接口开始。</p>
+          <button class="btn btn-ghost" id="emptyNewBtn">
+            <span class="plus">+</span> 创建第一个接口
+          </button>
+        </div>
+      </div>
+
+      <!-- Form -->
+      <div class="editor-form" id="editorForm" hidden>
+        <div class="editor-header">
+          <div class="editor-header-left">
+            <h2 class="section-label">编辑</h2>
+            <span class="endpoint-id mono" id="endpointId">id: —</span>
+          </div>
+          <div class="editor-header-right">
+            <span class="last-saved mono" id="lastSaved">已保存</span>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="method">方法</label>
+            <div class="select-wrap">
+              <select id="method" class="select">
+                <option>GET</option>
+                <option>POST</option>
+                <option>PUT</option>
+                <option>PATCH</option>
+                <option>DELETE</option>
+                <option>HEAD</option>
+                <option>OPTIONS</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="port">端口</label>
+            <input type="number" id="port" class="input mono" min="1" max="65535" />
+          </div>
+
+          <div class="field field-wide">
+            <label for="path">路径</label>
+            <input type="text" id="path" class="input mono" placeholder="/api/example" autocomplete="off" spellcheck="false" />
+          </div>
+
+          <div class="field">
+            <label for="status">状态码</label>
+            <input type="number" id="status" class="input mono" min="200" max="599" value="200" />
+          </div>
+        </div>
+
+        <div class="editor-body">
+          <div class="editor-split">
+            <div class="editor-pane editor-pane-edit">
+              <div class="editor-toolbar">
+                <div class="toolbar-left">
+                  <span class="section-label">响应体</span>
+                  <span class="format-hint mono">JSON</span>
+                </div>
+                <div class="toolbar-right">
+                  <span class="validation-status" id="validationStatus">
+                    <span class="val-mark">·</span>
+                    <span class="val-text">空</span>
+                  </span>
+                  <button class="btn btn-ghost btn-sm" id="formatBtn">格式化</button>
+                  <button class="btn btn-ghost btn-sm" id="validateBtn">校验</button>
+                </div>
+              </div>
+              <div class="code-editor-wrap" id="editorWrap">
+                <div id="responseEditorHost" class="code-editor"></div>
+                <button class="floating-btn" id="dynamicValueBtn" hidden type="button">动态值</button>
+              </div>
+              <div class="editor-meta">
+                <span class="mono" id="lineCount">0 行</span>
+                <span class="meta-sep">·</span>
+                <span class="mono" id="charCount">0 字符</span>
+                <span class="meta-sep">·</span>
+                <span class="mono">Tab 插入 2 空格</span>
+              </div>
+            </div>
+
+            <div class="editor-pane editor-pane-preview">
+              <div class="editor-toolbar">
+                <div class="toolbar-left">
+                  <span class="section-label">预览</span>
+                  <span class="format-hint mono">已解析</span>
+                </div>
+                <div class="toolbar-right">
+                  <span class="mono" id="previewStats">表达式: 0 · 错误: 0</span>
+                  <button class="btn btn-ghost btn-sm" id="previewRefreshBtn" aria-label="刷新预览">↻</button>
+                </div>
+              </div>
+              <div class="preview-banner" id="previewBanner" hidden></div>
+              <pre class="preview-pane mono" id="previewPane">// 在左侧编辑响应体，此处显示解析结果</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="editor-footer">
+          <button class="btn btn-danger" id="deleteBtn">删除</button>
+          <div class="spacer"></div>
+          <button class="btn btn-ghost" id="revertBtn">撤销</button>
+          <button class="btn btn-primary" id="saveBtn">保存</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section class="logs" data-reveal="3">
+    <div class="logs-header">
+      <div class="logs-header-left">
+        <h2 class="section-label">请求日志</h2>
+        <span class="logs-status mono" id="logsStatus">
+          <span class="led led-mini" data-state="stopped"></span>
+          <span>空闲</span>
+        </span>
+      </div>
+      <div class="logs-header-right">
+        <span class="logs-count mono" id="logsCount">0 条 · 最多 500</span>
+        <label class="toggle">
+          <input type="checkbox" id="autoScrollToggle" checked />
+          <span class="toggle-label">自动滚动</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="simulateToggle" />
+          <span class="toggle-label">模拟请求</span>
+        </label>
+        <button class="btn btn-ghost btn-sm" id="clearLogsBtn">清空</button>
+      </div>
+    </div>
+
+    <div class="logs-table" id="logsTable">
+      <div class="logs-row logs-head">
+        <span class="col-time">时间</span>
+        <span class="col-method">方法</span>
+        <span class="col-path">路径</span>
+        <span class="col-port">端口</span>
+        <span class="col-status">状态</span>
+        <span class="col-duration">耗时</span>
+        <span class="col-ip">来源 IP</span>
+        <span class="col-result">结果</span>
+      </div>
+      <div class="logs-body" id="logsBody">
+        <div class="logs-empty" id="logsEmpty">
+          <span class="logs-empty-mark">//</span>
+          <span>暂无请求。点击 <strong>启动</strong> 开启 mock 引擎。</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Generator modal -->
+  <div class="modal" id="generatorModal" hidden>
+    <div class="modal-backdrop" id="generatorBackdrop"></div>
+    <div class="modal-panel generator-panel" role="dialog" aria-labelledby="generatorTitle" aria-modal="true">
+      <div class="modal-header">
+        <button class="btn btn-icon" id="generatorBack" aria-label="返回">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <h2 class="section-label" id="generatorTitle">数据生成器</h2>
+        <button class="btn btn-icon" id="generatorClose" aria-label="关闭">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="generator-locale">
+        <span class="meta-label">类型</span>
+        <select class="select select-sm" id="generatorLocale">
+          <option value="zh_CN">简体中文</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+
+      <div class="generator-search">
+        <input type="text" class="input mono" id="generatorSearch" placeholder="选择一个动态值函数" autocomplete="off" />
+      </div>
+
+      <div class="generator-categories" id="generatorCategories">
+        <!-- populated by JS -->
+      </div>
+
+      <div class="generator-expr">
+        <span class="meta-label">表达式:</span>
+        <code class="mono" id="generatorExprText">—</code>
+      </div>
+      <div class="generator-preview">
+        <span class="meta-label">预览:</span>
+        <code class="mono" id="generatorSampleText">—</code>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-wide" id="generatorInsertBtn" disabled>插 入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings dialog -->
+  <div class="modal" id="settingsModal" hidden>
+    <div class="modal-backdrop" id="settingsBackdrop"></div>
+    <div class="modal-panel" role="dialog" aria-labelledby="settingsTitle" aria-modal="true">
+      <div class="modal-header">
+        <h2 class="section-label" id="settingsTitle">设置</h2>
+        <button class="btn btn-icon" id="settingsClose" aria-label="关闭">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="field field-wide">
+          <label for="storagePath">存储路径</label>
+          <input type="text" id="storagePath" class="input mono" />
+          <p class="field-hint">默认：<span class="mono">~/Documents/MockServer</span></p>
+        </div>
+        <div class="field">
+          <label for="uiPort">UI 端口</label>
+          <input type="number" id="uiPort" class="input mono" min="1" max="65535" />
+          <p class="field-hint">重启后生效。</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="settingsCancel">取消</button>
+        <button class="btn btn-primary" id="settingsSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="editor.js" type="module"></script>
+  <script src="app.js" type="module"></script>
+</body>
+</html>
