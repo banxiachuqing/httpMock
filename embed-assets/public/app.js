@@ -550,6 +550,8 @@ loadAll().then(() => {
     },
     onSelectionChange: (state) => updateFloatingButton(state),
   });
+  // onChange 在 initial mount 时不触发；手动跑一次预览刷新
+  if (ep) setTimeout(refreshPreview, 100);
   window.__editorMounted = true;
   connectSSE();
   // Fetch initial runtime status so list LEDs reflect failed/running per port
