@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import { AppError, toErrorResponse, statusFor } from './errors.js';
 import { sseMiddleware, broadcast } from './sse.js';
 import { isValidStoragePath } from './paths.js';
+import { registerPreviewRoutes } from './api-preview.js';
 
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
@@ -141,6 +142,9 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
     logBuffer.clear();
     res.status(204).end();
   });
+
+  // Preview & generators (dynamic response values) —挂 createApi 末尾、错误中间件之前
+  registerPreviewRoutes(app);
 
   // Error handler (must be last in createApi so API errors are formatted)
   app.use((err, _req, res, _next) => {
