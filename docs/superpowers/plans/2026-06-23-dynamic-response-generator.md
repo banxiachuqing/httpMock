@@ -1234,13 +1234,9 @@ function countExpressions(text) {
 
 **Step 4: 在 `src/api.js` 末尾挂上路由**
 
-修改 `src/api.js`，在 `createApi` 函数体末尾、`return app;` 之前加：
-
-```js
-  // Preview & generators (dynamic response values)
-  const { registerPreviewRoutes } = await import('./api-preview.js');
-  registerPreviewRoutes(app);
-```
+修改 `src/api.js`：
+- 顶部加 import：`import { registerPreviewRoutes } from './api-preview.js';`
+- 在 `createApi` 函数体末尾、`return app;` 之前加：`registerPreviewRoutes(app);`
 
 具体位置：找到 `export function createApi(...)` 末尾的 `return app;`（约 160+ 行附近），在那行之前插入。
 
@@ -1483,7 +1479,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 在文件末尾（`</body>` 之前），加模态框 markup 占位（Task 9 才完整实现）：
 
 ```html
-  <!-- Generator modal placeholder (Task 9 fills in) -->
+  <!-- Generator modal placeholder (Task 9 fills in the markup; current commit ships empty div so Task 8's openGeneratorModal stub can be tested) -->
   <div class="modal" id="generatorModal" hidden></div>
 ```
 
@@ -1811,18 +1807,32 @@ async function refreshPreview() {
 }
 
 function renderPreview(value, errors) {
-  const errorRanges = errors.map((e) => ({ from: e.from, to: e.to, message: e.message }));
   const json = JSON.stringify(value, null, 2);
-  previewPane.textContent = json;
-  // 高亮表达式错误位置 —— 简单做法：根据 error.from/to 找到字符串位置，wrap span
-  if (errorRanges.length === 0) return;
-  // JSON 输出中字符串原文不再有 {{...}}（被替换）；错误区间表示原 editor 文本位置
-  // 这里仅做最简实现：在 JSON 文本末尾追加错误清单
-  let errHtml = '\n\n';
-  for (const e of errors) {
-    errHtml += `⚠ ${e.message} (col ${e.from}–${e.to})\n`;
+  // 表达式错（混合 → 原 {{...}} 保留；纯 → null）—— 对混合情况在输出中找到
+  // 残留的 {{...}} 包红色 span，纯情况无文本可标，仅追加错误文字
+  const hasError = errors.length > 0;
+  previewPane.textContent = '';
+  if (hasError && json.includes('{{')) {
+    const re = /\{\{[^}]*\}\}/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(json)) !== null) {
+      if (m.index > last) previewPane.appendChild(document.createTextNode(json.slice(last, m.index)));
+      const span = document.createElement('span');
+      span.className = 'expr-error';
+      span.textContent = m[0];
+      previewPane.appendChild(span);
+      last = m.index + m[0].length;
+    }
+    if (last < json.length) previewPane.appendChild(document.createTextNode(json.slice(last)));
+  } else {
+    previewPane.textContent = json;
   }
-  previewPane.textContent = json + errHtml;
+  if (hasError) {
+    let errText = '\n\n';
+    for (const e of errors) errText += `⚠ ${e.message}\n`;
+    previewPane.appendChild(document.createTextNode(errText));
+  }
 }
 
 previewRefreshBtn.addEventListener('click', refreshPreview);
@@ -1905,9 +1915,10 @@ function coordsAtPosForRange(range) {
   }
 }
 
-// Task 10 实现 openGeneratorModal
+// Task 10 实现 openGeneratorModal —— 此处为中间态占位符（Task 10 整段替换）
 window.__openGeneratorModal = (opts) => {
-  // 占位：Task 10 替换
+  // 占位：Task 10 替换。允许 console.warn 因为这是 dev-only 临时态，
+  // 最终代码（Task 10）不出现 console 输出。
   console.warn('openGeneratorModal not implemented yet', opts);
 };
 ```
@@ -2032,7 +2043,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 .generator-search {
   padding: 8px 16px;
   border-bottom: 1px solid var(--border, #d8d8d2);
-anus
+}
+
 .generator-categories {
   flex: 1;
   overflow: auto;
@@ -2110,15 +2122,6 @@ anus
 .btn-wide { width: 100%; }
 
 .select-sm { padding: 2px 8px; font-size: 12px; }
-```
-
-（删除上面 CSS 块中第 `anus` 那行 —— 这是 placeholder 误输入，正确结尾是 `}`。修正后：）
-
-```css
-.generator-search {
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border, #d8d8d2);
-}
 ```
 
 **Step 3: 视觉验证**
@@ -2505,38 +2508,19 @@ let serverCtx;
 test.beforeAll(async () => { serverCtx = await bootServer(); });
 test.afterAll(async () => { await serverCtx.cleanup(); });
 
-test('happy path: insert {{$uuid}} via modal and see live preview', async ({ page }) => {
+test('happy path: live preview shows resolved UUID + serve returns real UUID', async ({ page }) => {
   await page.goto('http://127.0.0.1:5050');
   const epId = await newEndpoint(page, { method: 'GET', port: 19501, path: '/dyn1' });
 
-  // 在响应体输入初始 JSON
+  // 通过 API 直接写入响应体（避开浮按钮点击的复杂交互；浮按钮本身已在 Task 10 手测）
   await page.evaluate(async (id) => {
     await fetch(`/api/endpoints/${id}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ response: { id: 'placeholder' } }),
+      body: JSON.stringify({ response: { id: '{{$uuid}}' } }),
     });
   }, epId);
   await page.reload();
-
-  // 选中 placeholder 字符串：双击进入选中态
-  await page.locator('.cm-content').click();
-  // 用 keyboard 全选内容
-  await page.keyboard.press('Control+A');
-  await page.keyboard.press('Delete');
-  await page.keyboard.type('{ "id": "placeholder" }');
-
-  // 在 "placeholder" 内点击，触发浮按钮
-  // 用 evaluate 把光标定位到 placeholder 字符串中部
-  await page.evaluate(() => {
-    const view = window.editorView || null;
-  });
-
-  // 简化：直接用 evaluate 把表达式写进去（验证端到端链路）
-  // 然后手动测浮按钮的交互（不在 E2E 范围 —— 在 Task 10 已手测）
-  await page.keyboard.press('Control+A');
-  await page.keyboard.press('Delete');
-  await page.keyboard.type('{ "id": "{{$uuid}}" }');
 
   // 等预览刷新（防抖 300ms）
   await page.waitForTimeout(500);
@@ -2544,9 +2528,6 @@ test('happy path: insert {{$uuid}} via modal and see live preview', async ({ pag
   // 验证预览面板含 UUID
   const previewText = await page.locator('#previewPane').textContent();
   expect(previewText).toMatch(/"id":\s*"[0-9a-f-]{36}"/);
-
-  // 保存
-  await page.locator('#saveBtn').click();
 
   // 启动 mock 引擎
   await page.locator('#startStopBtn').click();
