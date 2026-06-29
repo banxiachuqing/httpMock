@@ -104,7 +104,27 @@ const els = {
   uiPort: $('#uiPort'),
   maxBody: $('#settingsMaxBody'),
   maxBodyHint: $('#settingsMaxBodyHint'),
+
+  // Log detail dialog
+  logDetail: $('#log-detail'),
+  logDetailMethod: $('#logDetailMethod'),
+  logDetailPath: $('#logDetailPath'),
+  logDetailStatus: $('#logDetailStatus'),
+  logDetailClose: $('#logDetailClose'),
+  logDetailMeta: $('#logDetailMeta'),
+  logDetailQueryCount: $('#logDetailQueryCount'),
+  logDetailQueryTable: $('#logDetailQueryTable'),
+  logDetailQueryEmpty: $('#logDetailQueryEmpty'),
+  logDetailHeadersCount: $('#logDetailHeadersCount'),
+  logDetailHeadersTable: $('#logDetailHeadersTable'),
+  logDetailHeadersEmpty: $('#logDetailHeadersEmpty'),
+  logDetailBodyWarning: $('#logDetailBodyWarning'),
+  logDetailBody: $('#logDetailBody'),
+  logDetailBodyPlain: $('#logDetailBodyPlain'),
+  logDetailEmpty: $('#logDetailEmpty'),
 };
+
+let logDetailCM = null;
 
 // ============================================================
 // Render
@@ -251,7 +271,118 @@ function renderLogEntry(entry) {
     <span class="log-result">${entry.matched ? '匹配' : '无路由'}</span>
   `;
   row.querySelector('.log-path').textContent = entry.path;
+  // 只有 HTTP 请求条目可点（过滤 resolver-warn）
+  if (entry.method) {
+    row.addEventListener('click', () => openLogDetail(entry.id));
+  }
   return row;
+}
+
+function openLogDetail(id) {
+  const entry = state.logs.find((e) => e.id === id);
+  if (!entry || !entry.method) return;
+  renderLogDetail(entry);
+  els.logDetail.showModal();
+}
+
+function closeLogDetail() {
+  if (els.logDetail.open) els.logDetail.close();
+}
+
+function renderLogDetail(entry) {
+  // 1. Header
+  els.logDetailMethod.textContent = entry.method;
+  els.logDetailMethod.dataset.method = entry.method;
+  els.logDetailPath.textContent = entry.path;
+  els.logDetailStatus.textContent = entry.status;
+  els.logDetailStatus.dataset.range = `${Math.floor(entry.status / 100)}xx`;
+
+  // 2. Meta
+  const time = new Date(entry.timestamp).toLocaleString('zh-CN', { hour12: false });
+  els.logDetailMeta.innerHTML = '';
+  const rows = [
+    ['时间', time],
+    ['端口', String(entry.port)],
+    ['耗时', `${entry.durationMs} ms`],
+    ['IP', entry.ip ? entry.ip.replace(/^::ffff:/, '') : '—'],
+    ['路由', entry.matched ? '匹配' : '无路由'],
+  ];
+  for (const [k, v] of rows) {
+    const dt = document.createElement('dt'); dt.textContent = k;
+    const dd = document.createElement('dd'); dd.textContent = v;
+    els.logDetailMeta.append(dt, dd);
+  }
+
+  // 3. Query
+  const queryTbody = els.logDetailQueryTable.querySelector('tbody');
+  queryTbody.innerHTML = '';
+  const params = new URLSearchParams(entry.query || '');
+  const paramKeys = [...params.keys()];
+  if (paramKeys.length === 0) {
+    els.logDetailQueryTable.hidden = true;
+    els.logDetailQueryEmpty.hidden = false;
+    els.logDetailQueryCount.textContent = '0';
+  } else {
+    els.logDetailQueryTable.hidden = false;
+    els.logDetailQueryEmpty.hidden = true;
+    els.logDetailQueryCount.textContent = String(paramKeys.length);
+    for (const [k, v] of params) {
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td'); td1.textContent = k;
+      const td2 = document.createElement('td'); td2.textContent = v;
+      tr.append(td1, td2);
+      queryTbody.append(tr);
+    }
+  }
+
+  // 4. Headers
+  const headerTbody = els.logDetailHeadersTable.querySelector('tbody');
+  headerTbody.innerHTML = '';
+  const headerEntries = Object.entries(entry.requestHeaders || {});
+  if (headerEntries.length === 0) {
+    els.logDetailHeadersTable.hidden = true;
+    els.logDetailHeadersEmpty.hidden = false;
+    els.logDetailHeadersCount.textContent = '0';
+  } else {
+    els.logDetailHeadersTable.hidden = false;
+    els.logDetailHeadersEmpty.hidden = true;
+    els.logDetailHeadersCount.textContent = String(headerEntries.length);
+    for (const [k, v] of headerEntries) {
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td'); td1.textContent = k;
+      const td2 = document.createElement('td');
+      td2.textContent = Array.isArray(v) ? v.join(', ') : String(v);
+      tr.append(td1, td2);
+      headerTbody.append(tr);
+    }
+  }
+
+  // 5. Body
+  if (logDetailCM) { logDetailCM.destroy(); logDetailCM = null; }
+  els.logDetailBody.innerHTML = '';
+
+  const body = entry.requestBodyPreview || '';
+  if (!body) {
+    els.logDetailEmpty.hidden = false;
+    els.logDetailBodyWarning.hidden = true;
+    els.logDetailBody.hidden = true;
+    els.logDetailBodyPlain.hidden = true;
+  } else {
+    els.logDetailEmpty.hidden = true;
+    els.logDetailBodyWarning.hidden = !entry.requestBodyTruncated;
+    let parsed;
+    try { parsed = JSON.parse(body); } catch {}
+    if (parsed !== undefined) {
+      const formatted = JSON.stringify(parsed, null, 2);
+      els.logDetailBody.hidden = false;
+      els.logDetailBodyPlain.hidden = true;
+      logDetailCM = window.mountReadonlyEditor(els.logDetailBody, formatted);
+    } else {
+      els.logDetailBody.hidden = true;
+      els.logDetailBodyPlain.hidden = false;
+      els.logDetailBodyPlain.textContent = body;
+    }
+  }
 }
 
 function renderLogsInitial() {
@@ -548,6 +679,14 @@ els.settingsCancel.addEventListener('click', closeSettings);
 els.settingsSave.addEventListener('click', saveSettings);
 els.maxBody.addEventListener('input', () => {
   els.maxBodyHint.textContent = formatBytes(Number(els.maxBody.value)) || '—';
+});
+els.logDetailClose.addEventListener('click', closeLogDetail);
+els.logDetail.addEventListener('click', (e) => {
+  // 点 backdrop（dialog 自身）关闭；点内部内容不关
+  if (e.target === els.logDetail) closeLogDetail();
+});
+els.logDetail.addEventListener('close', () => {
+  if (logDetailCM) { logDetailCM.destroy(); logDetailCM = null; }
 });
 
 for (const f of [els.method, els.port, els.path, els.status]) {

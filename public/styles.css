@@ -1004,6 +1004,7 @@ button {
   border-bottom: 1px solid var(--border-soft);
   animation: logEnter var(--d-slow) var(--ease-out) backwards;
   position: relative;
+  cursor: pointer;
 }
 .log-entry::before {
   content: "";
@@ -1467,3 +1468,92 @@ button {
   border-color: var(--amber-dim);
   color: var(--amber);
 }
+
+/* ============================================================
+   Log detail dialog
+   ============================================================ */
+dialog.log-detail {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  max-width: 720px;
+  width: 90vw;
+  max-height: 80vh;
+  padding: 0;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+}
+dialog.log-detail::backdrop {
+  background: rgba(8, 14, 24, 0.6);
+  backdrop-filter: blur(2px);
+}
+.log-detail-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.log-detail-header .log-detail-method {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, monospace);
+  font-weight: 600;
+  font-size: 12px;
+}
+.log-detail-header .log-detail-path {
+  flex: 1;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 13px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.log-detail-header .log-detail-status {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, monospace);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+.log-detail-status[data-range="2xx"] { color: var(--green); }
+.log-detail-status[data-range="4xx"] { color: var(--amber); }
+.log-detail-status[data-range="5xx"] { color: var(--red); }
+.log-detail-close {
+  background: none; border: none; color: var(--text-tertiary);
+  font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1;
+}
+.log-detail-close:hover { color: var(--text); }
+
+.log-detail-section {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.log-detail-section:last-child { border-bottom: none; }
+.log-detail-section h3 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-tertiary); margin: 0 0 8px; font-weight: 600;
+}
+.log-detail-count {
+  color: var(--text-tertiary); font-weight: 400; margin-left: 4px;
+}
+.log-detail-meta { display: grid; grid-template-columns: 80px 1fr; gap: 4px 12px; margin: 0; font-size: 12px; }
+.log-detail-meta dt { color: var(--text-tertiary); }
+.log-detail-meta dd { margin: 0; font-family: var(--mono, ui-monospace, SFMono-Regular, monospace); }
+
+.log-detail-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--mono, ui-monospace, SFMono-Regular, monospace); }
+.log-detail-table th, .log-detail-table td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border-soft); }
+.log-detail-table th { color: var(--text-tertiary); font-weight: 500; width: 30%; word-break: break-all; }
+.log-detail-table td { word-break: break-all; }
+
+.log-detail-body { max-height: 320px; overflow: auto; border: 1px solid var(--border); border-radius: 4px; }
+.log-detail-body .cm-editor { max-height: 320px; }
+.log-detail-body-plain {
+  max-height: 320px; overflow: auto; padding: 8px 12px; margin: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 4px;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 12px; white-space: pre-wrap; word-break: break-all;
+}
+.log-detail-body-warning {
+  background: rgba(255, 170, 0, 0.12);
+  color: var(--amber);
+  padding: 6px 10px; border-radius: 4px; font-size: 12px;
+  margin-bottom: 8px;
+}
+.log-detail-empty { color: var(--text-tertiary); font-size: 12px; margin: 0; }
