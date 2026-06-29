@@ -102,6 +102,8 @@ const els = {
   settingsSave: $('#settingsSave'),
   storagePath: $('#storagePath'),
   uiPort: $('#uiPort'),
+  maxBody: $('#settingsMaxBody'),
+  maxBodyHint: $('#settingsMaxBodyHint'),
 };
 
 // ============================================================
@@ -428,6 +430,14 @@ function formatJSON(value) {
   return JSON.stringify(value, null, 2);
 }
 
+function formatBytes(n) {
+  if (!Number.isFinite(n) || n < 1) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
 function tryFormat() {
   const text = getValue();
   if (!text.trim()) return;
@@ -487,14 +497,30 @@ function connectSSE() {
 function openSettings() {
   els.storagePath.value = state.config.settings.storagePath;
   els.uiPort.value = state.config.settings.uiPort;
+  els.maxBody.value = state.config.settings.maxBodyBytes ?? 4194304;
+  els.maxBodyHint.textContent = formatBytes(Number(els.maxBody.value));
   els.settingsModal.hidden = false;
 }
 function closeSettings() { els.settingsModal.hidden = true; }
 async function saveSettings() {
-  await api.patchConfig({ storagePath: els.storagePath.value.trim(), uiPort: Number(els.uiPort.value) });
+  const newMax = Number(els.maxBody.value);
+  if (!Number.isInteger(newMax) || newMax < 1) {
+    flash('请求体大小上限必须是正整数', 'red');
+    return;
+  }
+  const newStoragePath = els.storagePath.value.trim();
+  const newUiPort = Number(els.uiPort.value);
+  const needsRestart =
+    newStoragePath !== state.config.settings.storagePath ||
+    newUiPort !== state.config.settings.uiPort;
+  await api.patchConfig({
+    storagePath: newStoragePath,
+    uiPort: newUiPort,
+    maxBodyBytes: newMax,
+  });
   state.config = await api.getConfig();
   closeSettings();
-  flash('已保存 · 重启后生效', 'green');
+  flash(needsRestart ? '已保存 · 重启后生效' : '已保存 · 立即生效', 'green');
 }
 
 // ============================================================
@@ -520,6 +546,9 @@ els.settingsBackdrop.addEventListener('click', closeSettings);
 els.settingsClose.addEventListener('click', closeSettings);
 els.settingsCancel.addEventListener('click', closeSettings);
 els.settingsSave.addEventListener('click', saveSettings);
+els.maxBody.addEventListener('input', () => {
+  els.maxBodyHint.textContent = formatBytes(Number(els.maxBody.value)) || '—';
+});
 
 for (const f of [els.method, els.port, els.path, els.status]) {
   f.addEventListener('input', markDirty);
