@@ -37,6 +37,23 @@ describe('GET /api/logs', () => {
   });
 });
 
+describe('GET /api/logs — requestBodyTruncated field', () => {
+  it('includes requestBodyTruncated field on every log entry', async () => {
+    logBuffer.push({
+      id: 'a', timestamp: Date.now(), method: 'GET', path: '/x', port: 8080,
+      status: 200, requestBodyPreview: '', requestBodyTruncated: false,
+    });
+    logBuffer.push({
+      id: 'b', timestamp: Date.now(), method: 'POST', path: '/y', port: 8080,
+      status: 200, requestBodyPreview: 'big...', requestBodyTruncated: true,
+    });
+    const r = await ctx.request.get('/api/logs');
+    expect(r.status).toBe(200);
+    expect(r.body[0].requestBodyTruncated).toBe(false);
+    expect(r.body[1].requestBodyTruncated).toBe(true);
+  });
+});
+
 describe('GET /events (SSE)', () => {
   it('emits a log event when the buffer receives a new entry', async () => {
     const server = ctx.app.listen(0);
