@@ -1480,7 +1480,7 @@ dialog.log-detail {
   max-width: 720px;
   width: 90vw;
   max-height: 80vh;
-  padding: 0;
+  padding: 20px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
 }
 dialog.log-detail::backdrop {
@@ -1489,7 +1489,7 @@ dialog.log-detail::backdrop {
 }
 .log-detail-header {
   display: flex; align-items: center; gap: 12px;
-  padding: 14px 18px;
+  padding: 0 0 14px 0;
   border-bottom: 1px solid var(--border);
 }
 .log-detail-header .log-detail-method {
@@ -1521,7 +1521,7 @@ dialog.log-detail::backdrop {
 .log-detail-close:hover { color: var(--text); }
 
 .log-detail-section {
-  padding: 14px 18px;
+  padding: 14px 0;
   border-bottom: 1px solid var(--border-soft);
 }
 .log-detail-section:last-child { border-bottom: none; }
