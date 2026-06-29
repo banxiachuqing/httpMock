@@ -53,6 +53,11 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
   app.patch('/api/config', async (req, res, next) => {
     try {
       const { settings = {} } = req.body || {};
+      if (settings.maxBodyBytes !== undefined) {
+        if (!Number.isInteger(settings.maxBodyBytes) || settings.maxBodyBytes < 1) {
+          throw new AppError(400, 'INVALID_VALUE', 'maxBodyBytes must be a positive integer');
+        }
+      }
       if (settings.storagePath !== undefined) {
         if (!isValidStoragePath(settings.storagePath)) {
           throw new AppError(400, 'INVALID_PATH', 'storagePath must be an absolute path');
@@ -68,6 +73,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
       await configStore.update((cfg) => {
         if (settings.uiPort !== undefined) cfg.settings.uiPort = settings.uiPort;
         if (settings.storagePath !== undefined) cfg.settings.storagePath = settings.storagePath;
+        if (settings.maxBodyBytes !== undefined) cfg.settings.maxBodyBytes = settings.maxBodyBytes;
         return cfg;
       });
       res.json(configStore.config);
