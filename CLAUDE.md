@@ -52,7 +52,8 @@ bun build.mjs bun-windows-arm64 mockserver-arm.exe        # Windows ARM
 **环境变量**（`server.js` 接受）：
 - `MOCK_HOST` — bind host（默认 `127.0.0.1`，LAN 访问用 `0.0.0.0`）
 - `MOCK_SERVER_DIR` — 编译产物的资源根目录（`launcher.js` 自动注入；dev 不需要）
-- `MOCK_MAX_BODY_PREVIEW` — 请求体预览最大字节数（默认 2048）
+
+请求体大小上限（`settings.maxBodyBytes`，默认 4 MiB）由 Settings 面板运行时配置，mock-engine 每次请求实时读取；不再用环境变量。
 
 **单测 / 集成 / E2E**：
 ```bash

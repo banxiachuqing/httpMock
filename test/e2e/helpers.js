@@ -18,14 +18,16 @@ export async function bootServer() {
   };
 }
 
-export function hitMock(port, path, method = 'GET') {
+export function hitMock(port, path, opts = {}) {
+  const { method = 'GET', body, headers = {} } = opts;
   return new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port, path, method }, (res) => {
-      let body = '';
-      res.on('data', (c) => (body += c));
-      res.on('end', () => resolve({ status: res.statusCode, body }));
+    const req = http.request({ host: '127.0.0.1', port, path, method, headers }, (res) => {
+      let respBody = '';
+      res.on('data', (c) => (respBody += c));
+      res.on('end', () => resolve({ status: res.statusCode, body: respBody, headers: res.headers }));
     });
     req.on('error', reject);
+    if (body !== undefined) req.write(body);
     req.end();
   });
 }

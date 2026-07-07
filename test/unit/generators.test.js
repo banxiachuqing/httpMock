@@ -152,3 +152,31 @@ describe('getSample', () => {
     expect(s).toBeNull();
   });
 });
+
+describe('date — new generators (timestamp / now / format)', () => {
+  it('timestamp returns a positive integer', () => {
+    const v = runGenerator('date.timestamp', {});
+    expect(typeof v).toBe('number');
+    expect(Number.isInteger(v)).toBe(true);
+    expect(v).toBeGreaterThan(0);
+  });
+
+  it('now returns Date.now() within tolerance', () => {
+    const before = Date.now();
+    const v = runGenerator('date.now', {});
+    const after = Date.now();
+    expect(v).toBeGreaterThanOrEqual(before);
+    expect(v).toBeLessThanOrEqual(after);
+  });
+
+  it('format outputs yyyy-MM-dd hh:mm:ss pattern (local TZ)', () => {
+    const v = runGenerator('date.format', {});
+    expect(typeof v).toBe('string');
+    expect(v).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  });
+
+  it('format reflects current local time (contains current year)', () => {
+    const v = runGenerator('date.format', {});
+    expect(v).toContain(String(new Date().getFullYear()));
+  });
+});

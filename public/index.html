@@ -320,6 +320,12 @@
           <input type="number" id="uiPort" class="input mono" min="1" max="65535" />
           <p class="field-hint">重启后生效。</p>
         </div>
+        <div class="field">
+          <label for="settingsMaxBody">请求体大小上限 (bytes)</label>
+          <input id="settingsMaxBody" type="number" min="1" step="1" class="input mono" />
+          <span class="settings-hint" id="settingsMaxBodyHint">4.0 MB</span>
+          <p class="field-hint">mock 引擎接收请求时按此上限截断请求体。设为 1 MB 适合开发调试，更大适合文件上传场景。立即生效，不需重启。</p>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" id="settingsCancel">取消</button>
@@ -327,6 +333,47 @@
       </div>
     </div>
   </div>
+
+  <!-- Log detail dialog -->
+  <dialog id="log-detail" class="log-detail" aria-labelledby="log-detail-title">
+    <header class="log-detail-header">
+      <span class="log-detail-method" data-method="" id="logDetailMethod">METHOD</span>
+      <span class="log-detail-path" id="logDetailPath">/path</span>
+      <span class="log-detail-status" data-range="" id="logDetailStatus">200</span>
+      <button class="log-detail-close" id="logDetailClose" type="button" aria-label="关闭">×</button>
+    </header>
+
+    <section class="log-detail-section">
+      <h3>请求</h3>
+      <dl class="log-detail-meta" id="logDetailMeta"></dl>
+    </section>
+
+    <section class="log-detail-section">
+      <h3>查询参数 <span class="log-detail-count" id="logDetailQueryCount">0</span></h3>
+      <table class="log-detail-table" id="logDetailQueryTable" hidden>
+        <thead><tr><th>键</th><th>值</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="log-detail-empty" id="logDetailQueryEmpty">（无查询参数）</p>
+    </section>
+
+    <section class="log-detail-section">
+      <h3>请求头 <span class="log-detail-count" id="logDetailHeadersCount">0</span></h3>
+      <table class="log-detail-table" id="logDetailHeadersTable" hidden>
+        <thead><tr><th>键</th><th>值</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="log-detail-empty" id="logDetailHeadersEmpty">（无请求头）</p>
+    </section>
+
+    <section class="log-detail-section">
+      <h3>请求体</h3>
+      <div class="log-detail-body-warning" id="logDetailBodyWarning" hidden>请求体已截断（超出配置上限）</div>
+      <div class="log-detail-body" id="logDetailBody" hidden></div>
+      <pre class="log-detail-body-plain" id="logDetailBodyPlain" hidden></pre>
+      <p class="log-detail-empty" id="logDetailEmpty">（无请求体）</p>
+    </section>
+  </dialog>
 
   <script src="editor.js" type="module"></script>
   <script src="app.js" type="module"></script>

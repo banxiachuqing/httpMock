@@ -69,3 +69,34 @@ export function setValue(text) {
 export function getEditorView() {
   return view;
 }
+
+/**
+ * Read-only CodeMirror viewer for log detail body. Same lang-json + theme
+ * as mountEditor, but no editing surface. Caller is responsible for
+ * calling .destroy() on the returned view to free memory.
+ *
+ * @param {HTMLElement} parent
+ * @param {string} text
+ * @returns {EditorView}
+ */
+export function mountReadonlyEditor(parent, text) {
+  const state = EditorState.create({
+    doc: text,
+    extensions: [
+      lineNumbers(),
+      syntaxHighlighting(defaultHighlightStyle),
+      json(),
+      EditorView.editable.of(false),
+      EditorState.readOnly.of(true),
+      EditorView.theme({
+        '&': { backgroundColor: 'transparent' },
+        '.cm-scroller': { fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: '12px', lineHeight: '1.6' },
+        '.cm-content': { padding: '8px 12px' },
+        '.cm-gutters': { backgroundColor: 'transparent', borderRight: '1px solid #d8d8d2', color: '#8a8a82' },
+      }, { dark: true }),
+    ],
+  });
+  return new EditorView({ state, parent });
+}
+
+window.mountReadonlyEditor = mountReadonlyEditor;

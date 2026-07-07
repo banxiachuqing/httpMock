@@ -41,3 +41,28 @@ describe('PATCH /api/config', () => {
     expect(r.body.code).toBe('INVALID_PATH');
   });
 });
+
+describe('PATCH /api/config — maxBodyBytes', () => {
+  it('accepts a positive integer and persists it', async () => {
+    const r = await ctx.request.patch('/api/config').send({ settings: { maxBodyBytes: 1024 * 1024 } });
+    expect(r.status).toBe(200);
+    expect(r.body.settings.maxBodyBytes).toBe(1024 * 1024);
+    expect(store.config.settings.maxBodyBytes).toBe(1024 * 1024);
+  });
+
+  it('rejects zero, negative, and non-integer values with 400 INVALID_VALUE', async () => {
+    for (const bad of [0, -1, 1.5, NaN, 'lots', null, [], {}]) {
+      const r = await ctx.request.patch('/api/config').send({ settings: { maxBodyBytes: bad } });
+      expect(r.status, `value ${JSON.stringify(bad)}`).toBe(400);
+      expect(r.body.code, `value ${JSON.stringify(bad)}`).toBe('INVALID_VALUE');
+    }
+  });
+
+  it('omitting maxBodyBytes leaves existing value intact', async () => {
+    store.config.settings.maxBodyBytes = 7777;
+    const r = await ctx.request.patch('/api/config').send({ settings: { uiPort: 6060 } });
+    expect(r.status).toBe(200);
+    expect(r.body.settings.maxBodyBytes).toBe(7777);
+    expect(r.body.settings.uiPort).toBe(6060);
+  });
+});

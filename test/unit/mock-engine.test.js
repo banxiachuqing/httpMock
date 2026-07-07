@@ -175,3 +175,84 @@ describe('mock-engine with dynamic response', () => {
     expect(r.body).toBe('{"x":"id-7"}');
   });
 });
+
+describe('MockEngine body capture and truncation', () => {
+  function postWith(port, path, body) {
+    return new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port, path, method: 'POST' }, (res) => {
+        let data = '';
+        res.on('data', (c) => (data += c));
+        res.on('end', () => resolve({ status: res.statusCode, body: data }));
+      });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
+  }
+
+  function makeConfigStore(maxBodyBytes) {
+    return { config: { settings: { maxBodyBytes } } };
+  }
+
+  it('captures full body below limit and marks requestBodyTruncated=false', async () => {
+    const cs = makeConfigStore(4 * 1024 * 1024);
+    engine = new MockEngine({ logBuffer, configStore: cs });
+    await engine.start([
+      { id: 'a', port: 19001, method: 'POST', path: '/x', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    await postWith(19001, '/x', 'hello world');
+    expect(pushedLogs).toHaveLength(1);
+    expect(pushedLogs[0].requestBodyPreview).toBe('hello world');
+    expect(pushedLogs[0].requestBodyTruncated).toBe(false);
+  });
+
+  it('truncates body above limit and marks requestBodyTruncated=true', async () => {
+    const cs = makeConfigStore(10);
+    engine = new MockEngine({ logBuffer, configStore: cs });
+    await engine.start([
+      { id: 'a', port: 19002, method: 'POST', path: '/x', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    const big = 'x'.repeat(100);
+    await postWith(19002, '/x', big);
+    expect(pushedLogs[0].requestBodyPreview).toBe('x'.repeat(10));
+    expect(pushedLogs[0].requestBodyTruncated).toBe(true);
+  });
+
+  it('GET request with no body has empty preview and truncated=false', async () => {
+    const cs = makeConfigStore(100);
+    engine = new MockEngine({ logBuffer, configStore: cs });
+    await engine.start([
+      { id: 'a', port: 19003, method: 'GET', path: '/x', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    await get(19003, '/x');
+    expect(pushedLogs[0].requestBodyPreview).toBe('');
+    expect(pushedLogs[0].requestBodyTruncated).toBe(false);
+  });
+
+  it('falls back to 4 MiB when configStore is missing or settings.maxBodyBytes undefined', async () => {
+    engine = new MockEngine({ logBuffer, configStore: { config: { settings: {} } } });
+    await engine.start([
+      { id: 'a', port: 19004, method: 'POST', path: '/x', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    // 1 KB body — well under 4 MiB fallback
+    await postWith(19004, '/x', 'y'.repeat(1024));
+    expect(pushedLogs[0].requestBodyPreview).toHaveLength(1024);
+    expect(pushedLogs[0].requestBodyTruncated).toBe(false);
+  });
+
+  it('reads fresh maxBodyBytes on each request (no caching)', async () => {
+    const cs = { config: { settings: { maxBodyBytes: 5 } } };
+    engine = new MockEngine({ logBuffer, configStore: cs });
+    await engine.start([
+      { id: 'a', port: 19005, method: 'POST', path: '/x', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    await postWith(19005, '/x', 'aaaaaa');
+    expect(pushedLogs[0].requestBodyTruncated).toBe(true);
+
+    // User updates setting live
+    cs.config.settings.maxBodyBytes = 1000;
+    pushedLogs = [];
+    await postWith(19005, '/x', 'bbbbbb');
+    expect(pushedLogs[0].requestBodyTruncated).toBe(false);
+  });
+});

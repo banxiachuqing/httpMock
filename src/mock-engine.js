@@ -2,38 +2,54 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { resolve } from './expression-resolver.js';
 
-const DEFAULT_MAX_BODY_PREVIEW = 2048;
+const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
 
-function buildRouter(endpoints) {
-  const map = new Map();
-  for (const e of endpoints) {
-    if (e.enabled === false) continue;
-    const key = `${e.port}|${e.method}|${e.path}`;
-    map.set(key, e);
-  }
-  return map;
-}
-
+/**
+ * Read the request body up to maxBytes. Once the cumulative size exceeds
+ * maxBytes, further chunks are dropped (and `truncated` is set to true).
+ * Always resolves; never rejects.
+ *
+ * @param {import('node:http').IncomingMessage} req
+ * @param {number} maxBytes
+ * @returns {Promise<{ body: string, truncated: boolean }>}
+ */
 function readBody(req, maxBytes) {
   return new Promise((resolve) => {
     let size = 0;
+    let truncated = false;
     const chunks = [];
     req.on('data', (c) => {
+      const prevSize = size;
       size += c.length;
-      if (size <= maxBytes) chunks.push(c);
+      if (size > maxBytes) {
+        // Keep what we had room for; truncate this chunk at the boundary
+        const allowed = maxBytes - prevSize;
+        if (allowed > 0) {
+          chunks.push(c.subarray(0, allowed));
+        }
+        truncated = true;
+        return;
+      }
+      chunks.push(c);
     });
     req.on('end', () => {
-      resolve(Buffer.concat(chunks).toString('utf8'));
+      resolve({ body: Buffer.concat(chunks).toString('utf8'), truncated });
     });
-    req.on('error', () => resolve(''));
+    req.on('error', () => resolve({ body: '', truncated: false }));
   });
 }
 
 export class MockEngine {
-  constructor({ logBuffer, bindHost = '127.0.0.1', maxBodyPreview = DEFAULT_MAX_BODY_PREVIEW }) {
+  /**
+   * @param {object} opts
+   * @param {{ push: (e: object) => void }} opts.logBuffer
+   * @param {string} [opts.bindHost='127.0.0.1']
+   * @param {{ config: { settings: { maxBodyBytes?: number } } }} [opts.configStore]
+   */
+  constructor({ logBuffer, bindHost = '127.0.0.1', configStore }) {
     this.logBuffer = logBuffer;
     this.bindHost = bindHost;
-    this.maxBodyPreview = maxBodyPreview;
+    this.configStore = configStore;
     this.servers = new Map();
     this.statuses = new Map();
   }
@@ -57,17 +73,18 @@ export class MockEngine {
         const url = req.url || '/';
         const [pathOnly, queryStr = ''] = url.split('?');
         const matched = router.get(`${port}|${req.method}|${pathOnly}`);
-        const body = await readBody(req, this.maxBodyPreview);
+
+        const max = this.configStore?.config?.settings?.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+        const { body, truncated } = await readBody(req, max);
 
         if (matched) {
           res.statusCode = matched.statusCode || 200;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
-          let body;
+          let responseBody;
           try {
             const { value } = resolve(matched.response);
-            body = JSON.stringify(value);
+            responseBody = JSON.stringify(value);
           } catch (err) {
-            // resolver 永不抛（软失败），但兜底：发原始 + warn
             this.logBuffer?.push({
               id: crypto.randomUUID(),
               timestamp: Date.now(),
@@ -76,9 +93,9 @@ export class MockEngine {
               message: `resolver failed: ${err.message}`,
               endpointId: matched.id,
             });
-            body = JSON.stringify(matched.response ?? null);
+            responseBody = JSON.stringify(matched.response ?? null);
           }
-          res.end(body);
+          res.end(responseBody);
         } else {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -98,6 +115,7 @@ export class MockEngine {
           endpointId: matched?.id || null,
           requestHeaders: req.headers,
           requestBodyPreview: body,
+          requestBodyTruncated: truncated,
           // Prefer X-Forwarded-For if behind a proxy, else socket remote address
           ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
               || req.socket.remoteAddress
@@ -145,4 +163,14 @@ export class MockEngine {
     }
     return out;
   }
+}
+
+function buildRouter(endpoints) {
+  const map = new Map();
+  for (const e of endpoints) {
+    if (e.enabled === false) continue;
+    const key = `${e.port}|${e.method}|${e.path}`;
+    map.set(key, e);
+  }
+  return map;
 }
