@@ -69,3 +69,30 @@ describe('POST /api/generators/sample', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('date — new generators (timestamp / now / format) — integration', () => {
+  it('GET /api/generators lists date.timestamp / date.now / date.format in date category', async () => {
+    const res = await ctx.request.get('/api/generators');
+    expect(res.status).toBe(200);
+    const dateCat = res.body.categories.find((c) => c.id === 'date');
+    const ids = dateCat.generators.map((g) => g.id);
+    expect(ids).toContain('date.timestamp');
+    expect(ids).toContain('date.now');
+    expect(ids).toContain('date.format');
+  });
+
+  it('POST /api/generators/sample returns valid samples for new generators', async () => {
+    for (const id of ['date.timestamp', 'date.now', 'date.format']) {
+      const res = await ctx.request.post('/api/generators/sample').send({ id, args: {} });
+      expect(res.status, `id=${id}`).toBe(200);
+      expect(res.body.ok, `id=${id}`).toBe(true);
+      expect(res.body.sample, `id=${id}`).not.toBeNull();
+    }
+    // date.format 必须是合法格式字符串
+    const fmtRes = await ctx.request.post('/api/generators/sample').send({ id: 'date.format', args: {} });
+    expect(fmtRes.body.sample).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    // date.now 必须是合理毫秒（> 2020-01-01）
+    const nowRes = await ctx.request.post('/api/generators/sample').send({ id: 'date.now', args: {} });
+    expect(nowRes.body.sample).toBeGreaterThan(1577836800000);
+  });
+});
