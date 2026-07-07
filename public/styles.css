@@ -1474,12 +1474,13 @@ button {
    ============================================================ */
 dialog.log-detail {
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-1);
   color: var(--text);
   border-radius: 8px;
   max-width: 720px;
   width: 90vw;
   max-height: 80vh;
+  margin: auto;
   padding: 20px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
 }
