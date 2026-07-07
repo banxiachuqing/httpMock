@@ -87,6 +87,18 @@ export const GENERATORS = {
     args: [{ name: 'years', type: 'int', default: 1, min: 1, max: 100 }],
     run: ({ years }) => faker.date.future({ years }).toISOString(),
   },
+  'date.timestamp': {
+    category: 'date', label: '毫秒时间戳（随机）', outputType: 'number', args: [],
+    run: () => faker.date.anytime().getTime(),
+  },
+  'date.now': {
+    category: 'date', label: '当前时间毫秒', outputType: 'number', args: [],
+    run: () => Date.now(),
+  },
+  'date.format': {
+    category: 'date', label: '本地格式 yyyy-MM-dd hh:mm:ss', outputType: 'string', args: [],
+    run: () => formatLocalDateTime(new Date()),
+  },
 
   // ─── person ────────────────────────────────────────────
   'person.fullName': {
@@ -201,7 +213,7 @@ export const CATEGORIES = [
   { id: 'string',   label: '字符串/UUID等',         generatorIds: ['uuid', 'string.alphanumeric', 'string.nanoid', 'string.symbol'] },
   { id: 'lorem',    label: '单词/句子/段落等',       generatorIds: ['lorem.word', 'lorem.sentence', 'lorem.paragraph'] },
   { id: 'number',   label: '数值',                  generatorIds: ['int', 'float'] },
-  { id: 'date',     label: '日期/时间相关',           generatorIds: ['date', 'date.recent', 'date.past', 'date.future'] },
+  { id: 'date',     label: '日期/时间相关',           generatorIds: ['date', 'date.recent', 'date.past', 'date.future', 'date.timestamp', 'date.now', 'date.format'] },
   { id: 'person',   label: '姓名/性别/职业等个人资料', generatorIds: ['person.fullName', 'person.firstName', 'person.lastName', 'person.gender', 'person.jobTitle'] },
   { id: 'phone',    label: '电话/手机',              generatorIds: ['phone.number'] },
   { id: 'internet', label: '邮箱/网址/域名/IP/...',   generatorIds: ['internet.email', 'internet.url', 'internet.domainName', 'internet.ip', 'internet.userName', 'internet.password'] },
@@ -214,6 +226,27 @@ export const LOCALES = ['zh_CN', 'en'];
 function pickFaker(locale) {
   if (locale === 'en') return fakerEN;
   return fakerZH_CN;
+}
+
+function pad(n, w = 2) {
+  return String(n).padStart(w, '0');
+}
+
+/**
+ * 把 Date 格式化为本地时区的 `yyyy-MM-dd hh:mm:ss`。
+ * 不依赖 Intl / locale 库 — `getFullYear/getMonth/...` 返回本地数字。
+ * @param {Date} date
+ * @returns {string}
+ */
+function formatLocalDateTime(date) {
+  return [
+    date.getFullYear(),
+    '-', pad(date.getMonth() + 1),
+    '-', pad(date.getDate()),
+    ' ', pad(date.getHours()),
+    ':', pad(date.getMinutes()),
+    ':', pad(date.getSeconds()),
+  ].join('');
 }
 
 /**
