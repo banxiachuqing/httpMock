@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
+import fs from 'node:fs/promises';
 import express from 'express';
 import open from 'open';
 import { ConfigStore } from './src/config-store.js';
@@ -58,17 +59,29 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
   for (const [route, pkg] of Object.entries(transitiveMap)) {
     app.use(`/vendor/${route}`, express.static(path.join(__dirname, 'node_modules', pkg)));
   }
-  // Static files
-  app.use(express.static(finalPublicPath));
-  // 404 for everything else (non-/api unmatched, non-static)
+
+  // Read package.json version once at startup and inject into index.html.
+  // Replaces `{{VERSION}}` placeholder so the topbar shows the real version
+  // in dev mode (build.mjs already does this for packaged builds).
+  let pkgVersion = 'unknown';
+  try {
+    const pkgPath = path.join(__dirname, 'package.json');
+    pkgVersion = JSON.parse(await fs.readFile(pkgPath, 'utf8')).version;
+  } catch { /* keep 'unknown' — packaged mode already has version baked in by build.mjs */ }
+  const indexHtmlTemplate = await fs.readFile(path.join(finalPublicPath, 'index.html'), 'utf8');
+  const indexHtml = indexHtmlTemplate.replaceAll('{{VERSION}}', pkgVersion);
+
+  // Static files (no index fallback — index.html served explicitly below)
+  app.use(express.static(finalPublicPath, { index: false }));
+
+  // Serve index.html (with version) for / and SPA-style paths.
+  app.get(/^(?!\/api\/).*/, (_req, res) => {
+    res.type('html').send(indexHtml);
+  });
+
+  // 404 for /api/* unmatched
   app.use((req, res) => {
-    if (req.path.startsWith('/api/')) {
-      res.status(404).json({ error: 'not found', code: 'NOT_FOUND' });
-    } else {
-      res.sendFile(path.join(finalPublicPath, 'index.html'), (err) => {
-        if (err) res.status(404).end();
-      });
-    }
+    res.status(404).json({ error: 'not found', code: 'NOT_FOUND' });
   });
 
   const desired = uiPort ?? configStore.config.settings.uiPort ?? 5050;
