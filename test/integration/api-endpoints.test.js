@@ -87,3 +87,43 @@ describe('DELETE /api/endpoints/:id', () => {
     expect(list.body).toHaveLength(0);
   });
 });
+
+describe('endpoint name 字段', () => {
+  it('保存 trim 后的名称', async () => {
+    const r = await ctx.request.post('/api/endpoints').send({ ...validBody, name: '  用户登录 ' });
+    expect(r.status).toBe(201);
+    expect(r.body.name).toBe('用户登录');
+  });
+
+  it('超过 50 字符拒绝', async () => {
+    const r = await ctx.request.post('/api/endpoints').send({ ...validBody, name: 'x'.repeat(51) });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_NAME');
+  });
+
+  it('非字符串拒绝', async () => {
+    const r = await ctx.request.post('/api/endpoints').send({ ...validBody, name: 123 });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_NAME');
+  });
+
+  it('空白名称视为未填，不存储', async () => {
+    const r = await ctx.request.post('/api/endpoints').send({ ...validBody, name: '   ' });
+    expect(r.status).toBe(201);
+    expect(r.body.name).toBeUndefined();
+  });
+
+  it('PUT 可更新名称', async () => {
+    const created = await ctx.request.post('/api/endpoints').send(validBody);
+    const r = await ctx.request.put(`/api/endpoints/${created.body.id}`).send({ ...validBody, name: '改名' });
+    expect(r.status).toBe(200);
+    expect(r.body.name).toBe('改名');
+  });
+
+  it('PUT 空白名称清除已有名称', async () => {
+    const created = await ctx.request.post('/api/endpoints').send({ ...validBody, name: '原名' });
+    const r = await ctx.request.put(`/api/endpoints/${created.body.id}`).send({ ...validBody, name: '  ' });
+    expect(r.status).toBe(200);
+    expect(r.body.name).toBeUndefined();
+  });
+});

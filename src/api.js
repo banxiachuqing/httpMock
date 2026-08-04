@@ -8,6 +8,27 @@ import { registerPreviewRoutes } from './api-preview.js';
 
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
+const MAX_NAME_LENGTH = 50;
+
+function validateName(body) {
+  if (body.name === undefined) return;
+  if (typeof body.name !== 'string') {
+    throw new AppError(400, 'INVALID_NAME', 'name must be a string');
+  }
+  if (body.name.trim().length > MAX_NAME_LENGTH) {
+    throw new AppError(400, 'INVALID_NAME', `name must be at most ${MAX_NAME_LENGTH} chars`);
+  }
+}
+
+function withNormalizedName(ep) {
+  if (typeof ep.name === 'string') {
+    const trimmed = ep.name.trim();
+    if (trimmed) ep.name = trimmed;
+    else delete ep.name;
+  }
+  return ep;
+}
+
 function validateEndpointBody(body, { partial = false } = {}) {
   if (!body || typeof body !== 'object') throw new AppError(400, 'INVALID_BODY', 'body required');
   if (!partial || body.port !== undefined) {
@@ -30,6 +51,7 @@ function validateEndpointBody(body, { partial = false } = {}) {
     try { JSON.parse(JSON.stringify(body.response)); }
     catch { throw new AppError(400, 'INVALID_JSON', 'response must be JSON-serializable'); }
   }
+  validateName(body);
 }
 
 export function createApi({ configStore, logBuffer, mockEngine }) {
@@ -87,7 +109,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
     try {
       validateEndpointBody(req.body);
       const id = crypto.randomUUID();
-      const ep = { id, ...req.body, enabled: req.body.enabled !== false };
+      const ep = withNormalizedName({ id, ...req.body, enabled: req.body.enabled !== false });
       const all = [...configStore.config.endpoints, ep];
       configStore.checkUniqueness(all);
       await configStore.update((cfg) => { cfg.endpoints = all; return cfg; });
@@ -101,7 +123,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
       const idx = list.findIndex((e) => e.id === req.params.id);
       if (idx < 0) throw new AppError(404, 'NOT_FOUND', 'endpoint not found');
       validateEndpointBody(req.body);
-      const updated = { ...list[idx], ...req.body, id: list[idx].id };
+      const updated = withNormalizedName({ ...list[idx], ...req.body, id: list[idx].id });
       const all = [...list];
       all[idx] = updated;
       configStore.checkUniqueness(all, req.params.id);
