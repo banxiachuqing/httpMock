@@ -362,6 +362,29 @@
     </div>
   </div>
 
+  <!-- New port dialog -->
+  <div class="modal" id="newPortModal" hidden>
+    <div class="modal-backdrop" id="newPortBackdrop"></div>
+    <div class="modal-panel" role="dialog" aria-labelledby="newPortTitle" aria-modal="true">
+      <div class="modal-header">
+        <h2 class="section-label" id="newPortTitle">新建端口</h2>
+        <button class="btn btn-icon" id="newPortClose" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="field field-wide">
+          <label for="newPortNumber">端口号</label>
+          <input type="number" id="newPortNumber" class="input mono" min="1" max="65535" />
+          <p class="field-hint">1–65535 的整数，不能与现有端口重复。</p>
+          <p class="field-hint field-error" id="newPortError" hidden></p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="newPortCancel">取消</button>
+        <button class="btn btn-primary" id="newPortCreate">创建</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Log detail dialog -->
   <dialog id="log-detail" class="log-detail" aria-labelledby="log-detail-title">
     <header class="log-detail-header">

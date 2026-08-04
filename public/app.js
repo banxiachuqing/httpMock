@@ -3,6 +3,7 @@
 
 import { mountEditor, getValue, setValue, getEditorView } from './editor.js';
 import { startRouter, navigate } from './router.js';
+import { renderPortCards, initNewPortDialog } from './views/port-cards.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -24,6 +25,23 @@ const api = {
   },
   async deleteEndpoint(id) {
     return (await fetch(`/api/endpoints/${id}`, { method: 'DELETE' }));
+  },
+  async listPorts() { return (await fetch('/api/ports')).json(); },
+  async createPort(port) {
+    const r = await fetch('/api/ports', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ port }) });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.message || '创建端口失败');
+    return body;
+  },
+  async updatePort(port, body) {
+    const r = await fetch(`/api/ports/${port}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.message || '更新端口失败');
+    return json;
+  },
+  async deletePort(port) {
+    const r = await fetch(`/api/ports/${port}`, { method: 'DELETE' });
+    if (!r.ok && r.status !== 204) throw new Error('删除端口失败');
   },
   async runtimeStart() { return (await fetch('/api/runtime/start', { method: 'POST' })).json(); },
   async runtimeStop() { return (await fetch('/api/runtime/stop', { method: 'POST' })).json(); },
@@ -139,6 +157,15 @@ const els = {
   portNotFoundBack: $('#portNotFoundBack'),
   sidebarPanel: $('#sidebarPanel'),
   logsPanel: $('#logsPanel'),
+
+  // 新建端口弹窗
+  newPortModal: $('#newPortModal'),
+  newPortBackdrop: $('#newPortBackdrop'),
+  newPortClose: $('#newPortClose'),
+  newPortCancel: $('#newPortCancel'),
+  newPortCreate: $('#newPortCreate'),
+  newPortNumber: $('#newPortNumber'),
+  newPortError: $('#newPortError'),
 };
 
 let logDetailCM = null;
@@ -275,6 +302,16 @@ function renderStatus() {
 // 路由与视图切换
 // ============================================================
 let suppressHash = false;
+let newPortDialog = null;
+
+function renderHome() {
+  renderPortCards(state, {
+    grid: els.portCardGrid,
+    countEl: els.portCardCount,
+    api,
+    onNewPort: () => newPortDialog.open(),
+  });
+}
 
 async function applyRoute(route) {
   if (state.dirty && state.route.view === 'port' && !confirm('有未保存的修改，是否放弃？')) {
@@ -302,6 +339,8 @@ async function applyRoute(route) {
   els.sidebarPanel.hidden = home || !portKnown;
   els.editor.hidden = home || !portKnown;
   els.logsPanel.hidden = home || !portKnown;
+
+  if (home) renderHome();
 
   if (!home && portKnown) {
     els.portHeaderNumber.textContent = `:${route.port}`;
@@ -471,6 +510,7 @@ function appendLog(entry) {
   els.logsBody.appendChild(renderLogEntry(entry));
   els.logsCount.textContent = `${state.logs.length} 条 · 最多 500`;
   if (state.autoScroll) els.logsBody.scrollTop = els.logsBody.scrollHeight;
+  if (state.route.view === 'home') renderHome();
 }
 
 // ============================================================
@@ -478,7 +518,7 @@ function appendLog(entry) {
 // ============================================================
 async function loadAll() {
   state.config = await api.getConfig();
-  state.ports = await (await fetch('/api/ports')).json();
+  state.ports = await api.listPorts();
   state.endpoints = await api.listEndpoints();
   state.selectedId = state.endpoints[0]?.id || null;
   state.logs = await api.recentLogs(500);
@@ -614,6 +654,7 @@ async function refreshRuntimeStatus() {
     state.runtimeStatus = await api.runtimeStatus();
   } catch {}
   renderEndpointList();
+  if (state.route.view === 'home') renderHome();
 }
 
 // ============================================================
@@ -791,6 +832,7 @@ loadAll().then(() => {
   refreshRuntimeStatus();
   // Poll every 5s to catch external changes (e.g. someone else binds the port)
   setInterval(refreshRuntimeStatus, 5000);
+  newPortDialog = initNewPortDialog({ els, state, api });
   startRouter((route) => {
     if (suppressHash) { suppressHash = false; return; }
     applyRoute(route);

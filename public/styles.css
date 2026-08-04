@@ -1618,3 +1618,110 @@ dialog.log-detail::backdrop {
   align-items: center;
   justify-content: center;
 }
+
+.port-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  padding: var(--s-4) var(--s-5);
+  box-shadow: var(--shadow-panel);
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--d-fast) ease, border-color var(--d-fast) ease;
+}
+
+.port-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-bright);
+}
+
+.port-card:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.port-card[data-enabled='false'] {
+  opacity: 0.55;
+}
+
+.port-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.port-card-number {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.port-card-toggle {
+  margin-left: auto;
+}
+
+.port-card-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+}
+
+.port-card-stats > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.port-card-stats dt {
+  color: var(--text-tertiary);
+}
+
+.port-card-stats dd {
+  margin: 0;
+  color: var(--text-secondary);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.port-card-last {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.port-card-time {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.port-card-new {
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.port-card-new:hover {
+  color: var(--text-primary);
+}
+
+.port-empty-hint {
+  grid-column: 1 / -1;
+  color: var(--text-tertiary);
+  padding: var(--s-6);
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-3);
+}
+
+.field-error {
+  color: var(--red);
+}
