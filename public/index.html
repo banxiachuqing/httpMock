@@ -152,7 +152,7 @@
         </div>
 
         <div class="form-grid">
-          <div class="field field-wide">
+          <div class="field field-full">
             <label for="endpointName">接口名称</label>
             <input type="text" id="endpointName" class="input" maxlength="50" placeholder="可选，留空时列表显示 URL" autocomplete="off" />
           </div>
@@ -177,12 +177,12 @@
             <input type="number" id="port" class="input mono" min="1" max="65535" disabled title="端口由端口详情页统一管理" />
           </div>
 
-          <div class="field field-wide">
+          <div class="field field-path">
             <label for="path">路径</label>
             <input type="text" id="path" class="input mono" placeholder="/api/example" autocomplete="off" spellcheck="false" />
           </div>
 
-          <div class="field">
+          <div class="field field-status">
             <label for="status">状态码</label>
             <input type="number" id="status" class="input mono" min="200" max="599" value="200" />
           </div>

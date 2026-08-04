@@ -787,7 +787,7 @@ button {
 
 .form-grid {
   display: grid;
-  grid-template-columns: 100px 100px 1fr 100px;
+  grid-template-columns: 84px 90px 1fr 84px;
   gap: var(--s-3);
   padding: var(--s-5) var(--s-6) var(--s-4);
   border-bottom: 1px solid var(--border-soft);
@@ -795,6 +795,9 @@ button {
 
 .field { display: flex; flex-direction: column; gap: var(--s-2); }
 .field-wide { grid-column: span 2; }
+.field-full { grid-column: 1 / -1; }
+.field-path { grid-column: 3; }
+.field-status { grid-column: 4; }
 .field label {
   font-family: var(--font-sans);
   font-size: 10px;
