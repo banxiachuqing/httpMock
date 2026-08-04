@@ -111,7 +111,7 @@ server.js (startServer, listenWithFallback)
 - `public/views/port-cards.js` — 首页端口卡片渲染 + 新建端口弹窗。
 - `public/views/port-detail.js` — 详情页端口页头交互（启用/改号/删除）。
 - `public/editor.js` — CodeMirror 6 bootstrap（lang-json + lint + commands）。
-- `public/styles.css` — Mission Bridge 视觉方向。
+- `public/styles.css` — Cinematic Dark Glass 视觉方向（深色渐变 + 玻璃面板 + 靛蓝主色 + 背景光斑）。
 
 **全局状态键**（`public/app.js` 的 `state`）：`config / ports / endpoints / selectedId / dirty / runtime / runtimeStatus / logs / autoScroll / route`。`runtimeStatus` 是 `{port: {state, reason?}}` 字典，每 5s 轮询 `/api/runtime/status`；`route` 是 `{view:'home'} | {view:'port', port}`，由 `router.js` 驱动。
 
