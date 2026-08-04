@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { bootServer, hitMock } from './helpers.js';
+import { bootServer, hitMock, enterPortDetail } from './helpers.js';
 
 let server;
 
@@ -38,8 +38,7 @@ test('happy path: live preview shows resolved UUID + serve returns real UUID', a
       }),
     });
   });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(1500);
+  await enterPortDetail(page, server.baseURL, 19501);
   await page.locator('.endpoint-item').first().dispatchEvent('click');
   await expect(page.locator('#editorForm')).toBeVisible();
   await page.waitForTimeout(500);
@@ -75,8 +74,7 @@ test('number expression preserves type (no quotes around int)', async ({ page })
       }),
     });
   });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(1500);
+  await enterPortDetail(page, server.baseURL, 19502);
   await page.locator('.endpoint-item').first().dispatchEvent('click');
   await expect(page.locator('#editorForm')).toBeVisible();
 
@@ -103,8 +101,7 @@ test('JSON syntax error keeps last good preview + shows banner', async ({ page }
       }),
     });
   });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(1500);
+  await enterPortDetail(page, server.baseURL, 19503);
   await page.locator('.endpoint-item').first().dispatchEvent('click');
   await expect(page.locator('#editorForm')).toBeVisible();
 
@@ -138,8 +135,7 @@ test('end-to-end serve: dynamic UUID appears in real mock response', async ({ pa
       }),
     });
   });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(1500);
+  await enterPortDetail(page, server.baseURL, 19504);
   await page.locator('.endpoint-item').first().dispatchEvent('click');
   await expect(page.locator('#editorForm')).toBeVisible();
   await page.waitForTimeout(300);

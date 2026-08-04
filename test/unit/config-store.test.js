@@ -17,8 +17,9 @@ afterEach(() => dir.cleanup());
 describe('ConfigStore.load', () => {
   it('initializes a fresh config when file is missing', async () => {
     const cfg = await store.load();
-    expect(cfg.version).toBe(1);
+    expect(cfg.version).toBe(2);
     expect(cfg.settings).toEqual({ storagePath: dir.path, uiPort: 5050, maxBodyBytes: 4 * 1024 * 1024 });
+    expect(cfg.ports).toEqual([]);
     expect(cfg.endpoints).toEqual([]);
   });
 
@@ -38,7 +39,7 @@ describe('ConfigStore.load', () => {
   it('backs up corrupt file and returns fresh config', async () => {
     fs.writeFileSync(path.join(dir.path, 'data.json'), 'not json');
     const cfg = await store.load();
-    expect(cfg.version).toBe(1);
+    expect(cfg.version).toBe(2);
     const files = fs.readdirSync(dir.path);
     expect(files.some((f) => f.startsWith('data.json.broken-'))).toBe(true);
   });

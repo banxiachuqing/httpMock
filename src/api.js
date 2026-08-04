@@ -5,8 +5,37 @@ import { AppError, toErrorResponse, statusFor } from './errors.js';
 import { sseMiddleware, broadcast } from './sse.js';
 import { isValidStoragePath } from './paths.js';
 import { registerPreviewRoutes } from './api-preview.js';
+import { registerPortRoutes } from './api-ports.js';
 
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
+
+const MAX_NAME_LENGTH = 50;
+
+function validateName(body) {
+  if (body.name === undefined) return;
+  if (typeof body.name !== 'string') {
+    throw new AppError(400, 'INVALID_NAME', 'name must be a string');
+  }
+  if (body.name.trim().length > MAX_NAME_LENGTH) {
+    throw new AppError(400, 'INVALID_NAME', `name must be at most ${MAX_NAME_LENGTH} chars`);
+  }
+}
+
+function withNormalizedName(ep) {
+  if (typeof ep.name === 'string') {
+    const trimmed = ep.name.trim();
+    if (trimmed) ep.name = trimmed;
+    else delete ep.name;
+  }
+  return ep;
+}
+
+// 端点引用的端口不在 ports 列表时自动补建（避免运行时静默跳过）
+function ensurePortEntity(cfg, port) {
+  if (!cfg.ports.some((p) => p.port === port)) {
+    cfg.ports = [...cfg.ports, { port, enabled: true }].sort((a, b) => a.port - b.port);
+  }
+}
 
 function validateEndpointBody(body, { partial = false } = {}) {
   if (!body || typeof body !== 'object') throw new AppError(400, 'INVALID_BODY', 'body required');
@@ -30,6 +59,7 @@ function validateEndpointBody(body, { partial = false } = {}) {
     try { JSON.parse(JSON.stringify(body.response)); }
     catch { throw new AppError(400, 'INVALID_JSON', 'response must be JSON-serializable'); }
   }
+  validateName(body);
 }
 
 export function createApi({ configStore, logBuffer, mockEngine }) {
@@ -87,10 +117,14 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
     try {
       validateEndpointBody(req.body);
       const id = crypto.randomUUID();
-      const ep = { id, ...req.body, enabled: req.body.enabled !== false };
+      const ep = withNormalizedName({ id, ...req.body, enabled: req.body.enabled !== false });
       const all = [...configStore.config.endpoints, ep];
       configStore.checkUniqueness(all);
-      await configStore.update((cfg) => { cfg.endpoints = all; return cfg; });
+      await configStore.update((cfg) => {
+        cfg.endpoints = all;
+        ensurePortEntity(cfg, ep.port);
+        return cfg;
+      });
       res.status(201).json(ep);
     } catch (e) { next(e); }
   });
@@ -101,11 +135,15 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
       const idx = list.findIndex((e) => e.id === req.params.id);
       if (idx < 0) throw new AppError(404, 'NOT_FOUND', 'endpoint not found');
       validateEndpointBody(req.body);
-      const updated = { ...list[idx], ...req.body, id: list[idx].id };
+      const updated = withNormalizedName({ ...list[idx], ...req.body, id: list[idx].id });
       const all = [...list];
       all[idx] = updated;
       configStore.checkUniqueness(all, req.params.id);
-      await configStore.update((cfg) => { cfg.endpoints = all; return cfg; });
+      await configStore.update((cfg) => {
+        cfg.endpoints = all;
+        ensurePortEntity(cfg, updated.port);
+        return cfg;
+      });
       res.json(updated);
     } catch (e) { next(e); }
   });
@@ -123,7 +161,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
   // Runtime
   app.post('/api/runtime/start', async (req, res, next) => {
     try {
-      const result = await mockEngine.start(configStore.config.endpoints);
+      const result = await mockEngine.start(configStore.config.endpoints, configStore.config.ports);
       res.json(result);
     } catch (e) { next(e); }
   });
@@ -148,6 +186,9 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
     logBuffer.clear();
     res.status(204).end();
   });
+
+  // Ports CRUD（端口一等实体）
+  registerPortRoutes(app, { configStore });
 
   // Preview & generators (dynamic response values) —挂 createApi 末尾、错误中间件之前
   registerPreviewRoutes(app);

@@ -32,6 +32,15 @@ export function hitMock(port, path, opts = {}) {
   });
 }
 
+export async function enterPortDetail(page, baseURL, port) {
+  await page.goto(`${baseURL}/#/port/${port}`, { waitUntil: 'load' });
+  // goto 到仅 hash 变化的 URL 不会重新加载页面（loadAll 不重跑），
+  // 导致前端状态陈旧（端点/运行状态/预览）。reload 强制全新启动，同时保留 hash。
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(800);
+  await page.waitForSelector('#portHeader:not([hidden])');
+}
+
 export async function newEndpoint(page, { method = 'GET', port, path }) {
   return await page.evaluate(async ({ method, port, path }) => {
     const r = await fetch('/api/endpoints', {

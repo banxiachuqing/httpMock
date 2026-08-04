@@ -22,7 +22,8 @@ export class ConfigStore {
       const raw = await fs.readFile(file, 'utf8');
       const parsed = JSON.parse(raw);
       if (typeof parsed.version !== 'number') throw new Error('missing version');
-      this.config = parsed;
+      this.config = this._migrate(parsed);
+      if (this.config !== parsed) await this._writeAtomic();
     } catch (e) {
       if (e.code !== 'ENOENT') {
         const backup = `${file}.broken-${Date.now()}`;
@@ -40,8 +41,9 @@ export class ConfigStore {
         } catch {}
       }
       this.config = {
-        version: 1,
+        version: 2,
         settings: { storagePath: this.storagePath, uiPort: 5050, maxBodyBytes: 4 * 1024 * 1024 },
+        ports: [],
         endpoints: [],
       };
       await this._writeAtomic();
@@ -62,6 +64,14 @@ export class ConfigStore {
     const tmp = `${file}.tmp`;
     await fs.writeFile(tmp, JSON.stringify(this.config, null, 2), 'utf8');
     await fs.rename(tmp, file);
+  }
+
+  _migrate(cfg) {
+    if (Array.isArray(cfg.ports)) return cfg;
+    const ports = [...new Set((cfg.endpoints || []).map((e) => e.port))]
+      .sort((a, b) => a - b)
+      .map((port) => ({ port, enabled: true }));
+    return { ...cfg, ports, version: 2 };
   }
 
   checkUniqueness(endpoints, excludeId = null) {

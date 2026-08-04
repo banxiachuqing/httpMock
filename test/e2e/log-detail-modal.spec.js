@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { bootServer, hitMock } from './helpers.js';
+import { bootServer, hitMock, enterPortDetail } from './helpers.js';
 
 let server;
 
@@ -45,8 +45,7 @@ test('click log row → dialog opens with 4 sections', async ({ page }) => {
   await createEndpointViaApi(page, {
     method: 'POST', port: 19601, path: '/x', statusCode: 200, response: { ok: true }, enabled: true,
   });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(800);
+  await enterPortDetail(page, server.baseURL, 19601);
   await page.locator('#startStopBtn').click();
   await page.waitForTimeout(600);
 
@@ -68,8 +67,7 @@ test('body is rendered in CodeMirror when valid JSON', async ({ page }) => {
   await createEndpointViaApi(page, {
     method: 'POST', port: 19602, path: '/x', statusCode: 200, response: { ok: true }, enabled: true,
   });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(800);
+  await enterPortDetail(page, server.baseURL, 19602);
   await page.locator('#startStopBtn').click();
   await page.waitForTimeout(600);
 
@@ -85,8 +83,7 @@ test('body is rendered as plain text when not JSON', async ({ page }) => {
   await createEndpointViaApi(page, {
     method: 'POST', port: 19603, path: '/x', statusCode: 200, response: { ok: true }, enabled: true,
   });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(800);
+  await enterPortDetail(page, server.baseURL, 19603);
   await page.locator('#startStopBtn').click();
   await page.waitForTimeout(600);
 
@@ -102,8 +99,7 @@ test('GET with no body shows empty placeholder', async ({ page }) => {
   await createEndpointViaApi(page, {
     method: 'GET', port: 19604, path: '/x', statusCode: 200, response: { ok: true }, enabled: true,
   });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(800);
+  await enterPortDetail(page, server.baseURL, 19604);
   await page.locator('#startStopBtn').click();
   await page.waitForTimeout(600);
 
@@ -117,8 +113,7 @@ test('query parameters are parsed into a table', async ({ page }) => {
   await createEndpointViaApi(page, {
     method: 'GET', port: 19605, path: '/x', statusCode: 200, response: { ok: true }, enabled: true,
   });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(800);
+  await enterPortDetail(page, server.baseURL, 19605);
   await page.locator('#startStopBtn').click();
   await page.waitForTimeout(600);
 
@@ -136,8 +131,7 @@ test('click on backdrop closes the dialog', async ({ page }) => {
   await createEndpointViaApi(page, {
     method: 'GET', port: 19606, path: '/x', statusCode: 200, response: { ok: true }, enabled: true,
   });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(800);
+  await enterPortDetail(page, server.baseURL, 19606);
   await page.locator('#startStopBtn').click();
   await page.waitForTimeout(600);
 
@@ -162,8 +156,7 @@ test('truncated body shows warning banner', async ({ page }) => {
   await createEndpointViaApi(page, {
     method: 'POST', port: 19607, path: '/x', statusCode: 200, response: { ok: true }, enabled: true,
   });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(800);
+  await enterPortDetail(page, server.baseURL, 19607);
   await page.locator('#startStopBtn').click();
   await page.waitForTimeout(600);
 

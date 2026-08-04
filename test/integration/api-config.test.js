@@ -23,7 +23,8 @@ describe('GET /api/config', () => {
   it('returns the current config', async () => {
     const r = await ctx.request.get('/api/config');
     expect(r.status).toBe(200);
-    expect(r.body.version).toBe(1);
+    expect(r.body.version).toBe(2);
+    expect(r.body.ports).toEqual([]);
     expect(r.body.settings.uiPort).toBe(5050);
   });
 });

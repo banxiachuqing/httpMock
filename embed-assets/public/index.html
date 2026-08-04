@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
     rel="stylesheet"
   />
   <link rel="stylesheet" href="styles.css" />
@@ -36,6 +36,7 @@
 </head>
 <body>
   <div class="grid-canvas" aria-hidden="true"></div>
+  <div class="blobs" aria-hidden="true"></div>
   <div class="grain" aria-hidden="true"></div>
 
   <header class="topbar" data-reveal="0">
@@ -68,8 +69,45 @@
     </div>
   </header>
 
+  <!-- 首页：端口卡片（卡片渲染见 views/port-cards.js） -->
+  <section class="home-view" id="viewHome" hidden>
+    <div class="home-header">
+      <h2 class="section-label">端口列表</h2>
+      <span class="sidebar-count" id="portCardCount">0</span>
+      <span class="home-hint">点击卡片进入端口详情</span>
+    </div>
+    <div class="port-card-grid" id="portCardGrid"></div>
+  </section>
+
+  <!-- 端口详情页页头 -->
+  <header class="port-header" id="portHeader" hidden>
+    <button class="btn btn-ghost btn-sm" id="backToHomeBtn">← 返回端口列表</button>
+    <span class="port-header-number mono" id="portHeaderNumber">:—</span>
+    <label class="toggle">
+      <input type="checkbox" id="portEnabledToggle" />
+      <span class="toggle-label">启用</span>
+    </label>
+    <span class="port-rename">
+      <input type="number" id="portNumberInput" class="input mono port-rename-input" min="1" max="65535" />
+      <button class="btn btn-ghost btn-sm" id="portRenameBtn">改号</button>
+    </span>
+    <button class="btn btn-danger btn-sm" id="deletePortBtn">删除端口</button>
+    <div class="spacer"></div>
+    <span class="led" id="portStatusLed" data-state="stopped" title="端口运行状态"></span>
+  </header>
+
+  <!-- hash 指向不存在端口时 -->
+  <div class="port-not-found" id="portNotFound" hidden>
+    <div class="editor-empty-inner">
+      <div class="editor-empty-mark">//</div>
+      <h3 class="editor-empty-title">端口不存在</h3>
+      <p class="editor-empty-text">它可能已被删除。</p>
+      <button class="btn btn-ghost" id="portNotFoundBack">返回端口列表</button>
+    </div>
+  </div>
+
   <main class="layout">
-    <aside class="sidebar" data-reveal="1">
+    <aside class="sidebar" id="sidebarPanel" data-reveal="1">
       <div class="sidebar-header">
         <h2 class="section-label">接口列表</h2>
         <span class="sidebar-count" id="endpointCount">0</span>
@@ -114,6 +152,11 @@
         </div>
 
         <div class="form-grid">
+          <div class="field field-full">
+            <label for="endpointName">接口名称</label>
+            <input type="text" id="endpointName" class="input" maxlength="50" placeholder="可选，留空时列表显示 URL" autocomplete="off" />
+          </div>
+
           <div class="field">
             <label for="method">方法</label>
             <div class="select-wrap">
@@ -131,15 +174,15 @@
 
           <div class="field">
             <label for="port">端口</label>
-            <input type="number" id="port" class="input mono" min="1" max="65535" />
+            <input type="number" id="port" class="input mono" min="1" max="65535" disabled title="端口由端口详情页统一管理" />
           </div>
 
-          <div class="field field-wide">
+          <div class="field field-path">
             <label for="path">路径</label>
             <input type="text" id="path" class="input mono" placeholder="/api/example" autocomplete="off" spellcheck="false" />
           </div>
 
-          <div class="field">
+          <div class="field field-status">
             <label for="status">状态码</label>
             <input type="number" id="status" class="input mono" min="200" max="599" value="200" />
           </div>
@@ -205,7 +248,7 @@
     </section>
   </main>
 
-  <section class="logs" data-reveal="3">
+  <section class="logs" id="logsPanel" data-reveal="3">
     <div class="logs-header">
       <div class="logs-header-left">
         <h2 class="section-label">请求日志</h2>
@@ -330,6 +373,29 @@
       <div class="modal-footer">
         <button class="btn btn-ghost" id="settingsCancel">取消</button>
         <button class="btn btn-primary" id="settingsSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New port dialog -->
+  <div class="modal" id="newPortModal" hidden>
+    <div class="modal-backdrop" id="newPortBackdrop"></div>
+    <div class="modal-panel" role="dialog" aria-labelledby="newPortTitle" aria-modal="true">
+      <div class="modal-header">
+        <h2 class="section-label" id="newPortTitle">新建端口</h2>
+        <button class="btn btn-icon" id="newPortClose" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="field field-wide">
+          <label for="newPortNumber">端口号</label>
+          <input type="number" id="newPortNumber" class="input mono" min="1" max="65535" />
+          <p class="field-hint">1–65535 的整数，不能与现有端口重复。</p>
+          <p class="field-hint field-error" id="newPortError" hidden></p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="newPortCancel">取消</button>
+        <button class="btn btn-primary" id="newPortCreate">创建</button>
       </div>
     </div>
   </div>

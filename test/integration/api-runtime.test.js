@@ -45,6 +45,14 @@ describe('POST /api/runtime/start', () => {
       await new Promise((res) => blocker.close(res));
     }
   });
+
+  it('禁用端口不随启动绑定', async () => {
+    await ctx.request.post('/api/endpoints').send({ port: 19095, method: 'GET', path: '/a', statusCode: 200, response: { ok: 1 } });
+    await ctx.request.put('/api/ports/19095').send({ enabled: false });
+    const r = await ctx.request.post('/api/runtime/start');
+    expect(r.body.running).toEqual([]);
+    expect(r.body.failed).toEqual([]);
+  });
 });
 
 describe('POST /api/runtime/stop', () => {
