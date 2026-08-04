@@ -37,17 +37,17 @@ test('接口名称显示在列表，留空回落 URL', async ({ page }) => {
   await enterPortDetail(page, server.baseURL, 17502);
 
   await page.locator('.endpoint-item').first().dispatchEvent('click');
-  // 未填名称 → 显示 METHOD path
-  await expect(page.locator('.endpoint-item .endpoint-path').first()).toHaveText('GET /api/x');
+  // 未填名称 → 名称行显示 METHOD path
+  await expect(page.locator('.endpoint-item .endpoint-name').first()).toHaveText('GET /api/x');
 
   await page.fill('#endpointName', '查询接口');
   await page.click('#saveBtn');
-  await expect(page.locator('.endpoint-item .endpoint-path').first()).toHaveText('查询接口');
+  await expect(page.locator('.endpoint-item .endpoint-name').first()).toHaveText('查询接口');
 
   // 清空名称 → 回落
   await page.fill('#endpointName', '');
   await page.click('#saveBtn');
-  await expect(page.locator('.endpoint-item .endpoint-path').first()).toHaveText('GET /api/x');
+  await expect(page.locator('.endpoint-item .endpoint-name').first()).toHaveText('GET /api/x');
 });
 
 test('详情页日志只显示本端口', async ({ page }) => {

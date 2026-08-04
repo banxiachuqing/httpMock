@@ -215,21 +215,26 @@ function renderEndpointList() {
     }
 
     li.innerHTML = `
-      <span class="endpoint-method" data-method="${ep.method}">${ep.method}</span>
-      <div class="endpoint-main">
-        <div class="endpoint-path"></div>
-        <div class="endpoint-port">${ep.port}</div>
+      <div class="endpoint-name-row">
+        <span class="endpoint-name"></span>
+        <span class="endpoint-status">
+          <span class="led led-mini" data-state="${ledState}" title="${ledTitle}"></span>
+        </span>
+        <button class="endpoint-delete" type="button" aria-label="删除" title="删除">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
       </div>
-      <div class="endpoint-status">
-        <span class="led led-mini" data-state="${ledState}" title="${ledTitle}"></span>
+      <div class="endpoint-meta">
+        <span class="endpoint-method" data-method="${ep.method}">${ep.method}</span>
+        <span class="endpoint-port">${ep.port}</span>
+        <span class="endpoint-path"></span>
+        <span class="endpoint-status-code">${ep.statusCode || 200}</span>
       </div>
-      <button class="endpoint-delete" type="button" aria-label="删除" title="删除">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      </button>
     `;
-    li.querySelector('.endpoint-path').textContent = ep.name || `${ep.method} ${ep.path}`;
+    li.querySelector('.endpoint-name').textContent = ep.name || `${ep.method} ${ep.path}`;
+    li.querySelector('.endpoint-path').textContent = ep.path;
     li.addEventListener('click', (e) => {
       // Ignore clicks on the delete button
       if (e.target.closest('.endpoint-delete')) return;
