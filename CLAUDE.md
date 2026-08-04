@@ -95,21 +95,25 @@ server.js (startServer, listenWithFallback)
 |---|---|---|
 | `server.js` | 进程入口、端口回退（+50 探测）、bind host 解析、自动开浏览器 | `__dirname` 接受 `MOCK_SERVER_DIR`（编译模式用） |
 | `src/config-store.js` | `data.json` 持久化、原子写、损坏文件轮转（max 5）、唯一性校验 | `update(mutator)` 是唯一写入入口；`checkUniqueness(endpoints, excludeId)` 校验 `(port, method, path)` |
-| `src/mock-engine.js` | 每端口 `http.createServer`，按 `port|method|path` 路由 | **端口隔离**：一个端口 EADDRINUSE 不影响其他端口；`getStatus()` 返回 `{port: {state, reason?}}` |
+| `src/mock-engine.js` | 每端口 `http.createServer`，按 `port|method|path` 路由 | `start(endpoints, ports)`：ports 列表模式下只绑定启用端口、空端口也绑定（404）；**端口隔离**：一个端口 EADDRINUSE 不影响其他端口；`getStatus()` 返回 `{port: {state, reason?}}` |
 | `src/log-buffer.js` | 500 条环形 + `subscribe(fn)` fan-out | `push()` 同步通知所有订阅者 |
 | `src/sse.js` | SSE helper + 客户端集合 | `sseMiddleware()` 返回 `{clients, handler}`；不调用 `next()` |
 | `src/errors.js` | `AppError(status, code, message)` + 信封 | 所有 API 错误统一经 `toErrorResponse`/`statusFor` |
-| `src/api.js` | Express 路由（CRUD + runtime + logs + SSE） | 末尾挂 `app.use((err,...)=>...)` 错误中间件 |
+| `src/api.js` | Express 路由（CRUD + runtime + logs + SSE） | 末尾挂 `app.use((err,...)=>...)` 错误中间件；端点自动补建端口实体 |
+| `src/api-ports.js` | `/api/ports` CRUD（端口一等实体） | `registerPortRoutes(app, {configStore})`；改号级联 endpoints；删除连带 endpoints |
 | `src/paths.js` | 跨平台存储路径 | 默认 `~/Documents/MockServer`，回退 `~/MockServer` |
 
 ### 前端（零构建）
 
-- `public/index.html` — 用 import map 引入 CodeMirror 模块。
-- `public/app.js` — `api` 客户端（10 个 fetch 包装） + `state` 单例 + 渲染层。无框架。
+- `public/index.html` — import map 引入 CodeMirror；body 网格双视图（首页卡片区 / 端口详情页）。
+- `public/app.js` — `api` 客户端 + `state` 单例 + 详情页渲染层 + 路由接线。无框架。
+- `public/router.js` — hash 路由（`#/` 首页，`#/port/<port>` 详情）。
+- `public/views/port-cards.js` — 首页端口卡片渲染 + 新建端口弹窗。
+- `public/views/port-detail.js` — 详情页端口页头交互（启用/改号/删除）。
 - `public/editor.js` — CodeMirror 6 bootstrap（lang-json + lint + commands）。
-- `public/styles.css` — Mission Bridge 视觉方向（深色墨蓝面板、信号灯）。
+- `public/styles.css` — Mission Bridge 视觉方向。
 
-**全局状态键**（`public/app.js` 的 `state`）：`config / endpoints / selectedId / dirty / runtime / runtimeStatus / logs / autoScroll`。`runtimeStatus` 是 `{port: {state, reason?}}` 字典，每 5s 轮询 `/api/runtime/status`（来自最近 commit）。
+**全局状态键**（`public/app.js` 的 `state`）：`config / ports / endpoints / selectedId / dirty / runtime / runtimeStatus / logs / autoScroll / route`。`runtimeStatus` 是 `{port: {state, reason?}}` 字典，每 5s 轮询 `/api/runtime/status`；`route` 是 `{view:'home'} | {view:'port', port}`，由 `router.js` 驱动。
 
 ### 测试布局
 
@@ -117,7 +121,7 @@ server.js (startServer, listenWithFallback)
 test/
 ├── unit/           # vitest — 单模块 (config-store, log-buffer, errors, paths, sse, mock-engine)
 ├── integration/    # vitest + supertest — API 路由 (api.test, api-config, api-endpoints, api-logs, api-runtime)
-├── e2e/            # Playwright headed (happy-path, json-editor, port-conflict)
+├── e2e/            # Playwright headed (happy-path, json-editor, port-conflict, port-cards, port-detail)
 └── helpers/
     ├── temp-dir.js     # tempDir(prefix) → {path, cleanup}
     └── test-server.js  # buildApp({storagePath, configStore, logBuffer, mockEngine}) → {app, request}
@@ -134,6 +138,8 @@ test/
 3. **`ConfigStore.update(mutator)` 是唯一写入入口**。`mutator` 接收 `structuredClone(this.config)`，返回新对象 —— 不要在外面就地改 `this.config`。
 4. **SSE 客户端订阅**：`LogBuffer.subscribe(fn)` 返回 `unsubscribe`；`api.js` 启动时一次性挂上 broadcast，不要重复挂。
 5. **`embed-assets/` 是 `build.mjs` 的输入**，内容是 `public/` 的副本（vendor 文件）。改 `public/` 必须同步到 `embed-assets/`，否则编译产物不一致。
+6. **端口一等实体**：`data.json` v2 含 `ports: [{port, enabled}]`；v1 数据加载时自动迁移。禁用端口不随启动绑定；空端口绑定后全返回 404。
+7. **端点自动补建端口**：`POST/PUT /api/endpoints` 引用未知端口时自动创建 `{port, enabled: true}`，保证不存在"有接口但端口实体缺失"的状态。
 
 ---
 
