@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { bootServer, hitMock } from './helpers.js';
+import { bootServer, hitMock, enterPortDetail } from './helpers.js';
 
 let server;
 
@@ -27,6 +27,8 @@ test('configuring an endpoint and hitting it produces a log entry', async ({ pag
     return { status: r.status, body: await r.json() };
   });
   expect(createResp.status).toBe(201);
+
+  await enterPortDetail(page, server.baseURL, 17001);
 
   // Start the mock engine via API
   const startResp = await page.evaluate(async () => {

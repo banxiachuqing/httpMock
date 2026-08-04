@@ -107,13 +107,22 @@ html, body {
 
 body {
   display: grid;
-  grid-template-rows: 56px 1fr 260px;
+  grid-template-rows: 56px auto 1fr 260px;
   grid-template-columns: 320px 1fr;
   grid-template-areas:
     "topbar  topbar"
+    "porthdr porthdr"
     "sidebar editor"
     "logs    logs";
   position: relative;
+}
+
+body[data-view='home'] {
+  grid-template-rows: 56px 1fr;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "topbar"
+    "home";
 }
 
 button, input, select, textarea {
@@ -1558,3 +1567,54 @@ dialog.log-detail::backdrop {
   margin-bottom: 8px;
 }
 .log-detail-empty { color: var(--text-tertiary); font-size: 12px; margin: 0; }
+
+/* ============================================================
+   首页（端口卡片）与端口页头
+   ============================================================ */
+.home-view {
+  grid-area: home;
+  overflow-y: auto;
+  padding: var(--s-6);
+}
+
+.home-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+
+.home-hint {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.port-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--s-4);
+}
+
+.port-header {
+  grid-area: porthdr;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.port-header-number {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.port-not-found {
+  grid-area: home;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

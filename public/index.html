@@ -68,8 +68,36 @@
     </div>
   </header>
 
+  <!-- 首页：端口卡片（卡片渲染见 views/port-cards.js） -->
+  <section class="home-view" id="viewHome" hidden>
+    <div class="home-header">
+      <h2 class="section-label">端口列表</h2>
+      <span class="sidebar-count" id="portCardCount">0</span>
+      <span class="home-hint">点击卡片进入端口详情</span>
+    </div>
+    <div class="port-card-grid" id="portCardGrid"></div>
+  </section>
+
+  <!-- 端口详情页页头 -->
+  <header class="port-header" id="portHeader" hidden>
+    <button class="btn btn-ghost btn-sm" id="backToHomeBtn">← 返回端口列表</button>
+    <span class="port-header-number mono" id="portHeaderNumber">:—</span>
+    <div class="spacer"></div>
+    <span class="led" id="portStatusLed" data-state="stopped" title="端口运行状态"></span>
+  </header>
+
+  <!-- hash 指向不存在端口时 -->
+  <div class="port-not-found" id="portNotFound" hidden>
+    <div class="editor-empty-inner">
+      <div class="editor-empty-mark">//</div>
+      <h3 class="editor-empty-title">端口不存在</h3>
+      <p class="editor-empty-text">它可能已被删除。</p>
+      <button class="btn btn-ghost" id="portNotFoundBack">返回端口列表</button>
+    </div>
+  </div>
+
   <main class="layout">
-    <aside class="sidebar" data-reveal="1">
+    <aside class="sidebar" id="sidebarPanel" data-reveal="1">
       <div class="sidebar-header">
         <h2 class="section-label">接口列表</h2>
         <span class="sidebar-count" id="endpointCount">0</span>
@@ -205,7 +233,7 @@
     </section>
   </main>
 
-  <section class="logs" data-reveal="3">
+  <section class="logs" id="logsPanel" data-reveal="3">
     <div class="logs-header">
       <div class="logs-header-left">
         <h2 class="section-label">请求日志</h2>

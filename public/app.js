@@ -2,6 +2,7 @@
 // Talks to /api/* and /events.
 
 import { mountEditor, getValue, setValue, getEditorView } from './editor.js';
+import { startRouter, navigate } from './router.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -51,6 +52,7 @@ const api = {
 // ============================================================
 const state = {
   config: null,
+  ports: [],
   endpoints: [],
   selectedId: null,
   dirty: false,
@@ -58,6 +60,7 @@ const state = {
   runtimeStatus: {}, // port -> { state, reason? }
   logs: [],
   autoScroll: true,
+  route: { view: 'home' },
 };
 
 // ============================================================
@@ -72,6 +75,7 @@ const els = {
   endpointList: $('#endpointList'),
   endpointCount: $('#endpointCount'),
   portSummaryList: $('#portSummaryList'),
+  editor: $('#editor'),
   editorEmpty: $('#editorEmpty'),
   editorForm: $('#editorForm'),
   endpointId: $('#endpointId'),
@@ -122,6 +126,19 @@ const els = {
   logDetailBody: $('#logDetailBody'),
   logDetailBodyPlain: $('#logDetailBodyPlain'),
   logDetailEmpty: $('#logDetailEmpty'),
+
+  // 视图与路由
+  viewHome: $('#viewHome'),
+  portCardGrid: $('#portCardGrid'),
+  portCardCount: $('#portCardCount'),
+  portHeader: $('#portHeader'),
+  backToHomeBtn: $('#backToHomeBtn'),
+  portHeaderNumber: $('#portHeaderNumber'),
+  portStatusLed: $('#portStatusLed'),
+  portNotFound: $('#portNotFound'),
+  portNotFoundBack: $('#portNotFoundBack'),
+  sidebarPanel: $('#sidebarPanel'),
+  logsPanel: $('#logsPanel'),
 };
 
 let logDetailCM = null;
@@ -252,6 +269,51 @@ function renderStatus() {
   pill.querySelector('.status-text').textContent = m.text;
   btn.querySelector('.btn-label').textContent = m.label;
   els.statusDetail.textContent = m.detail;
+}
+
+// ============================================================
+// 路由与视图切换
+// ============================================================
+let suppressHash = false;
+
+async function applyRoute(route) {
+  if (state.dirty && state.route.view === 'port' && !confirm('有未保存的修改，是否放弃？')) {
+    suppressHash = true;
+    location.hash = `#/port/${state.route.port}`;
+    return;
+  }
+  state.route = route;
+  state.dirty = false;
+
+  const home = route.view === 'home';
+  let portKnown = !home && state.ports.some((p) => p.port === route.port);
+  if (!home && !portKnown) {
+    // 端口可能刚被创建（API 直接建 / 另一标签页），拉一次最新数据再判断
+    try {
+      state.ports = await (await fetch('/api/ports')).json();
+      state.endpoints = await (await fetch('/api/endpoints')).json();
+      portKnown = state.ports.some((p) => p.port === route.port);
+    } catch {}
+  }
+  document.body.dataset.view = home ? 'home' : 'port';
+  els.viewHome.hidden = !home;
+  els.portHeader.hidden = home || !portKnown;
+  els.portNotFound.hidden = home || portKnown;
+  els.sidebarPanel.hidden = home || !portKnown;
+  els.editor.hidden = home || !portKnown;
+  els.logsPanel.hidden = home || !portKnown;
+
+  if (!home && portKnown) {
+    els.portHeaderNumber.textContent = `:${route.port}`;
+    const st = state.runtimeStatus[String(route.port)];
+    els.portStatusLed.dataset.state =
+      st?.state === 'failed' ? 'failed' : st?.state === 'running' ? 'running' : 'stopped';
+    // CodeMirror 在 hidden 容器里挂载过，显示后需要重新测量
+    getEditorView()?.requestMeasure();
+    renderEndpointList();
+    renderEditor();
+    renderLogsInitial();
+  }
 }
 
 function renderLogEntry(entry) {
@@ -416,6 +478,7 @@ function appendLog(entry) {
 // ============================================================
 async function loadAll() {
   state.config = await api.getConfig();
+  state.ports = await (await fetch('/api/ports')).json();
   state.endpoints = await api.listEndpoints();
   state.selectedId = state.endpoints[0]?.id || null;
   state.logs = await api.recentLogs(500);
@@ -658,6 +721,8 @@ async function saveSettings() {
 // Wire events
 // ============================================================
 els.startStopBtn.addEventListener('click', toggleRuntime);
+els.backToHomeBtn.addEventListener('click', () => navigate('#/'));
+els.portNotFoundBack.addEventListener('click', () => navigate('#/'));
 els.newEndpointBtn.addEventListener('click', createEndpoint);
 els.emptyNewBtn.addEventListener('click', createEndpoint);
 els.saveBtn.addEventListener('click', saveEndpoint);
@@ -726,6 +791,10 @@ loadAll().then(() => {
   refreshRuntimeStatus();
   // Poll every 5s to catch external changes (e.g. someone else binds the port)
   setInterval(refreshRuntimeStatus, 5000);
+  startRouter((route) => {
+    if (suppressHash) { suppressHash = false; return; }
+    applyRoute(route);
+  });
 });
 
 // ============================================================

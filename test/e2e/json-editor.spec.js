@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { bootServer } from './helpers.js';
+import { bootServer, enterPortDetail } from './helpers.js';
 
 let server;
 
@@ -22,9 +22,8 @@ test('format button pretty-prints JSON and validation surfaces errors', async ({
       body: JSON.stringify({ port: 17020, method: 'GET', path: '/api/json', statusCode: 200, response: { ok: 1 } }),
     });
   });
-  // Reload to pick up the new endpoint
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(1500);
+  // Enter the port detail view to pick up the new endpoint
+  await enterPortDetail(page, server.baseURL, 17020);
   // Select the new endpoint (it should be the first one)
   await page.locator('.endpoint-item').first().dispatchEvent('click');
   await expect(page.locator('#editorForm')).toBeVisible();
