@@ -5,6 +5,7 @@ import { AppError, toErrorResponse, statusFor } from './errors.js';
 import { sseMiddleware, broadcast } from './sse.js';
 import { isValidStoragePath } from './paths.js';
 import { registerPreviewRoutes } from './api-preview.js';
+import { registerPortRoutes } from './api-ports.js';
 
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
@@ -27,6 +28,13 @@ function withNormalizedName(ep) {
     else delete ep.name;
   }
   return ep;
+}
+
+// 端点引用的端口不在 ports 列表时自动补建（避免运行时静默跳过）
+function ensurePortEntity(cfg, port) {
+  if (!cfg.ports.some((p) => p.port === port)) {
+    cfg.ports = [...cfg.ports, { port, enabled: true }].sort((a, b) => a.port - b.port);
+  }
 }
 
 function validateEndpointBody(body, { partial = false } = {}) {
@@ -112,7 +120,11 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
       const ep = withNormalizedName({ id, ...req.body, enabled: req.body.enabled !== false });
       const all = [...configStore.config.endpoints, ep];
       configStore.checkUniqueness(all);
-      await configStore.update((cfg) => { cfg.endpoints = all; return cfg; });
+      await configStore.update((cfg) => {
+        cfg.endpoints = all;
+        ensurePortEntity(cfg, ep.port);
+        return cfg;
+      });
       res.status(201).json(ep);
     } catch (e) { next(e); }
   });
@@ -127,7 +139,11 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
       const all = [...list];
       all[idx] = updated;
       configStore.checkUniqueness(all, req.params.id);
-      await configStore.update((cfg) => { cfg.endpoints = all; return cfg; });
+      await configStore.update((cfg) => {
+        cfg.endpoints = all;
+        ensurePortEntity(cfg, updated.port);
+        return cfg;
+      });
       res.json(updated);
     } catch (e) { next(e); }
   });
@@ -170,6 +186,9 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
     logBuffer.clear();
     res.status(204).end();
   });
+
+  // Ports CRUD（端口一等实体）
+  registerPortRoutes(app, { configStore });
 
   // Preview & generators (dynamic response values) —挂 createApi 末尾、错误中间件之前
   registerPreviewRoutes(app);
