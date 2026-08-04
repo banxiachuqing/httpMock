@@ -4,6 +4,7 @@
 import { mountEditor, getValue, setValue, getEditorView } from './editor.js';
 import { startRouter, navigate } from './router.js';
 import { renderPortCards, initNewPortDialog } from './views/port-cards.js';
+import { renderPortHeader, initPortDetail } from './views/port-detail.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -166,6 +167,13 @@ const els = {
   newPortCreate: $('#newPortCreate'),
   newPortNumber: $('#newPortNumber'),
   newPortError: $('#newPortError'),
+
+  // 详情页端口操作
+  portEnabledToggle: $('#portEnabledToggle'),
+  portNumberInput: $('#portNumberInput'),
+  portRenameBtn: $('#portRenameBtn'),
+  deletePortBtn: $('#deletePortBtn'),
+  endpointName: $('#endpointName'),
 };
 
 let logDetailCM = null;
@@ -221,7 +229,7 @@ function renderEndpointList() {
         </svg>
       </button>
     `;
-    li.querySelector('.endpoint-path').textContent = ep.path;
+    li.querySelector('.endpoint-path').textContent = ep.name || `${ep.method} ${ep.path}`;
     li.addEventListener('click', (e) => {
       // Ignore clicks on the delete button
       if (e.target.closest('.endpoint-delete')) return;
@@ -268,6 +276,7 @@ function renderEditor() {
   els.endpointId.textContent = `id: ${ep.id.slice(0, 8)}…`;
   if (!state.dirty) {
     els.method.value = ep.method;
+    els.endpointName.value = ep.name || '';
     els.port.value = ep.port;
     els.path.value = ep.path;
     els.status.value = ep.statusCode || 200;
@@ -343,10 +352,7 @@ async function applyRoute(route) {
   if (home) renderHome();
 
   if (!home && portKnown) {
-    els.portHeaderNumber.textContent = `:${route.port}`;
-    const st = state.runtimeStatus[String(route.port)];
-    els.portStatusLed.dataset.state =
-      st?.state === 'failed' ? 'failed' : st?.state === 'running' ? 'running' : 'stopped';
+    renderPortHeader(state, els);
     // CodeMirror 在 hidden 容器里挂载过，显示后需要重新测量
     getEditorView()?.requestMeasure();
     renderEndpointList();
@@ -486,36 +492,66 @@ function renderLogDetail(entry) {
   }
 }
 
+function visibleLogs() {
+  if (state.route.view === 'port') {
+    return state.logs.filter((e) => e.port === state.route.port);
+  }
+  return state.logs;
+}
+
+function updateLogsCount() {
+  const vis = visibleLogs();
+  els.logsCount.textContent = state.route.view === 'port'
+    ? `${vis.length} 条 / 共 ${state.logs.length} 条`
+    : `${state.logs.length} 条 · 最多 500`;
+}
+
 function renderLogsInitial() {
   els.logsBody.innerHTML = '';
-  if (state.logs.length === 0) {
+  const vis = visibleLogs();
+  if (vis.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'logs-empty';
     empty.innerHTML = `<span class="logs-empty-mark">//</span><span>暂无请求。</span>`;
     els.logsBody.appendChild(empty);
   } else {
-    for (const e of state.logs) els.logsBody.appendChild(renderLogEntry(e));
+    for (const e of vis) els.logsBody.appendChild(renderLogEntry(e));
   }
-  els.logsCount.textContent = `${state.logs.length} 条 · 最多 500`;
+  updateLogsCount();
   if (state.autoScroll) els.logsBody.scrollTop = els.logsBody.scrollHeight;
 }
 
 function appendLog(entry) {
   state.logs.push(entry);
   if (state.logs.length > 500) state.logs.splice(0, state.logs.length - 500);
-  // Remove the empty-state placeholder if it's still there so the new entry
-  // appears at the top of the log list rather than below a 200px-tall gap.
-  const empty = els.logsBody.querySelector('.logs-empty');
-  if (empty) empty.remove();
-  els.logsBody.appendChild(renderLogEntry(entry));
-  els.logsCount.textContent = `${state.logs.length} 条 · 最多 500`;
-  if (state.autoScroll) els.logsBody.scrollTop = els.logsBody.scrollHeight;
+  const isPortView = state.route.view === 'port';
+  const matches = !isPortView || entry.port === state.route.port;
+  if (matches) {
+    // Remove the empty-state placeholder if it's still there so the new entry
+    // appears at the top of the log list rather than below a 200px-tall gap.
+    const empty = els.logsBody.querySelector('.logs-empty');
+    if (empty) empty.remove();
+    els.logsBody.appendChild(renderLogEntry(entry));
+    if (state.autoScroll) els.logsBody.scrollTop = els.logsBody.scrollHeight;
+  }
+  updateLogsCount();
   if (state.route.view === 'home') renderHome();
 }
 
 // ============================================================
 // Actions
 // ============================================================
+async function refreshAll() {
+  state.ports = await api.listPorts();
+  state.endpoints = await api.listEndpoints();
+  if (!state.endpoints.some((e) => e.id === state.selectedId)) {
+    state.selectedId = state.endpoints[0]?.id || null;
+    state.dirty = false;
+  }
+  render();
+  if (state.route.view === 'port') renderPortHeader(state, els);
+}
+
 async function loadAll() {
   state.config = await api.getConfig();
   state.ports = await api.listPorts();
@@ -557,14 +593,10 @@ function markDirty() {
 }
 
 async function createEndpoint() {
-  // Pick an unused-looking port and a clear placeholder path so the user
-  // can tell the editor has been reset (not just "looks the same as before").
-  const usedPorts = new Set(state.endpoints.map((e) => e.port));
-  let port = 8080;
-  while (usedPorts.has(port)) port++;
+  if (state.route.view !== 'port') return;
   const ep = await api.createEndpoint({
     method: 'GET',
-    port,
+    port: state.route.port,
     path: '/api/new',
     statusCode: 200,
     response: { ok: true },
@@ -583,6 +615,7 @@ function renderEditorForCreate(ep) {
   els.endpointId.textContent = `id: ${ep.id.slice(0, 8)}…`;
   // Always write new values, regardless of dirty state
   els.method.value = ep.method;
+  els.endpointName.value = ep.name || '';
   els.port.value = ep.port;
   els.path.value = ep.path;
   els.status.value = ep.statusCode || 200;
@@ -606,12 +639,15 @@ async function saveEndpoint() {
     port: Number(els.port.value),
     path: els.path.value.trim(),
     statusCode: Number(els.status.value) || 200,
+    name: els.endpointName.value.trim(),
     response: (() => { const v = getValue(); return v ? JSON.parse(v) : null; })(),
     enabled: ep.enabled !== false,
   };
   try {
     const updated = await api.updateEndpoint(ep.id, body);
-    Object.assign(ep, updated);
+    // 用服务端响应整体替换（服务端可能删除字段，如清空 name，Object.assign 不会删键）
+    const idx = state.endpoints.findIndex((e) => e.id === updated.id);
+    if (idx >= 0) state.endpoints[idx] = updated;
     state.dirty = false;
     renderEndpointList();
     flash('已保存', 'green');
@@ -795,7 +831,7 @@ els.logDetail.addEventListener('close', () => {
   if (logDetailCM) { logDetailCM.destroy(); logDetailCM = null; }
 });
 
-for (const f of [els.method, els.port, els.path, els.status]) {
+for (const f of [els.method, els.endpointName, els.path, els.status]) {
   f.addEventListener('input', markDirty);
 }
 // CodeMirror handles its own input; onChange is wired in boot.
@@ -833,6 +869,7 @@ loadAll().then(() => {
   // Poll every 5s to catch external changes (e.g. someone else binds the port)
   setInterval(refreshRuntimeStatus, 5000);
   newPortDialog = initNewPortDialog({ els, state, api });
+  initPortDetail({ els, state, api, refreshAll });
   startRouter((route) => {
     if (suppressHash) { suppressHash = false; return; }
     applyRoute(route);

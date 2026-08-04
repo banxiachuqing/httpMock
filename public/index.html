@@ -82,6 +82,15 @@
   <header class="port-header" id="portHeader" hidden>
     <button class="btn btn-ghost btn-sm" id="backToHomeBtn">← 返回端口列表</button>
     <span class="port-header-number mono" id="portHeaderNumber">:—</span>
+    <label class="toggle">
+      <input type="checkbox" id="portEnabledToggle" />
+      <span class="toggle-label">启用</span>
+    </label>
+    <span class="port-rename">
+      <input type="number" id="portNumberInput" class="input mono port-rename-input" min="1" max="65535" />
+      <button class="btn btn-ghost btn-sm" id="portRenameBtn">改号</button>
+    </span>
+    <button class="btn btn-danger btn-sm" id="deletePortBtn">删除端口</button>
     <div class="spacer"></div>
     <span class="led" id="portStatusLed" data-state="stopped" title="端口运行状态"></span>
   </header>
@@ -142,6 +151,11 @@
         </div>
 
         <div class="form-grid">
+          <div class="field field-wide">
+            <label for="endpointName">接口名称</label>
+            <input type="text" id="endpointName" class="input" maxlength="50" placeholder="可选，留空时列表显示 URL" autocomplete="off" />
+          </div>
+
           <div class="field">
             <label for="method">方法</label>
             <div class="select-wrap">
@@ -159,7 +173,7 @@
 
           <div class="field">
             <label for="port">端口</label>
-            <input type="number" id="port" class="input mono" min="1" max="65535" />
+            <input type="number" id="port" class="input mono" min="1" max="65535" disabled title="端口由端口详情页统一管理" />
           </div>
 
           <div class="field field-wide">

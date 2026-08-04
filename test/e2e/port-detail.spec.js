@@ -1,0 +1,108 @@
+import { test, expect } from '@playwright/test';
+import { bootServer, hitMock, enterPortDetail } from './helpers.js';
+
+let server;
+
+test.beforeAll(async () => { server = await bootServer(); });
+test.afterAll(async () => { if (server) await server.cleanup(); });
+
+async function setup(page, port, epPath = '/api/x') {
+  await page.evaluate(async ({ port, epPath }) => {
+    await fetch('/api/ports', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ port }),
+    });
+    await fetch('/api/endpoints', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ port, method: 'GET', path: epPath, statusCode: 200, response: { ok: 1 } }),
+    });
+  }, { port, epPath });
+}
+
+test('新建接口时端口字段只读且为当前端口', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await setup(page, 17501);
+  await enterPortDetail(page, server.baseURL, 17501);
+
+  await page.click('#newEndpointBtn');
+  await expect(page.locator('#port')).toBeDisabled();
+  await expect(page.locator('#port')).toHaveValue('17501');
+});
+
+test('接口名称显示在列表，留空回落 URL', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await setup(page, 17502);
+  await enterPortDetail(page, server.baseURL, 17502);
+
+  await page.locator('.endpoint-item').first().dispatchEvent('click');
+  // 未填名称 → 显示 METHOD path
+  await expect(page.locator('.endpoint-item .endpoint-path').first()).toHaveText('GET /api/x');
+
+  await page.fill('#endpointName', '查询接口');
+  await page.click('#saveBtn');
+  await expect(page.locator('.endpoint-item .endpoint-path').first()).toHaveText('查询接口');
+
+  // 清空名称 → 回落
+  await page.fill('#endpointName', '');
+  await page.click('#saveBtn');
+  await expect(page.locator('.endpoint-item .endpoint-path').first()).toHaveText('GET /api/x');
+});
+
+test('详情页日志只显示本端口', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await setup(page, 17503, '/a');
+  await setup(page, 17504, '/b');
+  await page.evaluate(async () => {
+    await fetch('/api/runtime/start', { method: 'POST' });
+  });
+  await hitMock(17503, '/a');
+  await hitMock(17504, '/b');
+
+  await enterPortDetail(page, server.baseURL, 17503);
+  const rows = page.locator('#logsBody .log-entry');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first().locator('.log-port')).toHaveText('17503');
+  await expect(page.locator('#logsCount')).toContainText('1 条 / 共 2 条');
+});
+
+test('改端口号级联更新接口并更新 hash', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await setup(page, 17505);
+  await enterPortDetail(page, server.baseURL, 17505);
+
+  await page.fill('#portNumberInput', '17506');
+  await page.click('#portRenameBtn');
+
+  // 改号是异步的；header 本来就可见，等 URL 变化而不是 header
+  await page.waitForURL(/#\/port\/17506/, { timeout: 5000 });
+  expect(page.url()).toContain('#/port/17506');
+  const ports = await page.evaluate(async () => (await fetch('/api/ports')).json());
+  expect(ports.map((p) => p.port)).toContain(17506);
+  const eps = await page.evaluate(async () => (await fetch('/api/endpoints')).json());
+  // 共享服务器下其它测试的端点仍在；只断言改号端口的级联结果
+  expect(eps.some((e) => e.port === 17506)).toBe(true);
+  expect(eps.every((e) => e.port !== 17505)).toBe(true);
+});
+
+test('删除端口连带删除接口并回到首页', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await setup(page, 17507);
+  await enterPortDetail(page, server.baseURL, 17507);
+
+  page.once('dialog', (d) => {
+    expect(d.message()).toContain('1 个接口');
+    d.accept();
+  });
+  await page.click('#deletePortBtn');
+
+  await page.waitForSelector('#viewHome:not([hidden])');
+  const ports = await page.evaluate(async () => (await fetch('/api/ports')).json());
+  expect(ports.map((p) => p.port)).not.toContain(17507);
+  const eps = await page.evaluate(async () => (await fetch('/api/endpoints')).json());
+  expect(eps.filter((e) => e.port === 17507)).toHaveLength(0);
+});

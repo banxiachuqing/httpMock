@@ -1725,3 +1725,19 @@ dialog.log-detail::backdrop {
 .field-error {
   color: var(--red);
 }
+
+.port-rename {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.port-rename-input {
+  width: 90px;
+  padding: var(--s-1) var(--s-2);
+}
+
+#port:disabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
