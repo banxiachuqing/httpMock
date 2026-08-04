@@ -256,3 +256,41 @@ describe('MockEngine body capture and truncation', () => {
     expect(pushedLogs[0].requestBodyTruncated).toBe(false);
   });
 });
+
+describe('端口感知启动（ports 列表）', () => {
+  it('只绑定启用端口，禁用端口不监听', async () => {
+    engine = new MockEngine({ logBuffer });
+    const endpoints = [
+      { id: 'a', port: 18090, method: 'GET', path: '/on', statusCode: 200, response: { ok: 1 }, enabled: true },
+      { id: 'b', port: 18091, method: 'GET', path: '/off', statusCode: 200, response: { ok: 2 }, enabled: true },
+    ];
+    const ports = [
+      { port: 18090, enabled: true },
+      { port: 18091, enabled: false },
+    ];
+    const { running, failed } = await engine.start(endpoints, ports);
+    expect(running.map((r) => r.port)).toEqual([18090]);
+    expect(failed).toEqual([]);
+    const res = await get(18090, '/on');
+    expect(res.status).toBe(200);
+    await expect(get(18091, '/off')).rejects.toThrow();
+  });
+
+  it('启用但无端点的端口照常绑定，返回 404', async () => {
+    engine = new MockEngine({ logBuffer });
+    const { running } = await engine.start([], [{ port: 18092, enabled: true }]);
+    expect(running.map((r) => r.port)).toEqual([18092]);
+    const res = await get(18092, '/anything');
+    expect(res.status).toBe(404);
+  });
+
+  it('端点引用的端口不在 ports 列表时忽略', async () => {
+    engine = new MockEngine({ logBuffer });
+    const endpoints = [
+      { id: 'a', port: 18093, method: 'GET', path: '/x', statusCode: 200, response: {}, enabled: true },
+    ];
+    const { running, failed } = await engine.start(endpoints, []);
+    expect(running).toEqual([]);
+    expect(failed).toEqual([]);
+  });
+});

@@ -161,7 +161,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
   // Runtime
   app.post('/api/runtime/start', async (req, res, next) => {
     try {
-      const result = await mockEngine.start(configStore.config.endpoints);
+      const result = await mockEngine.start(configStore.config.endpoints, configStore.config.ports);
       res.json(result);
     } catch (e) { next(e); }
   });

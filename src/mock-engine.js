@@ -54,11 +54,23 @@ export class MockEngine {
     this.statuses = new Map();
   }
 
-  async start(endpoints) {
+  async start(endpoints, ports = null) {
     const byPort = new Map();
     for (const e of endpoints) {
       if (!byPort.has(e.port)) byPort.set(e.port, []);
       byPort.get(e.port).push(e);
+    }
+
+    // ports 列表模式：只绑定启用端口；空端口也绑定（404）；列表外的端点端口忽略。
+    // ports 为 null 时保持旧行为（按端点分组全绑定）。
+    if (Array.isArray(ports)) {
+      const allowed = new Set(ports.filter((p) => p.enabled !== false).map((p) => p.port));
+      for (const key of [...byPort.keys()]) {
+        if (!allowed.has(key)) byPort.delete(key);
+      }
+      for (const p of ports) {
+        if (p.enabled !== false && !byPort.has(p.port)) byPort.set(p.port, []);
+      }
     }
 
     await this.stop();
