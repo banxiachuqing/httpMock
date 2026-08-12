@@ -520,10 +520,11 @@ function renderLogsInitial() {
     empty.innerHTML = `<span class="logs-empty-mark">//</span><span>暂无请求。</span>`;
     els.logsBody.appendChild(empty);
   } else {
-    for (const e of vis) els.logsBody.appendChild(renderLogEntry(e));
+    // 倒序渲染：最新请求显示在列表顶部
+    for (let i = vis.length - 1; i >= 0; i--) els.logsBody.appendChild(renderLogEntry(vis[i]));
   }
   updateLogsCount();
-  if (state.autoScroll) els.logsBody.scrollTop = els.logsBody.scrollHeight;
+  if (state.autoScroll) els.logsBody.scrollTop = 0;
 }
 
 function appendLog(entry) {
@@ -536,8 +537,8 @@ function appendLog(entry) {
     // appears at the top of the log list rather than below a 200px-tall gap.
     const empty = els.logsBody.querySelector('.logs-empty');
     if (empty) empty.remove();
-    els.logsBody.appendChild(renderLogEntry(entry));
-    if (state.autoScroll) els.logsBody.scrollTop = els.logsBody.scrollHeight;
+    els.logsBody.prepend(renderLogEntry(entry));
+    if (state.autoScroll) els.logsBody.scrollTop = 0;
   }
   updateLogsCount();
   if (state.route.view === 'home') renderHome();
