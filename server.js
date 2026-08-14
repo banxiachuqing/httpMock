@@ -24,7 +24,7 @@ function listLocalIPv4s() {
   return out;
 }
 
-export async function startServer({ storagePath, uiPort, openBrowser = true, host, publicPath } = {}) {
+export async function startServer({ storagePath, uiPort, openBrowser = true, host, publicPath, desktop = false } = {}) {
   // Resolve bind host: param > MOCK_HOST env > 127.0.0.1
   const finalHost = host || process.env.MOCK_HOST || '127.0.0.1';
 
@@ -88,6 +88,12 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
   const server = await listenWithFallback(app, desired, finalHost);
   const port = server.address().port;
 
+  // 桌面壳握手协议（spec: docs/superpowers/specs/2026-08-14-tauri-desktop-design.md §4）
+  // 必须打在 hints 之前，壳拿到就绪行即可导航，其余输出进入壳的 tail 缓冲
+  if (desktop) {
+    process.stdout.write(`MOCK_READY ${JSON.stringify({ host: finalHost, port })}\n`);
+  }
+
   // Print connection hints
   console.log(`[mock-server] WebUI bound to http://${finalHost}:${port}`);
   if (finalHost === '127.0.0.1') {
@@ -146,7 +152,9 @@ function listenWithFallback(app, startPort, host) {
 
 const isMain = import.meta.url === `file://${process.argv[1]}` || !!process.env.MOCK_SERVER_DIR;
 if (isMain) {
-  startServer({ openBrowser: true }).catch((e) => {
+  const desktop = !!process.env.MOCK_DESKTOP;
+  startServer({ openBrowser: !desktop, desktop }).catch((e) => {
+    if (desktop) process.stdout.write(`MOCK_ERROR ${JSON.stringify({ message: e.message })}\n`);
     console.error('Failed to start:', e.message);
     process.exit(1);
   });
