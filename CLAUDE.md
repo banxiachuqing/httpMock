@@ -47,6 +47,11 @@ bun build.mjs                                             # 当前平台，产�
 bun build.mjs bun-darwin-x64 mockserver-intel             # macOS x64
 bun build.mjs bun-windows-x64 mockserver.exe              # Windows x64
 bun build.mjs bun-windows-arm64 mockserver-arm.exe        # Windows ARM
+
+# 桌面版（Tauri 壳 + Bun sidecar）
+pnpm dev:desktop            # 构建本机 sidecar + tauri dev（窗口模式调试）
+pnpm build:desktop          # 本机打包（macOS 出 .dmg）
+pnpm sidecar:prepare        # 只重建 src-tauri/binaries/ 下的 sidecar
 ```
 
 **环境变量**（`server.js` 接受）：
@@ -88,6 +93,10 @@ server.js (startServer, listenWithFallback)
         ├─ /api/*                    ← CRUD + runtime + logs + health
         └─ /                         ← public/（index.html + app.js + editor.js + styles.css）
 ```
+
+桌面模式：Tauri 壳（src-tauri/）spawn Bun sidecar（MOCK_DESKTOP=1），sidecar listen 成功打印
+MOCK_READY {"host","port"}，壳解析后 WebView 导航到该地址；关窗隐藏到托盘，托盘菜单
+负责显示/重启/退出。握手协议细节见 docs/superpowers/specs/2026-08-14-tauri-desktop-design.md。
 
 ### 模块职责（核心）
 
@@ -140,6 +149,7 @@ test/
 5. **`embed-assets/` 是 `build.mjs` 的输入**，内容是 `public/` 的副本（vendor 文件）。改 `public/` 必须同步到 `embed-assets/`，否则编译产物不一致。
 6. **端口一等实体**：`data.json` v2 含 `ports: [{port, enabled}]`；v1 数据加载时自动迁移。禁用端口不随启动绑定；空端口绑定后全返回 404。
 7. **端点自动补建端口**：`POST/PUT /api/endpoints` 引用未知端口时自动创建 `{port, enabled: true}`，保证不存在"有接口但端口实体缺失"的状态。
+8. **桌面壳只碰进程生命周期**：src-tauri/ 不得引入 mock 业务逻辑；sidecar 协议行（MOCK_READY/MOCK_ERROR）改动必须同步更新 src-tauri/src/sidecar.rs 的 parse_handshake_line。
 
 ---
 

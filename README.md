@@ -50,6 +50,8 @@ pnpm start
 | `pnpm test:watch` | watch 模式 |
 | `pnpm test:e2e` | 跑 E2E（headed） |
 | `pnpm format` | Prettier write |
+| `pnpm dev:desktop` | 桌面模式调试（Tauri 窗口，自动构建 sidecar） |
+| `pnpm build:desktop` | 本机打包桌面安装包（macOS 出 .dmg） |
 
 ## 🏗️ 架构
 
