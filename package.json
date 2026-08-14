@@ -11,7 +11,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "tauri": "tauri",
+    "sidecar:prepare": "node scripts/prepare-sidecar.mjs",
+    "dev:desktop": "node scripts/prepare-sidecar.mjs && pnpm tauri dev",
+    "build:desktop": "node scripts/prepare-sidecar.mjs && pnpm tauri build"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -34,6 +38,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
+    "@tauri-apps/cli": "^2.11.4",
     "supertest": "^7.0.0",
     "vitest": "^1.6.0"
   }

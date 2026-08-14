@@ -19,3 +19,9 @@ mockserver
 mockserver.exe
 embed-staging/
 launcher.js
+
+# Tauri 壳
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/*
+!src-tauri/binaries/.gitkeep

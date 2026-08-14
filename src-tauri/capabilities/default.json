@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "默认能力：主窗口 + sidecar 执行权限",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [{ "name": "binaries/mockserver", "sidecar": true, "args": true }]
+    }
+  ]
+}
