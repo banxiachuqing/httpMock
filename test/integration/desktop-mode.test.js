@@ -47,6 +47,11 @@ function waitForLine(child, prefix, timeoutMs = 8000) {
 }
 
 function spawnDesktop(extraEnv) {
+  // os.homedir() 在 Windows 上只认 USERPROFILE（不认 HOME），
+  // 因此设置 HOME 时必须同时设置 USERPROFILE，保证隔离目录在所有平台生效
+  if (extraEnv.HOME !== undefined && extraEnv.USERPROFILE === undefined) {
+    extraEnv = { ...extraEnv, USERPROFILE: extraEnv.HOME };
+  }
   return spawn(process.execPath, [path.join(ROOT, "server.js")], {
     cwd: ROOT,
     env: { ...process.env, MOCK_DESKTOP: "1", ...extraEnv },
