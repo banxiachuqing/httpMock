@@ -185,8 +185,11 @@ async fn read_loop(
                 let line = String::from_utf8_lossy(&bytes).trim_end().to_string();
                 match parse_handshake_line(&line) {
                     Some(Handshake::Ready { host, port }) => {
-                        let url = webview_url(&host, port);
                         let state = app.state::<SidecarState>();
+                        if gen != state.generation.load(Ordering::SeqCst) {
+                            continue; // 旧代数握手行：重启流程已接管，忽略
+                        }
+                        let url = webview_url(&host, port);
                         {
                             let mut st = state.status.lock().unwrap();
                             st.phase = "ready".into();
@@ -199,7 +202,13 @@ async fn read_loop(
                             let _ = app.emit("sidecar-ready", serde_json::json!({ "url": url }));
                         }
                     }
-                    Some(Handshake::Error { message }) => fail(&app, message),
+                    Some(Handshake::Error { message }) => {
+                        let state = app.state::<SidecarState>();
+                        if gen != state.generation.load(Ordering::SeqCst) {
+                            continue; // 旧代数握手行：重启流程已接管，忽略
+                        }
+                        fail(&app, message)
+                    }
                     None => push_tail(&app, &line),
                 }
             }
