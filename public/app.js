@@ -84,7 +84,7 @@ const api = {
       body: JSON.stringify(body),
     });
     const json = await r.json();
-    if (!r.ok) throw new Error(json.message || "更新端口失败");
+    if (!r.ok) throw new Error(json.error || "更新端口失败");
     return json;
   },
   async deletePort(port) {

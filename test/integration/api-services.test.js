@@ -119,6 +119,15 @@ describe('PUT /api/services/:id', () => {
     expect(r.body.code).toBe('DUPLICATE_SERVICE');
   });
 
+  it('enabled: 1（松散真值）翻转启用同样查重 → DUPLICATE_SERVICE', async () => {
+    await createWsPort();
+    await ctx.request.post('/api/services').send({ port: 8082, path: '/ws/A' });
+    const b = await ctx.request.post('/api/services').send({ port: 8082, path: '/ws/A', enabled: false });
+    const r = await ctx.request.put(`/api/services/${b.body.id}`).send({ enabled: 1 });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('DUPLICATE_SERVICE');
+  });
+
   it('禁用服务翻转启用且 path 唯一 → 200', async () => {
     await createWsPort();
     await ctx.request.post('/api/services').send({ port: 8082, path: '/ws/A' });

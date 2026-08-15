@@ -137,15 +137,16 @@ export function registerServiceRoutes(app, { configStore }) {
         if (idx < 0) throw new AppError(404, 'NOT_FOUND', 'service not found');
         const cur = list[idx];
         updated = { ...cur };
+        const newEnabled = body.enabled !== false;
         if (body.name !== undefined && body.name.trim()) updated.name = body.name.trim();
         if (body.path !== undefined) updated.path = body.path;
-        if (body.enabled !== undefined) updated.enabled = body.enabled !== false;
+        if (body.enabled !== undefined) updated.enabled = newEnabled;
         if (body.targetNamespace !== undefined) updated.targetNamespace = String(body.targetNamespace);
         const all = [...list];
         all[idx] = updated;
         const pathChanged = body.path !== undefined && body.path !== cur.path;
         // 禁用→启用翻转同样可能与他人撞车（建服务时因禁用被跳过）；true→false 不会
-        const enableFlip = body.enabled === true && cur.enabled === false;
+        const enableFlip = newEnabled && cur.enabled === false;
         if (pathChanged || enableFlip) {
           // 新 key / 新启用状态：自身不可能误报（同 key 单次出现），排除自身反而漏检
           configStore.checkServiceUniqueness(all);

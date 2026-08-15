@@ -304,9 +304,11 @@ export function initServiceDetail({
     const s = currentService(state);
     if (!s) return;
     try {
-      const updated = await api.createOperation(s.id, {
-        name: `op${(s.operations || []).length + 1}`,
-      });
+      // 循环寻找空闲 opN（删除非末位操作后 length+1 会与现存名字冲突）
+      const used = new Set((s.operations || []).map((o) => o.name));
+      let n = 1;
+      while (used.has(`op${n}`)) n += 1;
+      const updated = await api.createOperation(s.id, { name: `op${n}` });
       replaceService(state, updated);
       state.selectedOperationId =
         updated.operations[updated.operations.length - 1]?.id || null;
