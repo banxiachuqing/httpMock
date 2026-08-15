@@ -49,7 +49,7 @@
   <div class="grain" aria-hidden="true"></div>
 
   <header class="topbar" data-reveal="0">
-    <div class="brand">
+    <div class="brand" data-tauri-drag-region>
       <span class="brand-mark">
         <span class="brand-mock">MOCK</span><span class="brand-slash">//</span><span class="brand-srv">SERVER</span>
       </span>
@@ -58,6 +58,8 @@
         v{{VERSION}} · 本地开发工具
       </span>
     </div>
+
+    <div class="topbar-spacer" data-tauri-drag-region></div>
 
     <div class="topbar-actions">
       <div class="status-pill" id="globalStatus" data-state="stopped">

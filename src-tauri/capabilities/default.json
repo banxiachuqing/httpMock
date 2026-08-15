@@ -5,6 +5,7 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:app:allow-set-app-theme",
     "core:event:default",
     {
       "identifier": "shell:allow-execute",

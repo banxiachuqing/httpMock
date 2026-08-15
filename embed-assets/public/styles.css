@@ -1955,3 +1955,19 @@ dialog.log-detail::backdrop {
   --card-bg: rgba(255, 255, 255, 0.55);
   --card-hover: rgba(255, 255, 255, 0.75);
 }
+
+/* Tauri 桌面壳：Overlay 标题栏融合（红绿灯安全区 + 拖拽区） */
+.topbar-spacer {
+  flex: 1;
+  align-self: stretch;
+}
+
+html.tauri .topbar {
+  padding-left: 78px;
+}
+
+html.tauri .brand {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}

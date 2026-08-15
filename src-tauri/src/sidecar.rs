@@ -83,12 +83,21 @@ pub fn html_escape(s: &str) -> String {
 }
 
 /// 在当前页面（任意 origin）内嵌一个全屏错误/状态覆盖层
+/// 覆盖层读不到应用设置，跟随系统外观（spec §6）
 pub fn overlay_js(title: &str, detail: &str) -> String {
     let html = format!(
-        "<div style=\"font-family:system-ui,-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0b1020;color:#e6e9f2;text-align:center;padding:24px;box-sizing:border-box\">\
-<h1 style=\"font-size:20px;margin:0 0 12px\">{}</h1>\
-<pre style=\"max-width:80%;max-height:40vh;overflow:auto;white-space:pre-wrap;color:#9aa3b2;font-size:12px;text-align:left;background:#11162a;padding:12px;border-radius:8px\">{}</pre>\
-<p style=\"color:#9aa3b2;font-size:13px\">可从系统托盘菜单「重启服务」恢复</p></div>",
+        "<div class=\"mock-overlay\"><h1>{}</h1><pre>{}</pre><p>可从系统托盘菜单「重启服务」恢复</p></div>\
+<style>\
+.mock-overlay{{font-family:system-ui,-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0b1020;color:#e6e9f2;text-align:center;padding:24px;box-sizing:border-box}}\
+.mock-overlay h1{{font-size:20px;margin:0 0 12px}}\
+.mock-overlay pre{{max-width:80%;max-height:40vh;overflow:auto;white-space:pre-wrap;color:#9aa3b2;font-size:12px;text-align:left;background:#11162a;padding:12px;border-radius:8px}}\
+.mock-overlay p{{color:#9aa3b2;font-size:13px}}\
+@media (prefers-color-scheme: light){{\
+.mock-overlay{{background:#f4f6fb;color:#1a2233}}\
+.mock-overlay pre{{color:#455064;background:#e9edf5}}\
+.mock-overlay p{{color:#6b7688}}\
+}}\
+</style>",
         html_escape(title),
         html_escape(detail)
     );
@@ -316,5 +325,11 @@ mod tests {
         assert!(js.starts_with("document.body.innerHTML = "));
         assert!(!js.contains("<1>"));
         assert!(js.contains("&lt;1&gt;"));
+    }
+
+    #[test]
+    fn overlay_js_includes_light_media_query() {
+        let js = overlay_js("t", "d");
+        assert!(js.contains("prefers-color-scheme: light"));
     }
 }
