@@ -143,8 +143,11 @@ export function registerServiceRoutes(app, { configStore }) {
         if (body.targetNamespace !== undefined) updated.targetNamespace = String(body.targetNamespace);
         const all = [...list];
         all[idx] = updated;
-        if (body.path !== undefined && body.path !== cur.path) {
-          // path 已变更（新 key），无需排除自身；排除反而会漏掉与他服务的撞车
+        const pathChanged = body.path !== undefined && body.path !== cur.path;
+        // 禁用→启用翻转同样可能与他人撞车（建服务时因禁用被跳过）；true→false 不会
+        const enableFlip = body.enabled === true && cur.enabled === false;
+        if (pathChanged || enableFlip) {
+          // 新 key / 新启用状态：自身不可能误报（同 key 单次出现），排除自身反而漏检
           configStore.checkServiceUniqueness(all);
         }
         cfg.services = all;

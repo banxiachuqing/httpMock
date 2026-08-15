@@ -109,6 +109,33 @@ describe('PUT /api/services/:id', () => {
     expect(r.status).toBe(400);
     expect(r.body.code).toBe('DUPLICATE_SERVICE');
   });
+
+  it('禁用服务翻转启用且与他人同 (port,path) → DUPLICATE_SERVICE', async () => {
+    await createWsPort();
+    await ctx.request.post('/api/services').send({ port: 8082, path: '/ws/A' });
+    const b = await ctx.request.post('/api/services').send({ port: 8082, path: '/ws/A', enabled: false });
+    const r = await ctx.request.put(`/api/services/${b.body.id}`).send({ enabled: true });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('DUPLICATE_SERVICE');
+  });
+
+  it('禁用服务翻转启用且 path 唯一 → 200', async () => {
+    await createWsPort();
+    await ctx.request.post('/api/services').send({ port: 8082, path: '/ws/A' });
+    const b = await ctx.request.post('/api/services').send({ port: 8082, path: '/ws/B', enabled: false });
+    const r = await ctx.request.put(`/api/services/${b.body.id}`).send({ enabled: true });
+    expect(r.status).toBe(200);
+    expect(r.body.enabled).toBe(true);
+  });
+
+  it('enabled true→false 禁用不触发查重（服务可任意禁用）', async () => {
+    await createWsPort();
+    await ctx.request.post('/api/services').send({ port: 8082, path: '/ws/A' });
+    const b = await ctx.request.post('/api/services').send({ port: 8082, path: '/ws/B' });
+    const r = await ctx.request.put(`/api/services/${b.body.id}`).send({ enabled: false });
+    expect(r.status).toBe(200);
+    expect(r.body.enabled).toBe(false);
+  });
 });
 
 describe('POST /api/services/:id/wsdl（导入合并）', () => {
