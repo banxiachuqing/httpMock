@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-**`mock-server-webui`** — 本地 HTTP mock 服务，配 WebUI。零构建、原生 ESM + import map，单文件 Bun 可执行可打包。详细设计见 `docs/superpowers/specs/2026-06-08-mock-server-webui-design.md`。
+**`mock-tools`（曾用名 mock-server-webui / Mock//Server，2026-08 正式更名）** — 本地 HTTP mock 服务，配 WebUI。零构建、原生 ESM + import map，单文件 Bun 可执行可打包。详细设计见 `docs/superpowers/specs/2026-06-08-mock-server-webui-design.md`。
 
 **栈**：Node ≥18 · 纯 JavaScript（无 TS）· Express 4 · 原生 `node:http`（mock 引擎）· CodeMirror 6（ESM via importmap）· SSE · vitest + supertest（单元/集成）· Playwright headed（E2E）· Bun（打包）。
 

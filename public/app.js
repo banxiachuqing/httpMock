@@ -1,4 +1,4 @@
-// Mock//Server — production UI
+// Mock Tools — production UI
 // Talks to /api/* and /events.
 
 import {

@@ -207,10 +207,10 @@ jobs:
 
             | 平台 | 文件 |
             |---|---|
-            | macOS (Apple Silicon) | `MockServer_*_aarch64.dmg` |
-            | macOS (Intel) | `MockServer_*_x64.dmg` |
-            | Windows (x64) | `MockServer_*_x64-setup.exe` |
-            | Windows (ARM) | `MockServer_*_arm64-setup.exe` |
+            | macOS (Apple Silicon) | `Mock Tools_*_aarch64.dmg` |
+            | macOS (Intel) | `Mock Tools_*_x64.dmg` |
+            | Windows (x64) | `Mock Tools_*_x64-setup.exe` |
+            | Windows (ARM) | `Mock Tools_*_arm64-setup.exe` |
 
             > macOS 未签名：首次打开请右键 App →「打开」。
 
