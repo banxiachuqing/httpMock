@@ -22,16 +22,17 @@ function writeV1() {
   fs.writeFileSync(path.join(dir.path, 'data.json'), JSON.stringify(v1));
 }
 
-describe('ConfigStore v1 → v2 迁移', () => {
-  it('从端点派生去重升序的 ports，全部启用', async () => {
+describe('ConfigStore v1 → v3 迁移', () => {
+  it('从端点派生 ports 并补 type/services，直达 v3', async () => {
     writeV1();
     const store = new ConfigStore({ storagePath: dir.path });
     await store.load();
-    expect(store.config.version).toBe(2);
+    expect(store.config.version).toBe(3);
     expect(store.config.ports).toEqual([
-      { port: 8080, enabled: true },
-      { port: 9090, enabled: true },
+      { port: 8080, enabled: true, type: 'http' },
+      { port: 9090, enabled: true, type: 'http' },
     ]);
+    expect(store.config.services).toEqual([]);
   });
 
   it('迁移结果落盘', async () => {
@@ -39,11 +40,12 @@ describe('ConfigStore v1 → v2 迁移', () => {
     const store = new ConfigStore({ storagePath: dir.path });
     await store.load();
     const onDisk = JSON.parse(fs.readFileSync(path.join(dir.path, 'data.json'), 'utf8'));
-    expect(onDisk.version).toBe(2);
+    expect(onDisk.version).toBe(3);
     expect(onDisk.ports).toHaveLength(2);
+    expect(onDisk.services).toEqual([]);
   });
 
-  it('已有 ports 的 v2 数据不动', async () => {
+  it('v2 数据补 type 与 services', async () => {
     const v2 = {
       version: 2,
       settings: { storagePath: dir.path, uiPort: 5050, maxBodyBytes: 4194304 },
@@ -53,13 +55,31 @@ describe('ConfigStore v1 → v2 迁移', () => {
     fs.writeFileSync(path.join(dir.path, 'data.json'), JSON.stringify(v2));
     const store = new ConfigStore({ storagePath: dir.path });
     await store.load();
-    expect(store.config.ports).toEqual([{ port: 9999, enabled: false }]);
+    expect(store.config.version).toBe(3);
+    expect(store.config.ports).toEqual([{ port: 9999, enabled: false, type: 'http' }]);
+    expect(store.config.services).toEqual([]);
   });
 
-  it('全新存储直接是 version 2 + 空 ports', async () => {
+  it('v3 数据不动', async () => {
+    const v3 = {
+      version: 3,
+      settings: { storagePath: dir.path, uiPort: 5050, maxBodyBytes: 4194304 },
+      ports: [{ port: 9999, enabled: false, type: 'ws' }],
+      endpoints: [],
+      services: [{ id: 's1', port: 9999, path: '/ws/A', name: 'A', enabled: true, targetNamespace: 'urn:A', wsdl: null, operations: [] }],
+    };
+    fs.writeFileSync(path.join(dir.path, 'data.json'), JSON.stringify(v3));
     const store = new ConfigStore({ storagePath: dir.path });
     await store.load();
-    expect(store.config.version).toBe(2);
+    expect(store.config.ports).toEqual([{ port: 9999, enabled: false, type: 'ws' }]);
+    expect(store.config.services).toHaveLength(1);
+  });
+
+  it('全新存储直接是 version 3 + 空 ports/services', async () => {
+    const store = new ConfigStore({ storagePath: dir.path });
+    await store.load();
+    expect(store.config.version).toBe(3);
     expect(store.config.ports).toEqual([]);
+    expect(store.config.services).toEqual([]);
   });
 });
