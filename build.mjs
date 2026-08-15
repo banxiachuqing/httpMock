@@ -64,7 +64,9 @@ for (const f of files) {
 
 const lines = files.map((f) => {
   const stagedPath = './' + join(STAGING, f.rel + '.txt');
-  return `  ${JSON.stringify(f.rel)}: () => import(${JSON.stringify(stagedPath)})`;
+  // 键名统一 POSIX 分隔符：Windows 上 relative() 产出反斜杠，
+  // 会导致 launcher 里 relPath.startsWith('vendor/') 判断失效（vendor 不会映射到 node_modules）
+  return `  ${JSON.stringify(f.rel.replaceAll('\\', '/'))}: () => import(${JSON.stringify(stagedPath)})`;
 });
 
 const launcher = `// Auto-generated launcher (dynamic import) with file trace
