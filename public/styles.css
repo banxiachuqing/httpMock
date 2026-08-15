@@ -4,6 +4,8 @@
    ============================================================ */
 
 :root {
+  color-scheme: dark;
+
   /* Surfaces — deep dark gradient base */
   --bg: #0a0a0f;
   --bg-deep: #020203;
@@ -61,6 +63,38 @@
   --glass-blur: 20px;
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 
+  /* Theme-sensitive composites (hoisted from component rules) */
+  --bg-gradient: linear-gradient(160deg, #0a0a0f 0%, #05060a 55%, #020203 100%);
+  --blob-1: rgba(94, 106, 210, 0.16);
+  --blob-2: rgba(176, 106, 240, 0.10);
+  --blob-3: rgba(52, 209, 123, 0.08);
+  --blob-1-strong: rgba(94, 106, 210, 0.35);
+  --blob-2-strong: rgba(176, 106, 240, 0.22);
+  --topbar-bg: rgba(10, 10, 15, 0.55);
+  --focus-ring: rgba(94, 106, 210, 0.35);
+  --amber-wash-top: rgba(245, 184, 76, 0.14);
+  --amber-wash-bottom: rgba(245, 184, 76, 0.08);
+  --green-wash-top: rgba(52, 209, 123, 0.14);
+  --green-wash-bottom: rgba(52, 209, 123, 0.07);
+  --panel-bg: rgba(255, 255, 255, 0.04);
+  --danger-wash: rgba(200, 48, 42, 0.1);
+  --input-focus-bg: rgba(10, 10, 15, 0.6);
+  --input-focus-ring: rgba(94, 106, 210, 0.4);
+  --log-enter-bg: rgba(94, 106, 210, 0.18);
+  --backdrop: rgba(0, 0, 0, 0.6);
+  --modal-bg: rgba(18, 18, 26, 0.82);
+  --ok-ring: rgba(26, 135, 84, 0.18);
+  --err-ring: rgba(200, 48, 42, 0.18);
+  --banner-bg: rgba(200, 48, 42, 0.05);
+  --expr-error-bg: rgba(200, 48, 42, 0.08);
+  --amber-ring: rgba(184, 120, 10, 0.15);
+  --dialog-bg: rgba(18, 18, 26, 0.88);
+  --dialog-backdrop: rgba(4, 6, 12, 0.6);
+  --warning-wash: rgba(255, 170, 0, 0.12);
+  --porthdr-bg: rgba(255, 255, 255, 0.06);
+  --card-bg: rgba(255, 255, 255, 0.05);
+  --card-hover: rgba(255, 255, 255, 0.08);
+
   /* Typography */
   --font-sans: 'Inter', 'Noto Sans SC', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
@@ -101,7 +135,7 @@
 
 html, body {
   height: 100%;
-  background: linear-gradient(160deg, #0a0a0f 0%, #05060a 55%, #020203 100%);
+  background: var(--bg-gradient);
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -124,9 +158,9 @@ body {
     "logs    logs";
   position: relative;
   background-image:
-    radial-gradient(ellipse 60% 40% at 15% 0%, rgba(94, 106, 210, 0.16), transparent 60%),
-    radial-gradient(ellipse 50% 35% at 90% 10%, rgba(176, 106, 240, 0.10), transparent 60%),
-    radial-gradient(ellipse 55% 45% at 70% 100%, rgba(52, 209, 123, 0.08), transparent 60%);
+    radial-gradient(ellipse 60% 40% at 15% 0%, var(--blob-1), transparent 60%),
+    radial-gradient(ellipse 50% 35% at 90% 10%, var(--blob-2), transparent 60%),
+    radial-gradient(ellipse 55% 45% at 70% 100%, var(--blob-3), transparent 60%);
 }
 
 body[data-view='home'] {
@@ -197,7 +231,7 @@ button {
   height: 46vmax;
   top: -12vmax;
   left: -8vmax;
-  background: radial-gradient(circle, rgba(94, 106, 210, 0.35), transparent 65%);
+  background: radial-gradient(circle, var(--blob-1-strong), transparent 65%);
   animation: blobDrift 26s ease-in-out infinite alternate;
 }
 .blobs::after {
@@ -205,7 +239,7 @@ button {
   height: 40vmax;
   bottom: -14vmax;
   right: -6vmax;
-  background: radial-gradient(circle, rgba(176, 106, 240, 0.22), transparent 65%);
+  background: radial-gradient(circle, var(--blob-2-strong), transparent 65%);
   animation: blobDrift 32s ease-in-out infinite alternate-reverse;
 }
 
@@ -250,7 +284,7 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--s-4);
-  background: rgba(10, 10, 15, 0.55);
+  background: var(--topbar-bg);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border-bottom: 1px solid var(--border);
@@ -424,7 +458,7 @@ button {
 .btn:active { transform: translateY(1px); }
 .btn:focus-visible {
   border-color: var(--cyan);
-  box-shadow: 0 0 0 2px rgba(94, 106, 210, 0.35);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .btn-sm { height: 24px; padding: 0 var(--s-2); font-size: 11px; }
@@ -460,7 +494,7 @@ button {
   box-shadow: var(--glow-amber);
 }
 .btn-primary[data-state="stopped"] {
-  background: linear-gradient(to bottom, rgba(245, 184, 76, 0.14), rgba(245, 184, 76, 0.08));
+  background: linear-gradient(to bottom, var(--amber-wash-top), var(--amber-wash-bottom));
   border-color: var(--amber-dim);
   color: var(--amber);
 }
@@ -468,7 +502,7 @@ button {
 .btn-primary[data-state="stopped"]:hover { border-color: var(--amber); }
 
 .btn-primary[data-state="starting"] {
-  background: linear-gradient(to bottom, rgba(245, 184, 76, 0.14), rgba(245, 184, 76, 0.08));
+  background: linear-gradient(to bottom, var(--amber-wash-top), var(--amber-wash-bottom));
   border-color: var(--amber);
   color: var(--amber);
 }
@@ -477,7 +511,7 @@ button {
 }
 
 .btn-primary[data-state="running"] {
-  background: linear-gradient(to bottom, rgba(52, 209, 123, 0.14), rgba(52, 209, 123, 0.07));
+  background: linear-gradient(to bottom, var(--green-wash-top), var(--green-wash-bottom));
   border-color: var(--green-dim);
   color: var(--green);
 }
@@ -506,7 +540,7 @@ button {
   grid-area: sidebar;
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--panel-bg);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border-right: 1px solid var(--border);
@@ -679,7 +713,7 @@ button {
 .endpoint-item:hover .endpoint-delete,
 .endpoint-item:focus-within .endpoint-delete { opacity: 1; }
 .endpoint-delete:hover {
-  background: rgba(200, 48, 42, 0.1);
+  background: var(--danger-wash);
   color: var(--red);
   border-color: var(--red-dim);
 }
@@ -820,8 +854,8 @@ button {
 }
 .input:focus, .select:focus {
   border-color: var(--cyan);
-  background: rgba(10, 10, 15, 0.6);
-  box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.4);
+  background: var(--input-focus-bg);
+  box-shadow: 0 0 0 1px var(--input-focus-ring);
 }
 .input::placeholder { color: var(--text-faint); }
 .input.mono, .select.mono { font-family: var(--font-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
@@ -961,7 +995,7 @@ button {
   grid-area: logs;
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--panel-bg);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border-top: 1px solid var(--border);
@@ -1111,7 +1145,7 @@ button {
 .log-entry:hover { background: var(--surface-2); }
 
 @keyframes logEnter {
-  from { opacity: 0; transform: translateY(-4px); background: rgba(94, 106, 210, 0.18); }
+  from { opacity: 0; transform: translateY(-4px); background: var(--log-enter-bg); }
   to   { opacity: 1; transform: translateY(0); background: transparent; }
 }
 
@@ -1161,7 +1195,7 @@ button {
 .modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--backdrop);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: fadeIn var(--d-norm) var(--ease);
@@ -1172,7 +1206,7 @@ button {
   position: relative;
   width: 480px;
   max-width: calc(100vw - 32px);
-  background: rgba(18, 18, 26, 0.82);
+  background: var(--modal-bg);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border-bright);
@@ -1282,11 +1316,11 @@ button {
 }
 .preview-toolbar .meta.is-resolved .dot {
   background: var(--green);
-  box-shadow: 0 0 0 2px rgba(26, 135, 84, 0.18);
+  box-shadow: 0 0 0 2px var(--ok-ring);
 }
 .preview-toolbar .meta.has-errors .dot {
   background: var(--red);
-  box-shadow: 0 0 0 2px rgba(200, 48, 42, 0.18);
+  box-shadow: 0 0 0 2px var(--err-ring);
 }
 .preview-toolbar .meta .sep {
   width: 1px;
@@ -1306,9 +1340,9 @@ button {
   padding: 8px var(--s-4);
   font-family: var(--font-sans);
   font-size: 12px;
-  background: rgba(200, 48, 42, 0.05);
+  background: var(--banner-bg);
   color: var(--red);
-  border-bottom: 1px solid rgba(200, 48, 42, 0.18);
+  border-bottom: 1px solid var(--err-ring);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1319,7 +1353,7 @@ button {
   height: 6px;
   border-radius: 50%;
   background: var(--red);
-  box-shadow: 0 0 0 3px rgba(200, 48, 42, 0.18);
+  box-shadow: 0 0 0 3px var(--err-ring);
   flex-shrink: 0;
 }
 .preview-banner.is-neutral {
@@ -1351,7 +1385,7 @@ button {
 .preview-pane .v-punct { color: var(--text-faint); }
 /* 表达式错误占位（mixed-fail 保留的 {{...}}）—— 虚线下划线 + 极淡红底 */
 .preview-pane .expr-error {
-  background: rgba(200, 48, 42, 0.08);
+  background: var(--expr-error-bg);
   border-bottom: 1px dashed var(--red-dim);
   border-radius: 2px;
   padding: 0 2px;
@@ -1518,7 +1552,7 @@ button {
 .gen-args input:focus, .gen-args select:focus {
   outline: none;
   border-color: var(--amber-dim);
-  box-shadow: 0 0 0 2px rgba(184, 120, 10, 0.15);
+  box-shadow: 0 0 0 2px var(--amber-ring);
 }
 
 .generator-expr, .generator-preview {
@@ -1567,7 +1601,7 @@ button {
    ============================================================ */
 dialog.log-detail {
   border: 1px solid var(--border);
-  background: rgba(18, 18, 26, 0.88);
+  background: var(--dialog-bg);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   color: var(--text-primary);
@@ -1580,7 +1614,7 @@ dialog.log-detail {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), var(--glass-highlight);
 }
 dialog.log-detail::backdrop {
-  background: rgba(4, 6, 12, 0.6);
+  background: var(--dialog-backdrop);
   backdrop-filter: blur(4px);
 }
 .log-detail-header {
@@ -1647,7 +1681,7 @@ dialog.log-detail::backdrop {
   font-size: 12px; white-space: pre-wrap; word-break: break-all;
 }
 .log-detail-body-warning {
-  background: rgba(255, 170, 0, 0.12);
+  background: var(--warning-wash);
   color: var(--amber);
   padding: 6px 10px; border-radius: 4px; font-size: 12px;
   margin-bottom: 8px;
@@ -1690,7 +1724,7 @@ dialog.log-detail::backdrop {
   align-items: center;
   gap: var(--s-3);
   padding: var(--s-2) var(--s-4);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--porthdr-bg);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border-bottom: 1px solid var(--border);
@@ -1715,7 +1749,7 @@ dialog.log-detail::backdrop {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--card-bg);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--border);
@@ -1730,7 +1764,7 @@ dialog.log-detail::backdrop {
 .port-card:hover {
   transform: translateY(-2px);
   border-color: var(--border-bright);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--card-hover);
 }
 
 .port-card:focus-visible {
@@ -1835,4 +1869,89 @@ dialog.log-detail::backdrop {
 #port:disabled {
   color: var(--text-tertiary);
   cursor: not-allowed;
+}
+
+/* ============================================================
+   Light theme — 浅色玻璃（与暗色互为姊妹）
+   ============================================================ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f4f6fb;
+  --bg-deep: #e9edf5;
+  --grid: rgba(15, 23, 42, 0.05);
+  --surface-1: rgba(255, 255, 255, 0.55);
+  --surface-2: rgba(255, 255, 255, 0.72);
+  --surface-3: rgba(255, 255, 255, 0.85);
+  --surface-inset: rgba(15, 23, 42, 0.05);
+
+  --border: rgba(15, 23, 42, 0.10);
+  --border-bright: rgba(15, 23, 42, 0.20);
+  --border-soft: rgba(15, 23, 42, 0.06);
+
+  --text-primary: #1a2233;
+  --text-secondary: #455064;
+  --text-tertiary: #6b7688;
+  --text-faint: #98a1b0;
+
+  --green: #15803d;
+  --green-dim: #16a34a;
+  --amber: #b45309;
+  --amber-dim: #d97706;
+  --red: #dc2626;
+  --red-dim: #b91c1c;
+
+  --cyan: #4f46e5;
+  --magenta: #9333ea;
+
+  --ink: #1a2233;
+  --pencil: #6b7688;
+
+  --method-get: #15803d;
+  --method-post: #4f46e5;
+  --method-put: #b45309;
+  --method-patch: #9333ea;
+  --method-delete: #dc2626;
+  --method-head: #6b7688;
+  --method-options: #6b7688;
+
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 8px 24px rgba(15, 23, 42, 0.10);
+  --shadow-modal: 0 24px 64px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --glow-green: 0 0 8px rgba(21, 128, 61, 0.25);
+  --glow-amber: 0 0 8px rgba(180, 83, 9, 0.25);
+  --glow-red: 0 0 8px rgba(220, 38, 38, 0.25);
+  --glow-cyan: 0 0 8px rgba(79, 70, 229, 0.25);
+
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+
+  --bg-gradient: linear-gradient(160deg, #f6f8fc 0%, #eef1f7 55%, #e6ebf4 100%);
+  --blob-1: rgba(79, 70, 229, 0.10);
+  --blob-2: rgba(147, 51, 234, 0.07);
+  --blob-3: rgba(22, 163, 74, 0.06);
+  --blob-1-strong: rgba(79, 70, 229, 0.16);
+  --blob-2-strong: rgba(147, 51, 234, 0.12);
+  --topbar-bg: rgba(246, 248, 252, 0.65);
+  --focus-ring: rgba(79, 70, 229, 0.30);
+  --amber-wash-top: rgba(217, 119, 6, 0.10);
+  --amber-wash-bottom: rgba(217, 119, 6, 0.05);
+  --green-wash-top: rgba(22, 163, 74, 0.10);
+  --green-wash-bottom: rgba(22, 163, 74, 0.05);
+  --panel-bg: rgba(255, 255, 255, 0.50);
+  --danger-wash: rgba(220, 38, 38, 0.08);
+  --input-focus-bg: rgba(255, 255, 255, 0.8);
+  --input-focus-ring: rgba(79, 70, 229, 0.35);
+  --log-enter-bg: rgba(79, 70, 229, 0.12);
+  --backdrop: rgba(15, 23, 42, 0.35);
+  --modal-bg: rgba(255, 255, 255, 0.82);
+  --ok-ring: rgba(22, 163, 74, 0.20);
+  --err-ring: rgba(220, 38, 38, 0.18);
+  --banner-bg: rgba(220, 38, 38, 0.06);
+  --expr-error-bg: rgba(220, 38, 38, 0.08);
+  --amber-ring: rgba(217, 119, 6, 0.20);
+  --dialog-bg: rgba(255, 255, 255, 0.90);
+  --dialog-backdrop: rgba(15, 23, 42, 0.30);
+  --warning-wash: rgba(217, 119, 6, 0.10);
+  --porthdr-bg: rgba(15, 23, 42, 0.04);
+  --card-bg: rgba(255, 255, 255, 0.55);
+  --card-hover: rgba(255, 255, 255, 0.75);
 }
