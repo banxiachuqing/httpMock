@@ -74,7 +74,8 @@ jobs:
             triple: aarch64-apple-darwin
             bundles: dmg
             asset_name: mac-arm64
-          - os: macos-13
+          # macos-13 (Intel) runner 排队过长，x64 腿在 arm64 runner 上交叉编译
+          - os: macos-14
             sidecar_artifact: mockserver-mac-x64
             triple: x86_64-apple-darwin
             bundles: dmg
