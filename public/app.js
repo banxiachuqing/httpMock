@@ -59,14 +59,14 @@ const api = {
   async listPorts() {
     return (await fetch("/api/ports")).json();
   },
-  async createPort(port) {
+  async createPort(port, type = "http") {
     const r = await fetch("/api/ports", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ port }),
+      body: JSON.stringify({ port, type }),
     });
     const body = await r.json();
-    if (!r.ok) throw new Error(body.message || "创建端口失败");
+    if (!r.ok) throw new Error(body.error || "创建端口失败");
     return body;
   },
   async updatePort(port, body) {
@@ -128,6 +128,7 @@ const state = {
   config: null,
   ports: [],
   endpoints: [],
+  services: [],
   selectedId: null,
   dirty: false,
   runtime: "stopped",
@@ -639,6 +640,8 @@ function appendLog(entry) {
 async function refreshAll() {
   state.ports = await api.listPorts();
   state.endpoints = await api.listEndpoints();
+  state.config = await api.getConfig();
+  state.services = state.config.services || [];
   if (!state.endpoints.some((e) => e.id === state.selectedId)) {
     state.selectedId = state.endpoints[0]?.id || null;
     state.dirty = false;
@@ -653,6 +656,7 @@ async function loadAll() {
   applyTheme(state.config.settings.theme ?? "system");
   state.ports = await api.listPorts();
   state.endpoints = await api.listEndpoints();
+  state.services = state.config.services || [];
   state.selectedId = state.endpoints[0]?.id || null;
   state.logs = await api.recentLogs(500);
   // Also fetch runtime status so the global toggle reflects the real state

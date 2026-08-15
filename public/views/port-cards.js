@@ -20,6 +20,7 @@ function latestLogByPort(logs) {
 }
 
 function endpointLabel(entry, endpoints) {
+  if (entry.operationName) return entry.operationName === '?wsdl' ? '?wsdl' : entry.operationName;
   if (!entry.matched || !entry.endpointId) return `无路由 · ${entry.path}`;
   const ep = endpoints.find((e) => e.id === entry.endpointId);
   if (ep?.name) return ep.name;
@@ -27,6 +28,7 @@ function endpointLabel(entry, endpoints) {
 }
 
 function buildCard(p, state, lastEntry, api) {
+  const isWs = p.type === 'ws';
   const card = document.createElement('article');
   card.className = 'port-card';
   card.dataset.port = String(p.port);
@@ -35,14 +37,17 @@ function buildCard(p, state, lastEntry, api) {
   card.setAttribute('role', 'button');
   card.setAttribute('aria-label', `端口 ${p.port} 详情`);
 
-  const eps = state.endpoints.filter((e) => e.port === p.port);
-  const disabledCount = eps.filter((e) => e.enabled === false).length;
   const portStatus = state.runtimeStatus[String(p.port)];
   const ledState = portStatus?.state === 'failed' ? 'failed'
     : portStatus?.state === 'running' ? 'running' : 'stopped';
 
   const head = document.createElement('header');
   head.className = 'port-card-head';
+
+  const badge = document.createElement('span');
+  badge.className = 'port-type-badge';
+  badge.dataset.type = isWs ? 'ws' : 'http';
+  badge.textContent = isWs ? 'WS' : 'HTTP';
 
   const num = document.createElement('span');
   num.className = 'port-card-number mono';
@@ -77,18 +82,27 @@ function buildCard(p, state, lastEntry, api) {
   toggleLabel.textContent = '启用';
   toggle.append(checkbox, toggleLabel);
 
-  head.append(num, led, toggle);
+  head.append(num, badge, led, toggle);
 
   const stats = document.createElement('dl');
   stats.className = 'port-card-stats';
 
   const epRow = document.createElement('div');
   const epDt = document.createElement('dt');
-  epDt.textContent = '接口';
   const epDd = document.createElement('dd');
-  epDd.textContent = disabledCount > 0
-    ? `${eps.length} 个 · ${disabledCount} 个禁用`
-    : `${eps.length} 个`;
+  if (isWs) {
+    const svcs = (state.services || []).filter((s) => s.port === p.port);
+    const opsCount = svcs.reduce((n, s) => n + (s.operations?.length || 0), 0);
+    epDt.textContent = '服务';
+    epDd.textContent = `${svcs.length} 个 · ${opsCount} 操作`;
+  } else {
+    const eps = state.endpoints.filter((e) => e.port === p.port);
+    const disabledCount = eps.filter((e) => e.enabled === false).length;
+    epDt.textContent = '接口';
+    epDd.textContent = disabledCount > 0
+      ? `${eps.length} 个 · ${disabledCount} 个禁用`
+      : `${eps.length} 个`;
+  }
   epRow.append(epDt, epDd);
 
   const lastRow = document.createElement('div');
@@ -157,6 +171,7 @@ export function initNewPortDialog({ els, state, api }) {
   const open = () => {
     els.newPortNumber.value = String(nextFreePort(state.ports));
     els.newPortError.hidden = true;
+    els.newPortModal.querySelector('input[name="newPortType"][value="http"]').checked = true;
     els.newPortModal.hidden = false;
     els.newPortNumber.focus();
     els.newPortNumber.select();
@@ -174,8 +189,9 @@ export function initNewPortDialog({ els, state, api }) {
     if (state.ports.some((p) => p.port === port)) {
       return fail(`端口 ${port} 已存在`);
     }
+    const type = els.newPortModal.querySelector('input[name="newPortType"]:checked')?.value || 'http';
     try {
-      await api.createPort(port);
+      await api.createPort(port, type);
       state.ports = await api.listPorts();
       close();
       navigate(`#/port/${port}`);
