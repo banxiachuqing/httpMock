@@ -67,3 +67,23 @@ describe('PATCH /api/config — maxBodyBytes', () => {
     expect(r.body.settings.uiPort).toBe(6060);
   });
 });
+
+describe('PATCH /api/config — theme', () => {
+  it('PATCH /api/config 接受合法 theme 并持久化', async () => {
+    const res = await ctx.request.patch('/api/config').send({ settings: { theme: 'light' } });
+    expect(res.status).toBe(200);
+    const cfg = await ctx.request.get('/api/config');
+    expect(cfg.body.settings.theme).toBe('light');
+  });
+
+  it('PATCH /api/config 拒绝非法 theme 值', async () => {
+    const res = await ctx.request.patch('/api/config').send({ settings: { theme: 'neon' } });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_VALUE');
+  });
+
+  it('新配置默认 theme 为 system', async () => {
+    const cfg = await ctx.request.get('/api/config');
+    expect(cfg.body.settings.theme).toBe('system');
+  });
+});

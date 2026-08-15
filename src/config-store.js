@@ -42,7 +42,7 @@ export class ConfigStore {
       }
       this.config = {
         version: 2,
-        settings: { storagePath: this.storagePath, uiPort: 5050, maxBodyBytes: 4 * 1024 * 1024 },
+        settings: { storagePath: this.storagePath, uiPort: 5050, maxBodyBytes: 4 * 1024 * 1024, theme: 'system' },
         ports: [],
         endpoints: [],
       };

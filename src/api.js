@@ -88,6 +88,11 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
           throw new AppError(400, 'INVALID_VALUE', 'maxBodyBytes must be a positive integer');
         }
       }
+      if (settings.theme !== undefined) {
+        if (!['system', 'light', 'dark'].includes(settings.theme)) {
+          throw new AppError(400, 'INVALID_VALUE', "theme must be one of 'system' | 'light' | 'dark'");
+        }
+      }
       if (settings.storagePath !== undefined) {
         if (!isValidStoragePath(settings.storagePath)) {
           throw new AppError(400, 'INVALID_PATH', 'storagePath must be an absolute path');
@@ -104,6 +109,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
         if (settings.uiPort !== undefined) cfg.settings.uiPort = settings.uiPort;
         if (settings.storagePath !== undefined) cfg.settings.storagePath = settings.storagePath;
         if (settings.maxBodyBytes !== undefined) cfg.settings.maxBodyBytes = settings.maxBodyBytes;
+        if (settings.theme !== undefined) cfg.settings.theme = settings.theme;
         return cfg;
       });
       res.json(configStore.config);

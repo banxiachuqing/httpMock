@@ -18,7 +18,7 @@ describe('ConfigStore.load', () => {
   it('initializes a fresh config when file is missing', async () => {
     const cfg = await store.load();
     expect(cfg.version).toBe(2);
-    expect(cfg.settings).toEqual({ storagePath: dir.path, uiPort: 5050, maxBodyBytes: 4 * 1024 * 1024 });
+    expect(cfg.settings).toEqual({ storagePath: dir.path, uiPort: 5050, maxBodyBytes: 4 * 1024 * 1024, theme: 'system' });
     expect(cfg.ports).toEqual([]);
     expect(cfg.endpoints).toEqual([]);
   });
