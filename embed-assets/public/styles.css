@@ -1955,3 +1955,70 @@ dialog.log-detail::backdrop {
   --card-bg: rgba(255, 255, 255, 0.55);
   --card-hover: rgba(255, 255, 255, 0.75);
 }
+
+/* ============================================================
+   WebService 视图（spec 2026-08-15 §6）
+   ============================================================ */
+/* WS 端口详情：topbar / 端口页头 / 服务网格 / 日志 */
+body[data-view='ws-port'] {
+  grid-template-rows: 56px auto 1fr 260px;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "topbar"
+    "porthdr"
+    "home"
+    "logs";
+}
+
+.port-type-badge {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  opacity: 0.85;
+}
+.port-type-badge[data-type='http'] { color: #5e6ad2; }
+.port-type-badge[data-type='ws'] { color: var(--amber, #f5b84c); }
+
+.port-type-radios {
+  display: flex;
+  gap: 16px;
+}
+.port-type-radios label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.service-header-path { color: var(--text-faint, #5a5f6a); font-size: 12px; }
+
+.service-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.wsdl-badge {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+}
+.wsdl-badge[data-state='loaded'] { color: var(--green, #4ade80); }
+.wsdl-badge[data-state='none'] { color: var(--text-faint, #5a5f6a); }
+
+.wsdl-preview {
+  max-height: 180px;
+  overflow: auto;
+  background: var(--panel-bg, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  white-space: pre-wrap;
+}

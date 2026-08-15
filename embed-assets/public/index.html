@@ -27,6 +27,7 @@
       "@codemirror/view": "/vendor/codemirror/view/dist/index.js",
       "@codemirror/state": "/vendor/codemirror/state/dist/index.js",
       "@codemirror/lang-json": "/vendor/codemirror/lang-json/dist/index.js",
+      "@codemirror/lang-xml": "/vendor/codemirror/lang-xml/dist/index.js",
       "@codemirror/lint": "/vendor/codemirror/lint/dist/index.js",
       "@codemirror/commands": "/vendor/codemirror/commands/dist/index.js",
       "@codemirror/language": "/vendor/codemirror/language/dist/index.js",
@@ -38,6 +39,7 @@
       "@lezer/common": "/vendor/@lezer/common/dist/index.js",
       "@lezer/highlight": "/vendor/@lezer/highlight/dist/index.js",
       "@lezer/json": "/vendor/@lezer/json/dist/index.js",
+      "@lezer/xml": "/vendor/@lezer/xml/dist/index.js",
       "@lezer/lr": "/vendor/@lezer/lr/dist/index.js"
     }
   }
@@ -88,6 +90,16 @@
     <div class="port-card-grid" id="portCardGrid"></div>
   </section>
 
+  <!-- WS 端口详情：服务卡片网格（渲染见 views/ws-services.js） -->
+  <section class="home-view" id="viewWsPort" hidden>
+    <div class="home-header">
+      <h2 class="section-label">服务列表</h2>
+      <span class="sidebar-count" id="serviceCardCount">0</span>
+      <span class="home-hint">点击卡片进入服务详情</span>
+    </div>
+    <div class="port-card-grid" id="serviceCardGrid"></div>
+  </section>
+
   <!-- 端口详情页页头 -->
   <header class="port-header" id="portHeader" hidden>
     <button class="btn btn-ghost btn-sm" id="backToHomeBtn">← 返回端口列表</button>
@@ -103,6 +115,21 @@
     <button class="btn btn-danger btn-sm" id="deletePortBtn">删除端口</button>
     <div class="spacer"></div>
     <span class="led" id="portStatusLed" data-state="stopped" title="端口运行状态"></span>
+  </header>
+
+  <!-- WS 服务详情页页头 -->
+  <header class="port-header" id="serviceHeader" hidden>
+    <button class="btn btn-ghost btn-sm" id="backToPortBtn">← 返回服务列表</button>
+    <span class="port-header-number" id="serviceHeaderName">—</span>
+    <span class="mono service-header-path" id="serviceHeaderPath">—</span>
+    <label class="toggle">
+      <input type="checkbox" id="serviceEnabledToggle" />
+      <span class="toggle-label">启用</span>
+    </label>
+    <button class="btn btn-ghost btn-sm" id="importWsdlBtn">导入 WSDL</button>
+    <button class="btn btn-ghost btn-sm" id="copyServiceAddrBtn">复制地址</button>
+    <button class="btn btn-danger btn-sm" id="deleteServiceBtn">删除服务</button>
+    <div class="spacer"></div>
   </header>
 
   <!-- hash 指向不存在端口时 -->
@@ -133,6 +160,19 @@
           <span class="port-summary-list" id="portSummaryList">—</span>
         </div>
       </div>
+    </aside>
+
+    <aside class="sidebar" id="wsSidebarPanel" hidden>
+      <div class="sidebar-header">
+        <h2 class="section-label">操作列表</h2>
+        <span class="sidebar-count" id="operationCount">0</span>
+        <button class="btn btn-ghost btn-sm" id="newOperationBtn">
+          <span class="plus">+</span> 新建
+        </button>
+      </div>
+      <ul class="endpoint-list" id="operationList" role="listbox" aria-label="操作列表">
+        <!-- populated by views/ws-detail.js -->
+      </ul>
     </aside>
 
     <section class="editor" data-reveal="2" id="editor">
@@ -255,6 +295,110 @@
         </div>
       </div>
     </section>
+
+    <section class="editor" id="wsEditor" hidden>
+      <div class="editor-empty" id="wsEditorEmpty">
+        <div class="editor-empty-inner">
+          <div class="editor-empty-mark">&lt;/&gt;</div>
+          <h3 class="editor-empty-title">尚未选择操作</h3>
+          <p class="editor-empty-text">从左侧选择一个 operation，或新建一个。</p>
+          <button class="btn btn-ghost" id="wsEmptyNewBtn">
+            <span class="plus">+</span> 创建第一个操作
+          </button>
+        </div>
+      </div>
+
+      <div class="editor-form" id="wsEditorForm" hidden>
+        <div class="editor-header">
+          <div class="editor-header-left">
+            <h2 class="section-label">编辑操作</h2>
+            <span class="endpoint-id mono" id="wsOperationId">id: —</span>
+          </div>
+          <div class="editor-header-right">
+            <span class="last-saved mono" id="wsLastSaved">已保存</span>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="wsOpName">操作名</label>
+            <input type="text" id="wsOpName" class="input mono" maxlength="100" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="field field-path">
+            <label for="wsOpSoapAction">SOAPAction（可空）</label>
+            <input type="text" id="wsOpSoapAction" class="input mono" placeholder="urn:getUser" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="field field-status">
+            <label for="wsOpStatus">状态码</label>
+            <input type="number" id="wsOpStatus" class="input mono" min="100" max="599" value="200" />
+          </div>
+          <div class="field">
+            <label for="wsResponseType">响应类型</label>
+            <div class="select-wrap">
+              <select id="wsResponseType" class="select">
+                <option value="normal">正常响应</option>
+                <option value="fault">SOAP Fault</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="editor-body">
+          <div class="editor-split">
+            <div class="editor-pane editor-pane-edit">
+              <div class="editor-toolbar">
+                <div class="toolbar-left">
+                  <span class="section-label">响应体</span>
+                  <span class="format-hint mono">XML</span>
+                </div>
+                <div class="toolbar-right">
+                  <span class="validation-status" id="wsValidationStatus">
+                    <span class="val-mark">·</span>
+                    <span class="val-text">空</span>
+                  </span>
+                  <button class="btn btn-ghost btn-sm" id="wsFormatBtn">格式化</button>
+                  <button class="btn btn-ghost btn-sm" id="wsValidateBtn">校验</button>
+                  <button class="btn btn-ghost btn-sm" id="wsDynamicBtn" type="button" title="选中要替换的文本（或放好光标），再点这个按钮">动态值</button>
+                </div>
+              </div>
+              <div class="code-editor-wrap" id="wsEditorWrap">
+                <div id="xmlEditorHost" class="code-editor"></div>
+              </div>
+              <div class="editor-meta">
+                <span class="mono" id="wsLineCount">0 行</span>
+                <span class="meta-sep">·</span>
+                <span class="mono" id="wsCharCount">0 字符</span>
+              </div>
+            </div>
+
+            <div class="editor-pane editor-pane-preview">
+              <div class="preview-toolbar">
+                <span class="meta is-resolved" id="wsPreviewMeta">
+                  <span class="dot"></span>
+                  <span id="wsPreviewMetaLabel">就绪</span>
+                </span>
+                <span class="meta">
+                  <span class="sep"></span>
+                  <span id="wsPreviewExprStat">表达式 <strong>0</strong></span>
+                  <span class="sep"></span>
+                  <span id="wsPreviewErrStat">错误 <strong>0</strong></span>
+                </span>
+                <button class="btn btn-ghost btn-sm" id="wsPreviewRefreshBtn" aria-label="刷新预览">↻</button>
+              </div>
+              <div class="preview-banner" id="wsPreviewBanner" hidden></div>
+              <pre class="preview-pane" id="wsPreviewPane">// 在左侧编辑响应 XML，此处显示解析结果</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="editor-footer">
+          <button class="btn btn-danger" id="wsDeleteOpBtn">删除</button>
+          <div class="spacer"></div>
+          <button class="btn btn-ghost" id="wsRevertBtn">撤销</button>
+          <button class="btn btn-primary" id="wsSaveOpBtn">保存</button>
+        </div>
+      </div>
+    </section>
   </main>
 
   <section class="logs" id="logsPanel" data-reveal="3">
@@ -299,6 +443,64 @@
       </div>
     </div>
   </section>
+
+  <!-- New WS service dialog -->
+  <div class="modal" id="newServiceModal" hidden>
+    <div class="modal-backdrop" id="newServiceBackdrop"></div>
+    <div class="modal-panel" role="dialog" aria-labelledby="newServiceTitle" aria-modal="true">
+      <div class="modal-header">
+        <h2 class="section-label" id="newServiceTitle">新建服务</h2>
+        <button class="btn btn-icon" id="newServiceClose" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="field field-wide">
+          <label for="newServiceName">服务名称</label>
+          <input type="text" id="newServiceName" class="input" maxlength="50" placeholder="UserService" autocomplete="off" />
+        </div>
+        <div class="field field-wide">
+          <label for="newServicePath">路径</label>
+          <input type="text" id="newServicePath" class="input mono" placeholder="/ws/UserService" autocomplete="off" spellcheck="false" />
+          <p class="field-hint">以 / 开头、不含 ?；同一端口内唯一。WSDL 地址即 该路径 + ?wsdl。</p>
+          <p class="field-hint field-error" id="newServiceError" hidden></p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="newServiceCancel">取消</button>
+        <button class="btn btn-primary" id="newServiceCreate">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import WSDL dialog -->
+  <div class="modal" id="importWsdlModal" hidden>
+    <div class="modal-backdrop" id="importWsdlBackdrop"></div>
+    <div class="modal-panel generator-panel" role="dialog" aria-labelledby="importWsdlTitle" aria-modal="true">
+      <div class="modal-header">
+        <h2 class="section-label" id="importWsdlTitle">导入 WSDL</h2>
+        <button class="btn btn-icon" id="importWsdlClose" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="field field-wide">
+          <label for="importWsdlText">WSDL 内容</label>
+          <textarea id="importWsdlText" class="input mono" rows="10" spellcheck="false"
+            placeholder="粘贴 WSDL XML，或选择本地 .wsdl 文件"></textarea>
+        </div>
+        <div class="field field-wide">
+          <label for="importWsdlFile">或选择文件</label>
+          <input type="file" id="importWsdlFile" accept=".wsdl,.xml" />
+        </div>
+        <p class="field-hint field-error" id="importWsdlError" hidden></p>
+        <p class="field-hint" id="importWsdlSummary"></p>
+        <pre class="wsdl-preview mono" id="importWsdlPreview" hidden></pre>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="importWsdlParseBtn">解析预览</button>
+        <div class="spacer"></div>
+        <button class="btn btn-ghost" id="importWsdlCancel">取消</button>
+        <button class="btn btn-primary" id="importWsdlConfirm" disabled>确认导入</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Generator modal -->
   <div class="modal" id="generatorModal" hidden>
@@ -404,6 +606,14 @@
         <button class="btn btn-icon" id="newPortClose" aria-label="关闭">×</button>
       </div>
       <div class="modal-body">
+        <div class="field field-wide">
+          <label>类型</label>
+          <div class="port-type-radios">
+            <label><input type="radio" name="newPortType" value="http" checked /> HTTP 接口</label>
+            <label><input type="radio" name="newPortType" value="ws" /> WebService (SOAP)</label>
+          </div>
+          <p class="field-hint">创建后类型不可更改。WebService 端口下按路径挂多个 SOAP 服务。</p>
+        </div>
         <div class="field field-wide">
           <label for="newPortNumber">端口号</label>
           <input type="number" id="newPortNumber" class="input mono" min="1" max="65535" />
