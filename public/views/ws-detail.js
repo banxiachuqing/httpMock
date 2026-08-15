@@ -277,12 +277,13 @@ export function initServiceDetail({
   els.deleteServiceBtn.addEventListener("click", async () => {
     const s = currentService(state);
     if (!s) return;
+    // 注意：dirty 不能在确认放弃后立刻清零 —— 若用户放弃确认（取消删除），
+    // 未保存的编辑必须保留（否则下次切换 operation 时会被 !state.dirty guard 静默丢弃）
     if (
       state.dirty &&
       !confirm("有未保存的修改，删除服务将放弃这些修改。继续？")
     )
       return;
-    state.dirty = false;
     if (
       !confirm(
         `确认删除服务 ${s.name}（${s.path}）？其下 ${(s.operations || []).length} 个操作将一并删除。`,
@@ -291,6 +292,7 @@ export function initServiceDetail({
       return;
     try {
       await api.deleteService(s.id);
+      state.dirty = false;
       await refreshAll();
       navigate(`#/port/${s.port}`);
     } catch (e) {
