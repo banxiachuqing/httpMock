@@ -250,14 +250,14 @@ async fn read_loop(
 pub fn kill_sidecar(app: &AppHandle) {
     let state = app.state::<SidecarState>();
     state.exiting.store(true, Ordering::SeqCst);
-    if let Some(mut child) = state.child.lock().unwrap().take() {
+    if let Some(child) = state.child.lock().unwrap().take() {
         let _ = child.kill();
     };
 }
 
 pub fn restart_sidecar(app: &AppHandle) {
     let state = app.state::<SidecarState>();
-    if let Some(mut child) = state.child.lock().unwrap().take() {
+    if let Some(child) = state.child.lock().unwrap().take() {
         let _ = child.kill();
     }
     state.next_ready_via_eval.store(true, Ordering::SeqCst);
