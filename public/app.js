@@ -12,6 +12,8 @@ import { applyTheme, onThemeChange } from "./theme.js";
 import { startRouter, navigate } from "./router.js";
 import { renderPortCards, initNewPortDialog } from "./views/port-cards.js";
 import { renderPortHeader, initPortDetail } from "./views/port-detail.js";
+import { renderServiceCards, initNewServiceDialog, serviceAddress } from "./views/ws-services.js";
+import { initImportWsdlDialog } from "./views/ws-import.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -110,14 +112,86 @@ const api = {
       })
     ).json();
   },
-  async preview(text) {
+  async preview(text, format) {
     return (
       await fetch("/api/preview", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(format ? { text, format } : { text }),
       })
     ).json();
+  },
+  async createService(body) {
+    const r = await fetch("/api/services", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "创建服务失败");
+    return json;
+  },
+  async updateService(id, body) {
+    const r = await fetch(`/api/services/${id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "更新服务失败");
+    return json;
+  },
+  async deleteService(id) {
+    const r = await fetch(`/api/services/${id}`, { method: "DELETE" });
+    if (!r.ok && r.status !== 204) throw new Error("删除服务失败");
+  },
+  async importServiceWsdl(id, wsdl) {
+    const r = await fetch(`/api/services/${id}/wsdl`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ wsdl }),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "导入 WSDL 失败");
+    return json;
+  },
+  async parseWsdl(wsdl) {
+    const r = await fetch("/api/wsdl/parse", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ wsdl }),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "WSDL 解析失败");
+    return json;
+  },
+  async createOperation(serviceId, body) {
+    const r = await fetch(`/api/services/${serviceId}/operations`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "新建操作失败");
+    return json;
+  },
+  async updateOperation(serviceId, opId, body) {
+    const r = await fetch(`/api/services/${serviceId}/operations/${opId}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "保存操作失败");
+    return json;
+  },
+  async deleteOperation(serviceId, opId) {
+    const r = await fetch(`/api/services/${serviceId}/operations/${opId}`, {
+      method: "DELETE",
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "删除操作失败");
+    return json;
   },
 };
 
@@ -231,6 +305,50 @@ const els = {
   portRenameBtn: $("#portRenameBtn"),
   deletePortBtn: $("#deletePortBtn"),
   endpointName: $("#endpointName"),
+
+  // WS 视图
+  viewWsPort: $("#viewWsPort"),
+  serviceCardGrid: $("#serviceCardGrid"),
+  serviceCardCount: $("#serviceCardCount"),
+  serviceHeader: $("#serviceHeader"),
+  backToPortBtn: $("#backToPortBtn"),
+  serviceHeaderName: $("#serviceHeaderName"),
+  serviceHeaderPath: $("#serviceHeaderPath"),
+  serviceEnabledToggle: $("#serviceEnabledToggle"),
+  importWsdlBtn: $("#importWsdlBtn"),
+  copyServiceAddrBtn: $("#copyServiceAddrBtn"),
+  deleteServiceBtn: $("#deleteServiceBtn"),
+  wsSidebarPanel: $("#wsSidebarPanel"),
+  operationCount: $("#operationCount"),
+  operationList: $("#operationList"),
+  newOperationBtn: $("#newOperationBtn"),
+  wsEditor: $("#wsEditor"),
+  wsEditorEmpty: $("#wsEditorEmpty"),
+  wsEditorForm: $("#wsEditorForm"),
+  wsEmptyNewBtn: $("#wsEmptyNewBtn"),
+
+  // 新建服务弹窗
+  newServiceModal: $("#newServiceModal"),
+  newServiceBackdrop: $("#newServiceBackdrop"),
+  newServiceClose: $("#newServiceClose"),
+  newServiceCancel: $("#newServiceCancel"),
+  newServiceCreate: $("#newServiceCreate"),
+  newServiceName: $("#newServiceName"),
+  newServicePath: $("#newServicePath"),
+  newServiceError: $("#newServiceError"),
+
+  // 导入 WSDL 弹窗
+  importWsdlModal: $("#importWsdlModal"),
+  importWsdlBackdrop: $("#importWsdlBackdrop"),
+  importWsdlClose: $("#importWsdlClose"),
+  importWsdlCancel: $("#importWsdlCancel"),
+  importWsdlParseBtn: $("#importWsdlParseBtn"),
+  importWsdlConfirm: $("#importWsdlConfirm"),
+  importWsdlText: $("#importWsdlText"),
+  importWsdlFile: $("#importWsdlFile"),
+  importWsdlError: $("#importWsdlError"),
+  importWsdlSummary: $("#importWsdlSummary"),
+  importWsdlPreview: $("#importWsdlPreview"),
 };
 
 let logDetailCM = null;
@@ -387,6 +505,8 @@ function renderStatus() {
 // ============================================================
 let suppressHash = false;
 let newPortDialog = null;
+let newServiceDialog = null;
+let importWsdlDialog = null;
 
 function renderHome() {
   renderPortCards(state, {
@@ -397,48 +517,97 @@ function renderHome() {
   });
 }
 
+function currentPortEntity(route) {
+  return state.ports.find((p) => p.port === route.port) || null;
+}
+
+function effectiveView(route) {
+  if (route.view === "home") return "home";
+  const portEntity = currentPortEntity(route);
+  if (!portEntity) return "not-found";
+  if (route.view === "service") {
+    const svc = (state.services || []).find(
+      (s) => s.id === route.serviceId && s.port === route.port,
+    );
+    return svc ? "service" : "not-found";
+  }
+  return portEntity.type === "ws" ? "ws-port" : "port";
+}
+
 async function applyRoute(route) {
   if (
     state.dirty &&
-    state.route.view === "port" &&
+    (state.route.view === "port" || state.route.view === "service") &&
     !confirm("有未保存的修改，是否放弃？")
   ) {
     suppressHash = true;
-    location.hash = `#/port/${state.route.port}`;
+    location.hash =
+      state.route.view === "service"
+        ? `#/port/${state.route.port}/svc/${state.route.serviceId}`
+        : `#/port/${state.route.port}`;
     return;
   }
   state.route = route;
   state.dirty = false;
 
-  const home = route.view === "home";
-  let portKnown = !home && state.ports.some((p) => p.port === route.port);
-  if (!home && !portKnown) {
+  if (route.view !== "home" && !currentPortEntity(route)) {
     // 端口可能刚被创建（API 直接建 / 另一标签页），拉一次最新数据再判断
     try {
-      state.ports = await (await fetch("/api/ports")).json();
-      state.endpoints = await (await fetch("/api/endpoints")).json();
-      portKnown = state.ports.some((p) => p.port === route.port);
+      state.ports = await api.listPorts();
+      state.endpoints = await api.listEndpoints();
+      state.config = await api.getConfig();
+      state.services = state.config.services || [];
     } catch {}
   }
-  document.body.dataset.view = home ? "home" : "port";
-  els.viewHome.hidden = !home;
-  els.portHeader.hidden = home || !portKnown;
-  els.portNotFound.hidden = home || portKnown;
-  els.sidebarPanel.hidden = home || !portKnown;
-  els.editor.hidden = home || !portKnown;
-  els.logsPanel.hidden = home || !portKnown;
 
-  if (home) renderHome();
+  const ev = effectiveView(route);
+  // route.view 是解析层视图（port），分流后回写有效视图（port/ws-port/service/not-found），
+  // refreshAll / boot 等处的 "ws-port" 分流判断依赖它
+  state.route = { ...route, view: ev };
+  document.body.dataset.view = ev === "not-found" ? "port" : ev;
+  els.viewHome.hidden = ev !== "home";
+  els.viewWsPort.hidden = ev !== "ws-port";
+  els.portHeader.hidden = !(ev === "port" || ev === "ws-port");
+  els.serviceHeader.hidden = ev !== "service";
+  els.portNotFound.hidden = ev !== "not-found";
+  els.sidebarPanel.hidden = ev !== "port";
+  els.wsSidebarPanel.hidden = ev !== "service";
+  els.editor.hidden = ev !== "port";
+  els.wsEditor.hidden = ev !== "service";
+  els.logsPanel.hidden = ev === "home";
 
-  if (!home && portKnown) {
-    renderPortHeader(state, els);
+  if (ev === "home") renderHome();
+  if (ev === "port" || ev === "ws-port") renderPortHeader(state, els);
+  if (ev === "port") {
     // CodeMirror 在 hidden 容器里挂载过，显示后需要重新测量
     getEditorView()?.requestMeasure();
     renderEndpointList();
     renderEditor();
     renderLogsInitial();
   }
+  if (ev === "ws-port") {
+    renderWsPortPage();
+    renderLogsInitial();
+  }
+  if (ev === "service") {
+    renderServicePage();
+    renderLogsInitial();
+  }
 }
+
+function renderWsPortPage() {
+  renderServiceCards(state, {
+    grid: els.serviceCardGrid,
+    countEl: els.serviceCardCount,
+    api,
+    onNewService: () => newServiceDialog.open(),
+    onImport: (svc) => importWsdlDialog.open(svc),
+    onChanged: refreshAll,
+  });
+}
+
+// service 视图的渲染在 Task 12 由 ws-detail.js 提供；此处先占位
+function renderServicePage() {}
 
 function renderLogEntry(entry) {
   const row = document.createElement("div");
@@ -586,7 +755,7 @@ function renderLogDetail(entry) {
 }
 
 function visibleLogs() {
-  if (state.route.view === "port") {
+  if (state.route.view !== "home") {
     return state.logs.filter((e) => e.port === state.route.port);
   }
   return state.logs;
@@ -595,7 +764,7 @@ function visibleLogs() {
 function updateLogsCount() {
   const vis = visibleLogs();
   els.logsCount.textContent =
-    state.route.view === "port"
+    state.route.view !== "home"
       ? `${vis.length} 条 / 共 ${state.logs.length} 条`
       : `${state.logs.length} 条 · 最多 500`;
 }
@@ -620,7 +789,7 @@ function renderLogsInitial() {
 function appendLog(entry) {
   state.logs.push(entry);
   if (state.logs.length > 500) state.logs.splice(0, state.logs.length - 500);
-  const isPortView = state.route.view === "port";
+  const isPortView = state.route.view !== "home";
   const matches = !isPortView || entry.port === state.route.port;
   if (matches) {
     // Remove the empty-state placeholder if it's still there so the new entry
@@ -647,7 +816,11 @@ async function refreshAll() {
     state.dirty = false;
   }
   render();
-  if (state.route.view === "port") renderPortHeader(state, els);
+  if (state.route.view === "port" || state.route.view === "ws-port") {
+    renderPortHeader(state, els);
+  }
+  if (state.route.view === "ws-port") renderWsPortPage();
+  if (state.route.view === "service") renderServicePage();
 }
 
 async function loadAll() {
@@ -995,6 +1168,25 @@ loadAll().then(() => {
   setInterval(refreshRuntimeStatus, 5000);
   newPortDialog = initNewPortDialog({ els, state, api });
   initPortDetail({ els, state, api, refreshAll });
+  newServiceDialog = initNewServiceDialog({
+    els,
+    state,
+    api,
+    onCreated: async () => {
+      state.config = await api.getConfig();
+      state.services = state.config.services || [];
+    },
+  });
+  importWsdlDialog = initImportWsdlDialog({
+    els,
+    api,
+    onImported: async () => {
+      state.config = await api.getConfig();
+      state.services = state.config.services || [];
+      if (state.route.view === "ws-port") renderWsPortPage();
+      if (state.route.view === "service") renderServicePage();
+    },
+  });
   startRouter((route) => {
     if (suppressHash) {
       suppressHash = false;
