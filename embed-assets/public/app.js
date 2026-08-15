@@ -6,12 +6,20 @@ import {
   getValue,
   setValue,
   getEditorView,
+  getActiveEditorView,
   setEditorTheme,
 } from "./editor.js";
 import { applyTheme, onThemeChange } from "./theme.js";
 import { startRouter, navigate } from "./router.js";
 import { renderPortCards, initNewPortDialog } from "./views/port-cards.js";
 import { renderPortHeader, initPortDetail } from "./views/port-detail.js";
+import {
+  renderServiceCards,
+  initNewServiceDialog,
+  serviceAddress,
+} from "./views/ws-services.js";
+import { initImportWsdlDialog } from "./views/ws-import.js";
+import { initServiceDetail, renderServiceDetail } from "./views/ws-detail.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -59,14 +67,14 @@ const api = {
   async listPorts() {
     return (await fetch("/api/ports")).json();
   },
-  async createPort(port) {
+  async createPort(port, type = "http") {
     const r = await fetch("/api/ports", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ port }),
+      body: JSON.stringify({ port, type }),
     });
     const body = await r.json();
-    if (!r.ok) throw new Error(body.message || "创建端口失败");
+    if (!r.ok) throw new Error(body.error || "创建端口失败");
     return body;
   },
   async updatePort(port, body) {
@@ -110,14 +118,86 @@ const api = {
       })
     ).json();
   },
-  async preview(text) {
+  async preview(text, format) {
     return (
       await fetch("/api/preview", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(format ? { text, format } : { text }),
       })
     ).json();
+  },
+  async createService(body) {
+    const r = await fetch("/api/services", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "创建服务失败");
+    return json;
+  },
+  async updateService(id, body) {
+    const r = await fetch(`/api/services/${id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "更新服务失败");
+    return json;
+  },
+  async deleteService(id) {
+    const r = await fetch(`/api/services/${id}`, { method: "DELETE" });
+    if (!r.ok && r.status !== 204) throw new Error("删除服务失败");
+  },
+  async importServiceWsdl(id, wsdl) {
+    const r = await fetch(`/api/services/${id}/wsdl`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ wsdl }),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "导入 WSDL 失败");
+    return json;
+  },
+  async parseWsdl(wsdl) {
+    const r = await fetch("/api/wsdl/parse", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ wsdl }),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "WSDL 解析失败");
+    return json;
+  },
+  async createOperation(serviceId, body) {
+    const r = await fetch(`/api/services/${serviceId}/operations`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "新建操作失败");
+    return json;
+  },
+  async updateOperation(serviceId, opId, body) {
+    const r = await fetch(`/api/services/${serviceId}/operations/${opId}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "保存操作失败");
+    return json;
+  },
+  async deleteOperation(serviceId, opId) {
+    const r = await fetch(`/api/services/${serviceId}/operations/${opId}`, {
+      method: "DELETE",
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "删除操作失败");
+    return json;
   },
 };
 
@@ -128,7 +208,9 @@ const state = {
   config: null,
   ports: [],
   endpoints: [],
+  services: [],
   selectedId: null,
+  selectedOperationId: null,
   dirty: false,
   runtime: "stopped",
   runtimeStatus: {}, // port -> { state, reason? }
@@ -230,6 +312,75 @@ const els = {
   portRenameBtn: $("#portRenameBtn"),
   deletePortBtn: $("#deletePortBtn"),
   endpointName: $("#endpointName"),
+
+  // WS 视图
+  viewWsPort: $("#viewWsPort"),
+  serviceCardGrid: $("#serviceCardGrid"),
+  serviceCardCount: $("#serviceCardCount"),
+  serviceHeader: $("#serviceHeader"),
+  backToPortBtn: $("#backToPortBtn"),
+  serviceHeaderName: $("#serviceHeaderName"),
+  serviceHeaderPath: $("#serviceHeaderPath"),
+  serviceEnabledToggle: $("#serviceEnabledToggle"),
+  importWsdlBtn: $("#importWsdlBtn"),
+  copyServiceAddrBtn: $("#copyServiceAddrBtn"),
+  deleteServiceBtn: $("#deleteServiceBtn"),
+  wsSidebarPanel: $("#wsSidebarPanel"),
+  operationCount: $("#operationCount"),
+  operationList: $("#operationList"),
+  newOperationBtn: $("#newOperationBtn"),
+  wsEditor: $("#wsEditor"),
+  wsEditorEmpty: $("#wsEditorEmpty"),
+  wsEditorForm: $("#wsEditorForm"),
+  wsEmptyNewBtn: $("#wsEmptyNewBtn"),
+
+  // WS 服务详情编辑区
+  xmlEditorHost: $("#xmlEditorHost"),
+  wsOperationId: $("#wsOperationId"),
+  wsOpName: $("#wsOpName"),
+  wsOpSoapAction: $("#wsOpSoapAction"),
+  wsOpStatus: $("#wsOpStatus"),
+  wsResponseType: $("#wsResponseType"),
+  wsValidationStatus: $("#wsValidationStatus"),
+  wsFormatBtn: $("#wsFormatBtn"),
+  wsValidateBtn: $("#wsValidateBtn"),
+  wsDynamicBtn: $("#wsDynamicBtn"),
+  wsLineCount: $("#wsLineCount"),
+  wsCharCount: $("#wsCharCount"),
+  wsPreviewMeta: $("#wsPreviewMeta"),
+  wsPreviewMetaLabel: $("#wsPreviewMetaLabel"),
+  wsPreviewExprStat: $("#wsPreviewExprStat"),
+  wsPreviewErrStat: $("#wsPreviewErrStat"),
+  wsPreviewRefreshBtn: $("#wsPreviewRefreshBtn"),
+  wsPreviewBanner: $("#wsPreviewBanner"),
+  wsPreviewPane: $("#wsPreviewPane"),
+  wsLastSaved: $("#wsLastSaved"),
+  wsDeleteOpBtn: $("#wsDeleteOpBtn"),
+  wsRevertBtn: $("#wsRevertBtn"),
+  wsSaveOpBtn: $("#wsSaveOpBtn"),
+
+  // 新建服务弹窗
+  newServiceModal: $("#newServiceModal"),
+  newServiceBackdrop: $("#newServiceBackdrop"),
+  newServiceClose: $("#newServiceClose"),
+  newServiceCancel: $("#newServiceCancel"),
+  newServiceCreate: $("#newServiceCreate"),
+  newServiceName: $("#newServiceName"),
+  newServicePath: $("#newServicePath"),
+  newServiceError: $("#newServiceError"),
+
+  // 导入 WSDL 弹窗
+  importWsdlModal: $("#importWsdlModal"),
+  importWsdlBackdrop: $("#importWsdlBackdrop"),
+  importWsdlClose: $("#importWsdlClose"),
+  importWsdlCancel: $("#importWsdlCancel"),
+  importWsdlParseBtn: $("#importWsdlParseBtn"),
+  importWsdlConfirm: $("#importWsdlConfirm"),
+  importWsdlText: $("#importWsdlText"),
+  importWsdlFile: $("#importWsdlFile"),
+  importWsdlError: $("#importWsdlError"),
+  importWsdlSummary: $("#importWsdlSummary"),
+  importWsdlPreview: $("#importWsdlPreview"),
 };
 
 let logDetailCM = null;
@@ -386,6 +537,8 @@ function renderStatus() {
 // ============================================================
 let suppressHash = false;
 let newPortDialog = null;
+let newServiceDialog = null;
+let importWsdlDialog = null;
 
 function renderHome() {
   renderPortCards(state, {
@@ -396,47 +549,98 @@ function renderHome() {
   });
 }
 
+function currentPortEntity(route) {
+  return state.ports.find((p) => p.port === route.port) || null;
+}
+
+function effectiveView(route) {
+  if (route.view === "home") return "home";
+  const portEntity = currentPortEntity(route);
+  if (!portEntity) return "not-found";
+  if (route.view === "service") {
+    const svc = (state.services || []).find(
+      (s) => s.id === route.serviceId && s.port === route.port,
+    );
+    return svc ? "service" : "not-found";
+  }
+  return portEntity.type === "ws" ? "ws-port" : "port";
+}
+
 async function applyRoute(route) {
   if (
     state.dirty &&
-    state.route.view === "port" &&
+    (state.route.view === "port" || state.route.view === "service") &&
     !confirm("有未保存的修改，是否放弃？")
   ) {
     suppressHash = true;
-    location.hash = `#/port/${state.route.port}`;
+    location.hash =
+      state.route.view === "service"
+        ? `#/port/${state.route.port}/svc/${state.route.serviceId}`
+        : `#/port/${state.route.port}`;
     return;
   }
   state.route = route;
   state.dirty = false;
 
-  const home = route.view === "home";
-  let portKnown = !home && state.ports.some((p) => p.port === route.port);
-  if (!home && !portKnown) {
+  if (route.view !== "home" && !currentPortEntity(route)) {
     // 端口可能刚被创建（API 直接建 / 另一标签页），拉一次最新数据再判断
     try {
-      state.ports = await (await fetch("/api/ports")).json();
-      state.endpoints = await (await fetch("/api/endpoints")).json();
-      portKnown = state.ports.some((p) => p.port === route.port);
+      state.ports = await api.listPorts();
+      state.endpoints = await api.listEndpoints();
+      state.config = await api.getConfig();
+      state.services = state.config.services || [];
     } catch {}
   }
-  document.body.dataset.view = home ? "home" : "port";
-  els.viewHome.hidden = !home;
-  els.portHeader.hidden = home || !portKnown;
-  els.portNotFound.hidden = home || portKnown;
-  els.sidebarPanel.hidden = home || !portKnown;
-  els.editor.hidden = home || !portKnown;
-  els.logsPanel.hidden = home || !portKnown;
 
-  if (home) renderHome();
+  const ev = effectiveView(route);
+  // route.view 是解析层视图（port），分流后回写有效视图（port/ws-port/service/not-found），
+  // refreshAll / boot 等处的 "ws-port" 分流判断依赖它
+  state.route = { ...route, view: ev };
+  document.body.dataset.view = ev === "not-found" ? "port" : ev;
+  els.viewHome.hidden = ev !== "home";
+  els.viewWsPort.hidden = ev !== "ws-port";
+  els.portHeader.hidden = !(ev === "port" || ev === "ws-port");
+  els.serviceHeader.hidden = ev !== "service";
+  els.portNotFound.hidden = ev !== "not-found";
+  els.sidebarPanel.hidden = ev !== "port";
+  els.wsSidebarPanel.hidden = ev !== "service";
+  els.editor.hidden = ev !== "port";
+  els.wsEditor.hidden = ev !== "service";
+  els.logsPanel.hidden = ev === "home";
 
-  if (!home && portKnown) {
-    renderPortHeader(state, els);
+  if (ev === "home") renderHome();
+  if (ev === "port" || ev === "ws-port") renderPortHeader(state, els);
+  if (ev === "port") {
     // CodeMirror 在 hidden 容器里挂载过，显示后需要重新测量
     getEditorView()?.requestMeasure();
     renderEndpointList();
     renderEditor();
     renderLogsInitial();
   }
+  if (ev === "ws-port") {
+    renderWsPortPage();
+    renderLogsInitial();
+  }
+  if (ev === "service") {
+    renderServicePage();
+    renderLogsInitial();
+  }
+}
+
+function renderWsPortPage() {
+  renderServiceCards(state, {
+    grid: els.serviceCardGrid,
+    countEl: els.serviceCardCount,
+    api,
+    onNewService: () => newServiceDialog.open(),
+    onImport: (svc) => importWsdlDialog.open(svc),
+    onChanged: refreshAll,
+  });
+}
+
+// service 视图的渲染由 ws-detail.js 提供
+function renderServicePage() {
+  renderServiceDetail();
 }
 
 function renderLogEntry(entry) {
@@ -455,9 +659,17 @@ function renderLogEntry(entry) {
     <span class="log-status" data-range="${range}">${entry.status}</span>
     <span class="log-duration">${entry.durationMs}</span>
     <span class="log-ip mono">${ip || "—"}</span>
-    <span class="log-result">${entry.matched ? "匹配" : "无路由"}</span>
+    <span class="log-result"></span>
   `;
   row.querySelector(".log-path").textContent = entry.path;
+  // operationName 来自请求数据，只能 textContent 赋值（不进 innerHTML）
+  row.querySelector(".log-result").textContent = entry.matched
+    ? entry.operationName
+      ? `✓ ${entry.operationName}`
+      : "匹配"
+    : entry.serviceId
+      ? `✗ Fault${entry.operationName ? ` · ${entry.operationName}` : ""}`
+      : "无路由";
   // 只有 HTTP 请求条目可点（过滤 resolver-warn）
   if (entry.method) {
     row.addEventListener("click", () => openLogDetail(entry.id));
@@ -585,7 +797,7 @@ function renderLogDetail(entry) {
 }
 
 function visibleLogs() {
-  if (state.route.view === "port") {
+  if (state.route.view !== "home") {
     return state.logs.filter((e) => e.port === state.route.port);
   }
   return state.logs;
@@ -594,7 +806,7 @@ function visibleLogs() {
 function updateLogsCount() {
   const vis = visibleLogs();
   els.logsCount.textContent =
-    state.route.view === "port"
+    state.route.view !== "home"
       ? `${vis.length} 条 / 共 ${state.logs.length} 条`
       : `${state.logs.length} 条 · 最多 500`;
 }
@@ -619,7 +831,7 @@ function renderLogsInitial() {
 function appendLog(entry) {
   state.logs.push(entry);
   if (state.logs.length > 500) state.logs.splice(0, state.logs.length - 500);
-  const isPortView = state.route.view === "port";
+  const isPortView = state.route.view !== "home";
   const matches = !isPortView || entry.port === state.route.port;
   if (matches) {
     // Remove the empty-state placeholder if it's still there so the new entry
@@ -639,12 +851,18 @@ function appendLog(entry) {
 async function refreshAll() {
   state.ports = await api.listPorts();
   state.endpoints = await api.listEndpoints();
+  state.config = await api.getConfig();
+  state.services = state.config.services || [];
   if (!state.endpoints.some((e) => e.id === state.selectedId)) {
     state.selectedId = state.endpoints[0]?.id || null;
     state.dirty = false;
   }
   render();
-  if (state.route.view === "port") renderPortHeader(state, els);
+  if (state.route.view === "port" || state.route.view === "ws-port") {
+    renderPortHeader(state, els);
+  }
+  if (state.route.view === "ws-port") renderWsPortPage();
+  if (state.route.view === "service") renderServicePage();
 }
 
 async function loadAll() {
@@ -653,6 +871,7 @@ async function loadAll() {
   applyTheme(state.config.settings.theme ?? "system");
   state.ports = await api.listPorts();
   state.endpoints = await api.listEndpoints();
+  state.services = state.config.services || [];
   state.selectedId = state.endpoints[0]?.id || null;
   state.logs = await api.recentLogs(500);
   // Also fetch runtime status so the global toggle reflects the real state
@@ -961,6 +1180,7 @@ document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "s") {
     e.preventDefault();
     if (!els.editorForm.hidden) saveEndpoint();
+    else if (!els.wsEditorForm.hidden) els.wsSaveOpBtn.click();
   }
   if (e.key === "Escape" && !els.settingsModal.hidden) closeSettings();
 });
@@ -991,6 +1211,32 @@ loadAll().then(() => {
   setInterval(refreshRuntimeStatus, 5000);
   newPortDialog = initNewPortDialog({ els, state, api });
   initPortDetail({ els, state, api, refreshAll });
+  newServiceDialog = initNewServiceDialog({
+    els,
+    state,
+    api,
+    onCreated: async () => {
+      state.config = await api.getConfig();
+      state.services = state.config.services || [];
+    },
+  });
+  importWsdlDialog = initImportWsdlDialog({
+    els,
+    api,
+    onImported: async () => {
+      state.config = await api.getConfig();
+      state.services = state.config.services || [];
+      if (state.route.view === "ws-port") renderWsPortPage();
+      if (state.route.view === "service") renderServicePage();
+    },
+  });
+  initServiceDetail({
+    els,
+    state,
+    api,
+    refreshAll,
+    importDialog: () => importWsdlDialog,
+  });
   startRouter((route) => {
     if (suppressHash) {
       suppressHash = false;
@@ -1558,7 +1804,8 @@ generatorInsertBtn.addEventListener("click", () => {
   const id = generatorState.selectedId;
   if (!id || !generatorState.pendingRange) return;
   const expr = buildExprText(id, generatorState.args);
-  const view = getEditorView();
+  // 插入目标 = 最近聚焦的编辑器（WS XML 编辑器聚焦时插到 XML 里）
+  const view = getActiveEditorView();
   const { from, to, hasQuotes } = generatorState.pendingRange;
   const replacement = hasQuotes ? expr : `"${expr}"`;
   const newCursor = from + (hasQuotes ? 0 : 1);
