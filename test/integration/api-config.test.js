@@ -87,3 +87,15 @@ describe('PATCH /api/config — theme', () => {
     expect(cfg.body.settings.theme).toBe('system');
   });
 });
+
+describe('GET /api/config — services wsdl strip', () => {
+  it('返回的 service 不含 wsdl 原文，替换为 hasWsdl 标志', async () => {
+    await ctx.request.post('/api/services').send({ port: 8083, path: '/ws/U', wsdl: '<wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" targetNamespace="urn:u"><wsdl:portType name="P"/></wsdl:definitions>' });
+    const cfg = (await ctx.request.get('/api/config')).body;
+    const svc = cfg.services.find((s) => s.path === '/ws/U');
+    expect(svc.wsdl).toBeUndefined();
+    expect(svc.hasWsdl).toBe(true);
+    // 存储层仍是完整 wsdl
+    expect(store.config.services.find((s) => s.path === '/ws/U').wsdl).toContain('targetNamespace="urn:u"');
+  });
+});

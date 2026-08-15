@@ -115,7 +115,7 @@ describe('端点自动补建端口实体', () => {
   it('POST /api/endpoints 为未知端口补建 port', async () => {
     await ctx.request.post('/api/endpoints').send({ port: 7777, method: 'GET', path: '/x', statusCode: 200, response: {} });
     const r = await ctx.request.get('/api/ports');
-    expect(r.body).toEqual([{ port: 7777, enabled: true }]);
+    expect(r.body).toEqual([{ port: 7777, enabled: true, type: 'http' }]);
   });
 
   it('PUT /api/endpoints 改到未知端口时补建', async () => {

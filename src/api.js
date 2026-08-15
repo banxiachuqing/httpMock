@@ -6,6 +6,7 @@ import { sseMiddleware, broadcast } from './sse.js';
 import { isValidStoragePath } from './paths.js';
 import { registerPreviewRoutes } from './api-preview.js';
 import { registerPortRoutes } from './api-ports.js';
+import { registerServiceRoutes, toPublicService } from './api-services.js';
 
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
@@ -30,10 +31,23 @@ function withNormalizedName(ep) {
   return ep;
 }
 
+// GET/PATCH /api/config 响应层：services[].wsdl 原文不随全量配置往返（spec §5）
+function publicConfig(cfg) {
+  return { ...cfg, services: (cfg.services || []).map(toPublicService) };
+}
+
 // 端点引用的端口不在 ports 列表时自动补建（避免运行时静默跳过）
 function ensurePortEntity(cfg, port) {
   if (!cfg.ports.some((p) => p.port === port)) {
-    cfg.ports = [...cfg.ports, { port, enabled: true }].sort((a, b) => a.port - b.port);
+    cfg.ports = [...cfg.ports, { port, enabled: true, type: 'http' }].sort((a, b) => a.port - b.port);
+  }
+}
+
+// ws 型端口拒绝挂 HTTP 端点（spec §3 端口类型约束）
+function assertHttpPort(cfg, port) {
+  const p = cfg.ports.find((x) => x.port === port);
+  if (p && p.type === 'ws') {
+    throw new AppError(400, 'PORT_TYPE_MISMATCH', `port ${port} is a webservice port`);
   }
 }
 
@@ -78,7 +92,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
   app.get('/events', (req, res) => sse.handler(req, res));
 
   // Config
-  app.get('/api/config', (_req, res) => res.json(configStore.config));
+  app.get('/api/config', (_req, res) => res.json(publicConfig(configStore.config)));
 
   app.patch('/api/config', async (req, res, next) => {
     try {
@@ -112,7 +126,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
         if (settings.theme !== undefined) cfg.settings.theme = settings.theme;
         return cfg;
       });
-      res.json(configStore.config);
+      res.json(publicConfig(configStore.config));
     } catch (e) { next(e); }
   });
 
@@ -125,6 +139,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
       const id = crypto.randomUUID();
       const ep = withNormalizedName({ id, ...req.body, enabled: req.body.enabled !== false });
       const all = [...configStore.config.endpoints, ep];
+      assertHttpPort(configStore.config, ep.port);
       configStore.checkUniqueness(all);
       await configStore.update((cfg) => {
         cfg.endpoints = all;
@@ -144,6 +159,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
       const updated = withNormalizedName({ ...list[idx], ...req.body, id: list[idx].id });
       const all = [...list];
       all[idx] = updated;
+      assertHttpPort(configStore.config, updated.port);
       configStore.checkUniqueness(all, req.params.id);
       await configStore.update((cfg) => {
         cfg.endpoints = all;
@@ -167,7 +183,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
   // Runtime
   app.post('/api/runtime/start', async (req, res, next) => {
     try {
-      const result = await mockEngine.start(configStore.config.endpoints, configStore.config.ports);
+      const result = await mockEngine.start(configStore.config.endpoints, configStore.config.ports, configStore.config.services || []);
       res.json(result);
     } catch (e) { next(e); }
   });
@@ -195,6 +211,9 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
 
   // Ports CRUD（端口一等实体）
   registerPortRoutes(app, { configStore });
+
+  // WebService services CRUD + WSDL 解析（spec §5）
+  registerServiceRoutes(app, { configStore });
 
   // Preview & generators (dynamic response values) —挂 createApi 末尾、错误中间件之前
   registerPreviewRoutes(app);

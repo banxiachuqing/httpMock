@@ -127,3 +127,18 @@ describe('endpoint name 字段', () => {
     expect(r.body.name).toBeUndefined();
   });
 });
+
+describe('端口类型约束', () => {
+  it('往 ws 端口建 endpoint → PORT_TYPE_MISMATCH', async () => {
+    await ctx.request.post('/api/ports').send({ port: 8082, type: 'ws' });
+    const r = await ctx.request.post('/api/endpoints').send({ method: 'GET', port: 8082, path: '/x', response: {} });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('PORT_TYPE_MISMATCH');
+  });
+
+  it('往 http 端口（或新端口）建 endpoint 正常，补建的端口带 type:http', async () => {
+    const r = await ctx.request.post('/api/endpoints').send({ method: 'GET', port: 8088, path: '/x', response: {} });
+    expect(r.status).toBe(201);
+    expect(store.config.ports.find((p) => p.port === 8088)).toEqual({ port: 8088, enabled: true, type: 'http' });
+  });
+});
