@@ -1,11 +1,17 @@
 // Mock//Server — production UI
 // Talks to /api/* and /events.
 
-import { mountEditor, getValue, setValue, getEditorView, setEditorTheme } from './editor.js';
-import { applyTheme, onThemeChange } from './theme.js';
-import { startRouter, navigate } from './router.js';
-import { renderPortCards, initNewPortDialog } from './views/port-cards.js';
-import { renderPortHeader, initPortDetail } from './views/port-detail.js';
+import {
+  mountEditor,
+  getValue,
+  setValue,
+  getEditorView,
+  setEditorTheme,
+} from "./editor.js";
+import { applyTheme, onThemeChange } from "./theme.js";
+import { startRouter, navigate } from "./router.js";
+import { renderPortCards, initNewPortDialog } from "./views/port-cards.js";
+import { renderPortHeader, initPortDetail } from "./views/port-detail.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -14,56 +20,104 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
 // API client
 // ============================================================
 const api = {
-  async getConfig() { return (await fetch('/api/config')).json(); },
-  async patchConfig(settings) {
-    return (await fetch('/api/config', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ settings }) })).json();
+  async getConfig() {
+    return (await fetch("/api/config")).json();
   },
-  async listEndpoints() { return (await fetch('/api/endpoints')).json(); },
+  async patchConfig(settings) {
+    return (
+      await fetch("/api/config", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ settings }),
+      })
+    ).json();
+  },
+  async listEndpoints() {
+    return (await fetch("/api/endpoints")).json();
+  },
   async createEndpoint(body) {
-    return (await fetch('/api/endpoints', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json();
+    return (
+      await fetch("/api/endpoints", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    ).json();
   },
   async updateEndpoint(id, body) {
-    return (await fetch(`/api/endpoints/${id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json();
+    return (
+      await fetch(`/api/endpoints/${id}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    ).json();
   },
   async deleteEndpoint(id) {
-    return (await fetch(`/api/endpoints/${id}`, { method: 'DELETE' }));
+    return await fetch(`/api/endpoints/${id}`, { method: "DELETE" });
   },
-  async listPorts() { return (await fetch('/api/ports')).json(); },
+  async listPorts() {
+    return (await fetch("/api/ports")).json();
+  },
   async createPort(port) {
-    const r = await fetch('/api/ports', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ port }) });
+    const r = await fetch("/api/ports", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ port }),
+    });
     const body = await r.json();
-    if (!r.ok) throw new Error(body.message || '创建端口失败');
+    if (!r.ok) throw new Error(body.message || "创建端口失败");
     return body;
   },
   async updatePort(port, body) {
-    const r = await fetch(`/api/ports/${port}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch(`/api/ports/${port}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
     const json = await r.json();
-    if (!r.ok) throw new Error(json.message || '更新端口失败');
+    if (!r.ok) throw new Error(json.message || "更新端口失败");
     return json;
   },
   async deletePort(port) {
-    const r = await fetch(`/api/ports/${port}`, { method: 'DELETE' });
-    if (!r.ok && r.status !== 204) throw new Error('删除端口失败');
+    const r = await fetch(`/api/ports/${port}`, { method: "DELETE" });
+    if (!r.ok && r.status !== 204) throw new Error("删除端口失败");
   },
-  async runtimeStart() { return (await fetch('/api/runtime/start', { method: 'POST' })).json(); },
-  async runtimeStop() { return (await fetch('/api/runtime/stop', { method: 'POST' })).json(); },
-  async runtimeStatus() { return (await fetch('/api/runtime/status')).json(); },
-  async recentLogs(limit = 500) { return (await fetch(`/api/logs?limit=${limit}`)).json(); },
-  async clearLogs() { await fetch('/api/logs', { method: 'DELETE' }); },
-  async getGenerators() { return (await fetch('/api/generators')).json(); },
+  async runtimeStart() {
+    return (await fetch("/api/runtime/start", { method: "POST" })).json();
+  },
+  async runtimeStop() {
+    return (await fetch("/api/runtime/stop", { method: "POST" })).json();
+  },
+  async runtimeStatus() {
+    return (await fetch("/api/runtime/status")).json();
+  },
+  async recentLogs(limit = 500) {
+    return (await fetch(`/api/logs?limit=${limit}`)).json();
+  },
+  async clearLogs() {
+    await fetch("/api/logs", { method: "DELETE" });
+  },
+  async getGenerators() {
+    return (await fetch("/api/generators")).json();
+  },
   async getGeneratorSample(id, args) {
-    return (await fetch('/api/generators/sample', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id, args }),
-    })).json();
+    return (
+      await fetch("/api/generators/sample", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, args }),
+      })
+    ).json();
   },
   async preview(text) {
-    return (await fetch('/api/preview', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text }),
-    })).json();
+    return (
+      await fetch("/api/preview", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      })
+    ).json();
   },
 };
 
@@ -76,106 +130,106 @@ const state = {
   endpoints: [],
   selectedId: null,
   dirty: false,
-  runtime: 'stopped',
+  runtime: "stopped",
   runtimeStatus: {}, // port -> { state, reason? }
   logs: [],
   autoScroll: true,
-  route: { view: 'home' },
+  route: { view: "home" },
 };
 
 // ============================================================
 // DOM refs
 // ============================================================
 const els = {
-  startStopBtn: $('#startStopBtn'),
-  globalStatus: $('#globalStatus'),
-  statusDetail: $('#statusDetail'),
-  newEndpointBtn: $('#newEndpointBtn'),
-  emptyNewBtn: $('#emptyNewBtn'),
-  endpointList: $('#endpointList'),
-  endpointCount: $('#endpointCount'),
-  portSummaryList: $('#portSummaryList'),
-  editor: $('#editor'),
-  editorEmpty: $('#editorEmpty'),
-  editorForm: $('#editorForm'),
-  endpointId: $('#endpointId'),
-  lastSaved: $('#lastSaved'),
-  method: $('#method'),
-  port: $('#port'),
-  path: $('#path'),
-  status: $('#status'),
-  responseEditor: { value: '' }, // legacy ref; replaced by CodeMirror getters
-  validationStatus: $('#validationStatus'),
-  formatBtn: $('#formatBtn'),
-  validateBtn: $('#validateBtn'),
-  saveBtn: $('#saveBtn'),
-  revertBtn: $('#revertBtn'),
-  deleteBtn: $('#deleteBtn'),
-  lineCount: $('#lineCount'),
-  charCount: $('#charCount'),
-  logsBody: $('#logsBody'),
-  logsCount: $('#logsCount'),
-  logsStatus: $('#logsStatus'),
-  autoScrollToggle: $('#autoScrollToggle'),
-  clearLogsBtn: $('#clearLogsBtn'),
-  settingsBtn: $('#settingsBtn'),
-  settingsModal: $('#settingsModal'),
-  settingsBackdrop: $('#settingsBackdrop'),
-  settingsClose: $('#settingsClose'),
-  settingsCancel: $('#settingsCancel'),
-  settingsSave: $('#settingsSave'),
-  storagePath: $('#storagePath'),
-  uiPort: $('#uiPort'),
-  maxBody: $('#settingsMaxBody'),
-  maxBodyHint: $('#settingsMaxBodyHint'),
-  theme: $('#settingsTheme'),
+  startStopBtn: $("#startStopBtn"),
+  globalStatus: $("#globalStatus"),
+  statusDetail: $("#statusDetail"),
+  newEndpointBtn: $("#newEndpointBtn"),
+  emptyNewBtn: $("#emptyNewBtn"),
+  endpointList: $("#endpointList"),
+  endpointCount: $("#endpointCount"),
+  portSummaryList: $("#portSummaryList"),
+  editor: $("#editor"),
+  editorEmpty: $("#editorEmpty"),
+  editorForm: $("#editorForm"),
+  endpointId: $("#endpointId"),
+  lastSaved: $("#lastSaved"),
+  method: $("#method"),
+  port: $("#port"),
+  path: $("#path"),
+  status: $("#status"),
+  responseEditor: { value: "" }, // legacy ref; replaced by CodeMirror getters
+  validationStatus: $("#validationStatus"),
+  formatBtn: $("#formatBtn"),
+  validateBtn: $("#validateBtn"),
+  saveBtn: $("#saveBtn"),
+  revertBtn: $("#revertBtn"),
+  deleteBtn: $("#deleteBtn"),
+  lineCount: $("#lineCount"),
+  charCount: $("#charCount"),
+  logsBody: $("#logsBody"),
+  logsCount: $("#logsCount"),
+  logsStatus: $("#logsStatus"),
+  autoScrollToggle: $("#autoScrollToggle"),
+  clearLogsBtn: $("#clearLogsBtn"),
+  settingsBtn: $("#settingsBtn"),
+  settingsModal: $("#settingsModal"),
+  settingsBackdrop: $("#settingsBackdrop"),
+  settingsClose: $("#settingsClose"),
+  settingsCancel: $("#settingsCancel"),
+  settingsSave: $("#settingsSave"),
+  storagePath: $("#storagePath"),
+  uiPort: $("#uiPort"),
+  maxBody: $("#settingsMaxBody"),
+  maxBodyHint: $("#settingsMaxBodyHint"),
+  theme: $("#settingsTheme"),
 
   // Log detail dialog
-  logDetail: $('#log-detail'),
-  logDetailMethod: $('#logDetailMethod'),
-  logDetailPath: $('#logDetailPath'),
-  logDetailStatus: $('#logDetailStatus'),
-  logDetailClose: $('#logDetailClose'),
-  logDetailMeta: $('#logDetailMeta'),
-  logDetailQueryCount: $('#logDetailQueryCount'),
-  logDetailQueryTable: $('#logDetailQueryTable'),
-  logDetailQueryEmpty: $('#logDetailQueryEmpty'),
-  logDetailHeadersCount: $('#logDetailHeadersCount'),
-  logDetailHeadersTable: $('#logDetailHeadersTable'),
-  logDetailHeadersEmpty: $('#logDetailHeadersEmpty'),
-  logDetailBodyWarning: $('#logDetailBodyWarning'),
-  logDetailBody: $('#logDetailBody'),
-  logDetailBodyPlain: $('#logDetailBodyPlain'),
-  logDetailEmpty: $('#logDetailEmpty'),
+  logDetail: $("#log-detail"),
+  logDetailMethod: $("#logDetailMethod"),
+  logDetailPath: $("#logDetailPath"),
+  logDetailStatus: $("#logDetailStatus"),
+  logDetailClose: $("#logDetailClose"),
+  logDetailMeta: $("#logDetailMeta"),
+  logDetailQueryCount: $("#logDetailQueryCount"),
+  logDetailQueryTable: $("#logDetailQueryTable"),
+  logDetailQueryEmpty: $("#logDetailQueryEmpty"),
+  logDetailHeadersCount: $("#logDetailHeadersCount"),
+  logDetailHeadersTable: $("#logDetailHeadersTable"),
+  logDetailHeadersEmpty: $("#logDetailHeadersEmpty"),
+  logDetailBodyWarning: $("#logDetailBodyWarning"),
+  logDetailBody: $("#logDetailBody"),
+  logDetailBodyPlain: $("#logDetailBodyPlain"),
+  logDetailEmpty: $("#logDetailEmpty"),
 
   // 视图与路由
-  viewHome: $('#viewHome'),
-  portCardGrid: $('#portCardGrid'),
-  portCardCount: $('#portCardCount'),
-  portHeader: $('#portHeader'),
-  backToHomeBtn: $('#backToHomeBtn'),
-  portHeaderNumber: $('#portHeaderNumber'),
-  portStatusLed: $('#portStatusLed'),
-  portNotFound: $('#portNotFound'),
-  portNotFoundBack: $('#portNotFoundBack'),
-  sidebarPanel: $('#sidebarPanel'),
-  logsPanel: $('#logsPanel'),
+  viewHome: $("#viewHome"),
+  portCardGrid: $("#portCardGrid"),
+  portCardCount: $("#portCardCount"),
+  portHeader: $("#portHeader"),
+  backToHomeBtn: $("#backToHomeBtn"),
+  portHeaderNumber: $("#portHeaderNumber"),
+  portStatusLed: $("#portStatusLed"),
+  portNotFound: $("#portNotFound"),
+  portNotFoundBack: $("#portNotFoundBack"),
+  sidebarPanel: $("#sidebarPanel"),
+  logsPanel: $("#logsPanel"),
 
   // 新建端口弹窗
-  newPortModal: $('#newPortModal'),
-  newPortBackdrop: $('#newPortBackdrop'),
-  newPortClose: $('#newPortClose'),
-  newPortCancel: $('#newPortCancel'),
-  newPortCreate: $('#newPortCreate'),
-  newPortNumber: $('#newPortNumber'),
-  newPortError: $('#newPortError'),
+  newPortModal: $("#newPortModal"),
+  newPortBackdrop: $("#newPortBackdrop"),
+  newPortClose: $("#newPortClose"),
+  newPortCancel: $("#newPortCancel"),
+  newPortCreate: $("#newPortCreate"),
+  newPortNumber: $("#newPortNumber"),
+  newPortError: $("#newPortError"),
 
   // 详情页端口操作
-  portEnabledToggle: $('#portEnabledToggle'),
-  portNumberInput: $('#portNumberInput'),
-  portRenameBtn: $('#portRenameBtn'),
-  deletePortBtn: $('#deletePortBtn'),
-  endpointName: $('#endpointName'),
+  portEnabledToggle: $("#portEnabledToggle"),
+  portNumberInput: $("#portNumberInput"),
+  portRenameBtn: $("#portRenameBtn"),
+  deletePortBtn: $("#deletePortBtn"),
+  endpointName: $("#endpointName"),
 };
 
 let logDetailCM = null;
@@ -191,26 +245,34 @@ function render() {
 
 function renderEndpointList() {
   els.endpointCount.textContent = state.endpoints.length;
-  const ports = [...new Set(state.endpoints.map((e) => e.port))].sort((a, b) => a - b);
-  els.portSummaryList.textContent = ports.length ? ports.map((p) => `:${p}`).join('  ') : '—';
+  const ports = [...new Set(state.endpoints.map((e) => e.port))].sort(
+    (a, b) => a - b,
+  );
+  els.portSummaryList.textContent = ports.length
+    ? ports.map((p) => `:${p}`).join("  ")
+    : "—";
 
-  els.endpointList.innerHTML = '';
+  els.endpointList.innerHTML = "";
   for (const ep of state.endpoints) {
-    const li = document.createElement('li');
-    li.className = 'endpoint-item' + (ep.id === state.selectedId ? ' selected' : '');
+    const li = document.createElement("li");
+    li.className =
+      "endpoint-item" + (ep.id === state.selectedId ? " selected" : "");
     li.dataset.id = ep.id;
-    li.setAttribute('role', 'option');
-    li.setAttribute('aria-selected', ep.id === state.selectedId ? 'true' : 'false');
+    li.setAttribute("role", "option");
+    li.setAttribute(
+      "aria-selected",
+      ep.id === state.selectedId ? "true" : "false",
+    );
 
     // Per-port status indicator: failed > running > stopped
     const portStatus = state.runtimeStatus[String(ep.port)];
-    let ledState = 'stopped';
-    let ledTitle = '';
-    if (portStatus?.state === 'failed') {
-      ledState = 'failed';
-      ledTitle = `端口 ${ep.port} 启动失败：${portStatus.reason || '未知原因'}`;
-    } else if (portStatus?.state === 'running') {
-      ledState = 'running';
+    let ledState = "stopped";
+    let ledTitle = "";
+    if (portStatus?.state === "failed") {
+      ledState = "failed";
+      ledTitle = `端口 ${ep.port} 启动失败：${portStatus.reason || "未知原因"}`;
+    } else if (portStatus?.state === "running") {
+      ledState = "running";
       ledTitle = `端口 ${ep.port} 运行中`;
     } else {
       ledTitle = `端口 ${ep.port} 未启动`;
@@ -235,14 +297,15 @@ function renderEndpointList() {
         <span class="endpoint-status-code">${ep.statusCode || 200}</span>
       </div>
     `;
-    li.querySelector('.endpoint-name').textContent = ep.name || `${ep.method} ${ep.path}`;
-    li.querySelector('.endpoint-path').textContent = ep.path;
-    li.addEventListener('click', (e) => {
+    li.querySelector(".endpoint-name").textContent =
+      ep.name || `${ep.method} ${ep.path}`;
+    li.querySelector(".endpoint-path").textContent = ep.path;
+    li.addEventListener("click", (e) => {
       // Ignore clicks on the delete button
-      if (e.target.closest('.endpoint-delete')) return;
+      if (e.target.closest(".endpoint-delete")) return;
       selectEndpoint(ep.id);
     });
-    li.querySelector('.endpoint-delete').addEventListener('click', (e) => {
+    li.querySelector(".endpoint-delete").addEventListener("click", (e) => {
       e.stopPropagation();
       deleteEndpointById(ep.id);
     });
@@ -257,7 +320,7 @@ async function deleteEndpointById(id) {
   try {
     await api.deleteEndpoint(id);
   } catch (e) {
-    alert('删除失败：' + (e?.message || '未知错误'));
+    alert("删除失败：" + (e?.message || "未知错误"));
     return;
   }
   const wasSelected = state.selectedId === id;
@@ -283,14 +346,14 @@ function renderEditor() {
   els.endpointId.textContent = `id: ${ep.id.slice(0, 8)}…`;
   if (!state.dirty) {
     els.method.value = ep.method;
-    els.endpointName.value = ep.name || '';
+    els.endpointName.value = ep.name || "";
     els.port.value = ep.port;
     els.path.value = ep.path;
     els.status.value = ep.statusCode || 200;
     els.responseEditor.value = formatJSON(ep.response);
     if (window.__editorMounted) setValue(formatJSON(ep.response));
-    els.lastSaved.textContent = 'saved';
-    els.lastSaved.style.color = '';
+    els.lastSaved.textContent = "saved";
+    els.lastSaved.style.color = "";
   }
   updateEditorMeta();
   validateJSON();
@@ -301,16 +364,20 @@ function renderStatus() {
   const pill = els.globalStatus;
   pill.dataset.state = state.runtime;
   btn.dataset.state = state.runtime;
-  pill.querySelector('.led').dataset.state = state.runtime;
+  pill.querySelector(".led").dataset.state = state.runtime;
   const map = {
-    stopped: { text: '已停止', label: '启动', detail: '所有端口空闲' },
-    starting: { text: '启动中', label: '启动中…', detail: '正在绑定端口' },
-    running: { text: '运行中', label: '停止', detail: `${new Set(state.endpoints.map((e) => e.port)).size} 个端口已上线` },
-    failed: { text: '启动失败', label: '重试', detail: '见接口列表' },
+    stopped: { text: "已停止", label: "启动", detail: "所有端口空闲" },
+    starting: { text: "启动中", label: "启动中…", detail: "正在绑定端口" },
+    running: {
+      text: "运行中",
+      label: "停止",
+      detail: `${new Set(state.endpoints.map((e) => e.port)).size} 个端口已上线`,
+    },
+    failed: { text: "启动失败", label: "重试", detail: "见接口列表" },
   };
   const m = map[state.runtime];
-  pill.querySelector('.status-text').textContent = m.text;
-  btn.querySelector('.btn-label').textContent = m.label;
+  pill.querySelector(".status-text").textContent = m.text;
+  btn.querySelector(".btn-label").textContent = m.label;
   els.statusDetail.textContent = m.detail;
 }
 
@@ -330,7 +397,11 @@ function renderHome() {
 }
 
 async function applyRoute(route) {
-  if (state.dirty && state.route.view === 'port' && !confirm('有未保存的修改，是否放弃？')) {
+  if (
+    state.dirty &&
+    state.route.view === "port" &&
+    !confirm("有未保存的修改，是否放弃？")
+  ) {
     suppressHash = true;
     location.hash = `#/port/${state.route.port}`;
     return;
@@ -338,17 +409,17 @@ async function applyRoute(route) {
   state.route = route;
   state.dirty = false;
 
-  const home = route.view === 'home';
+  const home = route.view === "home";
   let portKnown = !home && state.ports.some((p) => p.port === route.port);
   if (!home && !portKnown) {
     // 端口可能刚被创建（API 直接建 / 另一标签页），拉一次最新数据再判断
     try {
-      state.ports = await (await fetch('/api/ports')).json();
-      state.endpoints = await (await fetch('/api/endpoints')).json();
+      state.ports = await (await fetch("/api/ports")).json();
+      state.endpoints = await (await fetch("/api/endpoints")).json();
       portKnown = state.ports.some((p) => p.port === route.port);
     } catch {}
   }
-  document.body.dataset.view = home ? 'home' : 'port';
+  document.body.dataset.view = home ? "home" : "port";
   els.viewHome.hidden = !home;
   els.portHeader.hidden = home || !portKnown;
   els.portNotFound.hidden = home || portKnown;
@@ -369,11 +440,13 @@ async function applyRoute(route) {
 }
 
 function renderLogEntry(entry) {
-  const row = document.createElement('div');
-  row.className = `log-entry ${entry.matched ? 'matched' : 'missed'}`;
+  const row = document.createElement("div");
+  row.className = `log-entry ${entry.matched ? "matched" : "missed"}`;
   const range = `${Math.floor(entry.status / 100)}xx`;
-  const time = new Date(entry.timestamp).toLocaleTimeString('zh-CN', { hour12: false });
-  const ip = (entry.ip || '').replace(/^::ffff:/, ''); // strip IPv6-mapped prefix
+  const time = new Date(entry.timestamp).toLocaleTimeString("zh-CN", {
+    hour12: false,
+  });
+  const ip = (entry.ip || "").replace(/^::ffff:/, ""); // strip IPv6-mapped prefix
   row.innerHTML = `
     <span class="log-time">${time}</span>
     <span class="log-method" style="color: var(--method-${entry.method.toLowerCase()})">${entry.method}</span>
@@ -381,13 +454,13 @@ function renderLogEntry(entry) {
     <span class="log-port">${entry.port}</span>
     <span class="log-status" data-range="${range}">${entry.status}</span>
     <span class="log-duration">${entry.durationMs}</span>
-    <span class="log-ip mono">${ip || '—'}</span>
-    <span class="log-result">${entry.matched ? '匹配' : '无路由'}</span>
+    <span class="log-ip mono">${ip || "—"}</span>
+    <span class="log-result">${entry.matched ? "匹配" : "无路由"}</span>
   `;
-  row.querySelector('.log-path').textContent = entry.path;
+  row.querySelector(".log-path").textContent = entry.path;
   // 只有 HTTP 请求条目可点（过滤 resolver-warn）
   if (entry.method) {
-    row.addEventListener('click', () => openLogDetail(entry.id));
+    row.addEventListener("click", () => openLogDetail(entry.id));
   }
   return row;
 }
@@ -412,70 +485,80 @@ function renderLogDetail(entry) {
   els.logDetailStatus.dataset.range = `${Math.floor(entry.status / 100)}xx`;
 
   // 2. Meta
-  const time = new Date(entry.timestamp).toLocaleString('zh-CN', { hour12: false });
-  els.logDetailMeta.innerHTML = '';
+  const time = new Date(entry.timestamp).toLocaleString("zh-CN", {
+    hour12: false,
+  });
+  els.logDetailMeta.innerHTML = "";
   const rows = [
-    ['时间', time],
-    ['端口', String(entry.port)],
-    ['耗时', `${entry.durationMs} ms`],
-    ['IP', entry.ip ? entry.ip.replace(/^::ffff:/, '') : '—'],
-    ['路由', entry.matched ? '匹配' : '无路由'],
+    ["时间", time],
+    ["端口", String(entry.port)],
+    ["耗时", `${entry.durationMs} ms`],
+    ["IP", entry.ip ? entry.ip.replace(/^::ffff:/, "") : "—"],
+    ["路由", entry.matched ? "匹配" : "无路由"],
   ];
   for (const [k, v] of rows) {
-    const dt = document.createElement('dt'); dt.textContent = k;
-    const dd = document.createElement('dd'); dd.textContent = v;
+    const dt = document.createElement("dt");
+    dt.textContent = k;
+    const dd = document.createElement("dd");
+    dd.textContent = v;
     els.logDetailMeta.append(dt, dd);
   }
 
   // 3. Query
-  const queryTbody = els.logDetailQueryTable.querySelector('tbody');
-  queryTbody.innerHTML = '';
-  const params = new URLSearchParams(entry.query || '');
+  const queryTbody = els.logDetailQueryTable.querySelector("tbody");
+  queryTbody.innerHTML = "";
+  const params = new URLSearchParams(entry.query || "");
   const paramKeys = [...params.keys()];
   if (paramKeys.length === 0) {
     els.logDetailQueryTable.hidden = true;
     els.logDetailQueryEmpty.hidden = false;
-    els.logDetailQueryCount.textContent = '0';
+    els.logDetailQueryCount.textContent = "0";
   } else {
     els.logDetailQueryTable.hidden = false;
     els.logDetailQueryEmpty.hidden = true;
     els.logDetailQueryCount.textContent = String(paramKeys.length);
     for (const [k, v] of params) {
-      const tr = document.createElement('tr');
-      const td1 = document.createElement('td'); td1.textContent = k;
-      const td2 = document.createElement('td'); td2.textContent = v;
+      const tr = document.createElement("tr");
+      const td1 = document.createElement("td");
+      td1.textContent = k;
+      const td2 = document.createElement("td");
+      td2.textContent = v;
       tr.append(td1, td2);
       queryTbody.append(tr);
     }
   }
 
   // 4. Headers
-  const headerTbody = els.logDetailHeadersTable.querySelector('tbody');
-  headerTbody.innerHTML = '';
+  const headerTbody = els.logDetailHeadersTable.querySelector("tbody");
+  headerTbody.innerHTML = "";
   const headerEntries = Object.entries(entry.requestHeaders || {});
   if (headerEntries.length === 0) {
     els.logDetailHeadersTable.hidden = true;
     els.logDetailHeadersEmpty.hidden = false;
-    els.logDetailHeadersCount.textContent = '0';
+    els.logDetailHeadersCount.textContent = "0";
   } else {
     els.logDetailHeadersTable.hidden = false;
     els.logDetailHeadersEmpty.hidden = true;
     els.logDetailHeadersCount.textContent = String(headerEntries.length);
     for (const [k, v] of headerEntries) {
-      const tr = document.createElement('tr');
-      const td1 = document.createElement('td'); td1.textContent = k;
-      const td2 = document.createElement('td');
-      td2.textContent = Array.isArray(v) ? v.join(', ') : String(v);
+      const tr = document.createElement("tr");
+      const td1 = document.createElement("td");
+      td1.textContent = k;
+      const td2 = document.createElement("td");
+      td2.textContent = Array.isArray(v) ? v.join(", ") : String(v);
       tr.append(td1, td2);
       headerTbody.append(tr);
     }
   }
 
   // 5. Body
-  if (logDetailCM) { logDetailCM.destroy(); logDetailCM = null; }
-  els.logDetailBody.innerHTML = '';
+  if (logDetailCM) {
+    logDetailCM.destroy();
+    logDetailCM = null;
+  }
+  els.logDetailBody.innerHTML = "";
 
-  const body = entry.requestBodyPreview || '';
+  const body = entry.requestBodyPreview || "";
   if (!body) {
     els.logDetailEmpty.hidden = false;
     els.logDetailBodyWarning.hidden = true;
@@ -485,7 +568,9 @@ function renderLogDetail(entry) {
     els.logDetailEmpty.hidden = true;
     els.logDetailBodyWarning.hidden = !entry.requestBodyTruncated;
     let parsed;
-    try { parsed = JSON.parse(body); } catch {}
+    try {
+      parsed = JSON.parse(body);
+    } catch {}
     if (parsed !== undefined) {
       const formatted = JSON.stringify(parsed, null, 2);
       els.logDetailBody.hidden = false;
@@ -500,7 +585,7 @@ function renderLogDetail(entry) {
 }
 
 function visibleLogs() {
-  if (state.route.view === 'port') {
+  if (state.route.view === "port") {
     return state.logs.filter((e) => e.port === state.route.port);
   }
   return state.logs;
@@ -508,22 +593,24 @@ function visibleLogs() {
 
 function updateLogsCount() {
   const vis = visibleLogs();
-  els.logsCount.textContent = state.route.view === 'port'
-    ? `${vis.length} 条 / 共 ${state.logs.length} 条`
-    : `${state.logs.length} 条 · 最多 500`;
+  els.logsCount.textContent =
+    state.route.view === "port"
+      ? `${vis.length} 条 / 共 ${state.logs.length} 条`
+      : `${state.logs.length} 条 · 最多 500`;
 }
 
 function renderLogsInitial() {
-  els.logsBody.innerHTML = '';
+  els.logsBody.innerHTML = "";
   const vis = visibleLogs();
   if (vis.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'logs-empty';
+    const empty = document.createElement("div");
+    empty.className = "logs-empty";
     empty.innerHTML = `<span class="logs-empty-mark">//</span><span>暂无请求。</span>`;
     els.logsBody.appendChild(empty);
   } else {
     // 倒序渲染：最新请求显示在列表顶部
-    for (let i = vis.length - 1; i >= 0; i--) els.logsBody.appendChild(renderLogEntry(vis[i]));
+    for (let i = vis.length - 1; i >= 0; i--)
+      els.logsBody.appendChild(renderLogEntry(vis[i]));
   }
   updateLogsCount();
   if (state.autoScroll) els.logsBody.scrollTop = 0;
@@ -532,18 +619,18 @@ function renderLogsInitial() {
 function appendLog(entry) {
   state.logs.push(entry);
   if (state.logs.length > 500) state.logs.splice(0, state.logs.length - 500);
-  const isPortView = state.route.view === 'port';
+  const isPortView = state.route.view === "port";
   const matches = !isPortView || entry.port === state.route.port;
   if (matches) {
     // Remove the empty-state placeholder if it's still there so the new entry
     // appears at the top of the log list rather than below a 200px-tall gap.
-    const empty = els.logsBody.querySelector('.logs-empty');
+    const empty = els.logsBody.querySelector(".logs-empty");
     if (empty) empty.remove();
     els.logsBody.prepend(renderLogEntry(entry));
     if (state.autoScroll) els.logsBody.scrollTop = 0;
   }
   updateLogsCount();
-  if (state.route.view === 'home') renderHome();
+  if (state.route.view === "home") renderHome();
 }
 
 // ============================================================
@@ -557,13 +644,13 @@ async function refreshAll() {
     state.dirty = false;
   }
   render();
-  if (state.route.view === 'port') renderPortHeader(state, els);
+  if (state.route.view === "port") renderPortHeader(state, els);
 }
 
 async function loadAll() {
   state.config = await api.getConfig();
   onThemeChange((resolved) => setEditorTheme(resolved));
-  applyTheme(state.config.settings.theme ?? 'system');
+  applyTheme(state.config.settings.theme ?? "system");
   state.ports = await api.listPorts();
   state.endpoints = await api.listEndpoints();
   state.selectedId = state.endpoints[0]?.id || null;
@@ -582,13 +669,13 @@ async function loadAll() {
 // Priority: any failed → "failed"; any running → "running"; else → "stopped".
 function deriveGlobalRuntime() {
   const ports = Object.values(state.runtimeStatus);
-  if (ports.some((p) => p.state === 'failed')) state.runtime = 'failed';
-  else if (ports.some((p) => p.state === 'running')) state.runtime = 'running';
-  else state.runtime = 'stopped';
+  if (ports.some((p) => p.state === "failed")) state.runtime = "failed";
+  else if (ports.some((p) => p.state === "running")) state.runtime = "running";
+  else state.runtime = "stopped";
 }
 
 function selectEndpoint(id) {
-  if (state.dirty && !confirm('有未保存的修改，是否放弃？')) return;
+  if (state.dirty && !confirm("有未保存的修改，是否放弃？")) return;
   state.selectedId = id;
   state.dirty = false;
   renderEndpointList();
@@ -598,16 +685,16 @@ function selectEndpoint(id) {
 function markDirty() {
   if (state.dirty) return;
   state.dirty = true;
-  els.lastSaved.textContent = '未保存';
-  els.lastSaved.style.color = 'var(--amber)';
+  els.lastSaved.textContent = "未保存";
+  els.lastSaved.style.color = "var(--amber)";
 }
 
 async function createEndpoint() {
-  if (state.route.view !== 'port') return;
+  if (state.route.view !== "port") return;
   const ep = await api.createEndpoint({
-    method: 'GET',
+    method: "GET",
     port: state.route.port,
-    path: '/api/new',
+    path: "/api/new",
     statusCode: 200,
     response: { ok: true },
     enabled: true,
@@ -625,14 +712,14 @@ function renderEditorForCreate(ep) {
   els.endpointId.textContent = `id: ${ep.id.slice(0, 8)}…`;
   // Always write new values, regardless of dirty state
   els.method.value = ep.method;
-  els.endpointName.value = ep.name || '';
+  els.endpointName.value = ep.name || "";
   els.port.value = ep.port;
   els.path.value = ep.path;
   els.status.value = ep.statusCode || 200;
   els.responseEditor.value = formatJSON(ep.response);
   if (window.__editorMounted) setValue(formatJSON(ep.response));
-  els.lastSaved.textContent = '已保存';
-  els.lastSaved.style.color = '';
+  els.lastSaved.textContent = "已保存";
+  els.lastSaved.style.color = "";
   state.dirty = false;
   updateEditorMeta();
   validateJSON();
@@ -650,7 +737,10 @@ async function saveEndpoint() {
     path: els.path.value.trim(),
     statusCode: Number(els.status.value) || 200,
     name: els.endpointName.value.trim(),
-    response: (() => { const v = getValue(); return v ? JSON.parse(v) : null; })(),
+    response: (() => {
+      const v = getValue();
+      return v ? JSON.parse(v) : null;
+    })(),
     enabled: ep.enabled !== false,
   };
   try {
@@ -660,9 +750,9 @@ async function saveEndpoint() {
     if (idx >= 0) state.endpoints[idx] = updated;
     state.dirty = false;
     renderEndpointList();
-    flash('已保存', 'green');
+    flash("已保存", "green");
   } catch (e) {
-    flash('✗ 保存失败', 'red');
+    flash("✗ 保存失败", "red");
   }
 }
 
@@ -680,15 +770,16 @@ async function deleteEndpoint() {
 }
 
 async function toggleRuntime() {
-  if (state.runtime === 'running') {
-    state.runtime = 'stopped';
+  if (state.runtime === "running") {
+    state.runtime = "stopped";
     renderStatus();
     await api.runtimeStop();
   } else {
-    state.runtime = 'starting';
+    state.runtime = "starting";
     renderStatus();
     const result = await api.runtimeStart();
-    state.runtime = result.failed && result.failed.length > 0 ? 'failed' : 'running';
+    state.runtime =
+      result.failed && result.failed.length > 0 ? "failed" : "running";
     render();
   }
   await refreshRuntimeStatus();
@@ -700,19 +791,19 @@ async function refreshRuntimeStatus() {
     state.runtimeStatus = await api.runtimeStatus();
   } catch {}
   renderEndpointList();
-  if (state.route.view === 'home') renderHome();
+  if (state.route.view === "home") renderHome();
 }
 
 // ============================================================
 // JSON helpers
 // ============================================================
 function formatJSON(value) {
-  if (value === null || value === undefined) return '';
+  if (value === null || value === undefined) return "";
   return JSON.stringify(value, null, 2);
 }
 
 function formatBytes(n) {
-  if (!Number.isFinite(n) || n < 1) return '';
+  if (!Number.isFinite(n) || n < 1) return "";
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
@@ -724,29 +815,34 @@ function tryFormat() {
   if (!text.trim()) return;
   try {
     setValue(JSON.stringify(JSON.parse(text), null, 2));
-    setValidation('valid', '已格式化');
+    setValidation("valid", "已格式化");
     markDirty();
   } catch (e) {
-    setValidation('invalid', e.message);
+    setValidation("invalid", e.message);
   }
 }
 
 function validateJSON() {
   const text = getValue().trim();
-  if (!text) return setValidation('empty', '空');
-  try { JSON.parse(text); setValidation('valid', '合法'); }
-  catch { setValidation('invalid', 'JSON 不合法'); }
+  if (!text) return setValidation("empty", "空");
+  try {
+    JSON.parse(text);
+    setValidation("valid", "合法");
+  } catch {
+    setValidation("invalid", "JSON 不合法");
+  }
 }
 
 function setValidation(state_, text) {
   els.validationStatus.dataset.state = state_;
-  els.validationStatus.querySelector('.val-text').textContent = text;
-  els.validationStatus.querySelector('.val-mark').textContent = state_ === 'valid' ? '✓' : state_ === 'invalid' ? '✗' : '·';
+  els.validationStatus.querySelector(".val-text").textContent = text;
+  els.validationStatus.querySelector(".val-mark").textContent =
+    state_ === "valid" ? "✓" : state_ === "invalid" ? "✗" : "·";
 }
 
 function updateEditorMeta() {
   const text = getValue();
-  const lines = text === '' ? 0 : text.split('\n').length;
+  const lines = text === "" ? 0 : text.split("\n").length;
   els.lineCount.textContent = `${lines} 行`;
   els.charCount.textContent = `${text.length} 字符`;
 }
@@ -755,8 +851,8 @@ function flash(text, color) {
   els.lastSaved.textContent = text;
   els.lastSaved.style.color = `var(--${color})`;
   setTimeout(() => {
-    els.lastSaved.style.color = state.dirty ? 'var(--amber)' : '';
-    els.lastSaved.textContent = state.dirty ? '未保存' : '已保存';
+    els.lastSaved.style.color = state.dirty ? "var(--amber)" : "";
+    els.lastSaved.textContent = state.dirty ? "未保存" : "已保存";
   }, 1600);
 }
 
@@ -764,8 +860,8 @@ function flash(text, color) {
 // SSE
 // ============================================================
 function connectSSE() {
-  const es = new EventSource('/events');
-  es.addEventListener('log', (e) => {
+  const es = new EventSource("/events");
+  es.addEventListener("log", (e) => {
     const entry = JSON.parse(e.data);
     appendLog(entry);
   });
@@ -778,16 +874,18 @@ function connectSSE() {
 function openSettings() {
   els.storagePath.value = state.config.settings.storagePath;
   els.uiPort.value = state.config.settings.uiPort;
-  els.theme.value = state.config.settings.theme ?? 'system';
+  els.theme.value = state.config.settings.theme ?? "system";
   els.maxBody.value = state.config.settings.maxBodyBytes ?? 4194304;
   els.maxBodyHint.textContent = formatBytes(Number(els.maxBody.value));
   els.settingsModal.hidden = false;
 }
-function closeSettings() { els.settingsModal.hidden = true; }
+function closeSettings() {
+  els.settingsModal.hidden = true;
+}
 async function saveSettings() {
   const newMax = Number(els.maxBody.value);
   if (!Number.isInteger(newMax) || newMax < 1) {
-    flash('请求体大小上限必须是正整数', 'red');
+    flash("请求体大小上限必须是正整数", "red");
     return;
   }
   const newStoragePath = els.storagePath.value.trim();
@@ -802,59 +900,69 @@ async function saveSettings() {
     theme: els.theme.value,
   });
   state.config = await api.getConfig();
-  applyTheme(state.config.settings.theme ?? 'system');
+  applyTheme(state.config.settings.theme ?? "system");
   closeSettings();
-  flash(needsRestart ? '已保存 · 重启后生效' : '已保存 · 立即生效', 'green');
+  flash(needsRestart ? "已保存 · 重启后生效" : "已保存 · 立即生效", "green");
 }
 
 // ============================================================
 // Wire events
 // ============================================================
-els.startStopBtn.addEventListener('click', toggleRuntime);
-els.backToHomeBtn.addEventListener('click', () => navigate('#/'));
-els.portNotFoundBack.addEventListener('click', () => navigate('#/'));
-els.newEndpointBtn.addEventListener('click', createEndpoint);
-els.emptyNewBtn.addEventListener('click', createEndpoint);
-els.saveBtn.addEventListener('click', saveEndpoint);
-els.revertBtn.addEventListener('click', () => { state.dirty = false; renderEditor(); });
-els.deleteBtn.addEventListener('click', deleteEndpoint);
-els.formatBtn.addEventListener('click', tryFormat);
-els.validateBtn.addEventListener('click', validateJSON);
-els.clearLogsBtn.addEventListener('click', async () => {
+els.startStopBtn.addEventListener("click", toggleRuntime);
+els.backToHomeBtn.addEventListener("click", () => navigate("#/"));
+els.portNotFoundBack.addEventListener("click", () => navigate("#/"));
+els.newEndpointBtn.addEventListener("click", createEndpoint);
+els.emptyNewBtn.addEventListener("click", createEndpoint);
+els.saveBtn.addEventListener("click", saveEndpoint);
+els.revertBtn.addEventListener("click", () => {
+  state.dirty = false;
+  renderEditor();
+});
+els.deleteBtn.addEventListener("click", deleteEndpoint);
+els.formatBtn.addEventListener("click", tryFormat);
+els.validateBtn.addEventListener("click", validateJSON);
+els.clearLogsBtn.addEventListener("click", async () => {
   state.logs = [];
   renderLogsInitial();
   // Persist the clear to the server so it survives a page refresh
-  try { await api.clearLogs(); } catch {}
+  try {
+    await api.clearLogs();
+  } catch {}
 });
-els.autoScrollToggle.addEventListener('change', (e) => { state.autoScroll = e.target.checked; });
-els.settingsBtn.addEventListener('click', openSettings);
-els.settingsBackdrop.addEventListener('click', closeSettings);
-els.settingsClose.addEventListener('click', closeSettings);
-els.settingsCancel.addEventListener('click', closeSettings);
-els.settingsSave.addEventListener('click', saveSettings);
-els.maxBody.addEventListener('input', () => {
-  els.maxBodyHint.textContent = formatBytes(Number(els.maxBody.value)) || '—';
+els.autoScrollToggle.addEventListener("change", (e) => {
+  state.autoScroll = e.target.checked;
 });
-els.logDetailClose.addEventListener('click', closeLogDetail);
-els.logDetail.addEventListener('click', (e) => {
+els.settingsBtn.addEventListener("click", openSettings);
+els.settingsBackdrop.addEventListener("click", closeSettings);
+els.settingsClose.addEventListener("click", closeSettings);
+els.settingsCancel.addEventListener("click", closeSettings);
+els.settingsSave.addEventListener("click", saveSettings);
+els.maxBody.addEventListener("input", () => {
+  els.maxBodyHint.textContent = formatBytes(Number(els.maxBody.value)) || "—";
+});
+els.logDetailClose.addEventListener("click", closeLogDetail);
+els.logDetail.addEventListener("click", (e) => {
   // 点 backdrop（dialog 自身）关闭；点内部内容不关
   if (e.target === els.logDetail) closeLogDetail();
 });
-els.logDetail.addEventListener('close', () => {
-  if (logDetailCM) { logDetailCM.destroy(); logDetailCM = null; }
+els.logDetail.addEventListener("close", () => {
+  if (logDetailCM) {
+    logDetailCM.destroy();
+    logDetailCM = null;
+  }
 });
 
 for (const f of [els.method, els.endpointName, els.path, els.status]) {
-  f.addEventListener('input', markDirty);
+  f.addEventListener("input", markDirty);
 }
 // CodeMirror handles its own input; onChange is wired in boot.
 
-document.addEventListener('keydown', (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "s") {
     e.preventDefault();
     if (!els.editorForm.hidden) saveEndpoint();
   }
-  if (e.key === 'Escape' && !els.settingsModal.hidden) closeSettings();
+  if (e.key === "Escape" && !els.settingsModal.hidden) closeSettings();
 });
 
 // ============================================================
@@ -864,7 +972,7 @@ loadAll().then(() => {
   // Mount CodeMirror after the editor form is rendered.
   const ep = state.endpoints.find((e) => e.id === state.selectedId);
   mountEditor({
-    initialValue: ep ? formatJSON(ep.response) : '',
+    initialValue: ep ? formatJSON(ep.response) : "",
     onChange: () => {
       markDirty();
       validateJSON();
@@ -884,7 +992,10 @@ loadAll().then(() => {
   newPortDialog = initNewPortDialog({ els, state, api });
   initPortDetail({ els, state, api, refreshAll });
   startRouter((route) => {
-    if (suppressHash) { suppressHash = false; return; }
+    if (suppressHash) {
+      suppressHash = false;
+      return;
+    }
     applyRoute(route);
   });
 });
@@ -892,15 +1003,15 @@ loadAll().then(() => {
 // ============================================================
 // Preview pane (right) + Dynamic-value toolbar button
 // ============================================================
-const previewPane = $('#previewPane');
-const previewBanner = $('#previewBanner');
-const previewMeta = $('#previewMeta');
-const previewMetaLabel = $('#previewMetaLabel');
-const previewExprStat = $('#previewExprStat');
-const previewErrStat = $('#previewErrStat');
-const previewRefreshBtn = $('#previewRefreshBtn');
-const dynamicValueToolbarBtn = $('#dynamicValueToolbarBtn');
-const editorWrap = $('#editorWrap');
+const previewPane = $("#previewPane");
+const previewBanner = $("#previewBanner");
+const previewMeta = $("#previewMeta");
+const previewMetaLabel = $("#previewMetaLabel");
+const previewExprStat = $("#previewExprStat");
+const previewErrStat = $("#previewErrStat");
+const previewRefreshBtn = $("#previewRefreshBtn");
+const dynamicValueToolbarBtn = $("#dynamicValueToolbarBtn");
+const editorWrap = $("#editorWrap");
 
 let previewDebounceTimer = null;
 let lastGoodPreview = null;
@@ -911,18 +1022,18 @@ function schedulePreviewRefresh() {
 }
 
 function setPreviewMeta(state, label, exprCount, errCount) {
-  previewMeta.className = 'meta ' + state;
+  previewMeta.className = "meta " + state;
   previewMetaLabel.textContent = label;
   previewExprStat.innerHTML = `表达式 <strong>${exprCount}</strong>`;
   previewErrStat.innerHTML = `错误 <strong>${errCount}</strong>`;
-  previewErrStat.style.display = errCount > 0 ? '' : 'none';
+  previewErrStat.style.display = errCount > 0 ? "" : "none";
 }
 
 async function refreshPreview() {
   const text = getValue();
   if (!text.trim()) {
-    previewPane.textContent = '// 在左侧编辑响应体，此处显示解析结果';
-    setPreviewMeta('', '就绪', 0, 0);
+    previewPane.textContent = "// 在左侧编辑响应体，此处显示解析结果";
+    setPreviewMeta("", "就绪", 0, 0);
     previewBanner.hidden = true;
     return;
   }
@@ -930,25 +1041,25 @@ async function refreshPreview() {
   try {
     res = await api.preview(text);
   } catch (e) {
-    previewBanner.textContent = '预览暂不可用';
-    previewBanner.className = 'preview-banner';
+    previewBanner.textContent = "预览暂不可用";
+    previewBanner.className = "preview-banner";
     previewBanner.hidden = false;
-    setPreviewMeta('has-errors', '离线', 0, 1);
+    setPreviewMeta("has-errors", "离线", 0, 1);
     return;
   }
   if (!res.ok) {
-    previewBanner.textContent = res.error || 'JSON 解析失败';
-    previewBanner.className = 'preview-banner';
+    previewBanner.textContent = res.error || "JSON 解析失败";
+    previewBanner.className = "preview-banner";
     previewBanner.hidden = false;
     if (lastGoodPreview !== null) renderPreview(lastGoodPreview, []);
-    setPreviewMeta('has-errors', 'JSON 语法错', 0, 1);
+    setPreviewMeta("has-errors", "JSON 语法错", 0, 1);
     return;
   }
   previewBanner.hidden = true;
   renderPreview(res.resolved, res.errors);
   lastGoodPreview = res.resolved;
-  const state = res.errors.length > 0 ? 'has-errors' : 'is-resolved';
-  const label = res.errors.length > 0 ? '部分解析' : '已解析';
+  const state = res.errors.length > 0 ? "has-errors" : "is-resolved";
+  const label = res.errors.length > 0 ? "部分解析" : "已解析";
   setPreviewMeta(state, label, res.exprCount, res.errors.length);
 }
 
@@ -961,10 +1072,10 @@ async function refreshPreview() {
  * - mixed-fail 的 {{...}} 残留用 expr-error span（红虚线）
  */
 function renderPreview(value, errors) {
-  previewPane.textContent = '';
+  previewPane.textContent = "";
   const errorPositions = new Set();
   for (const e of errors) {
-    if (typeof e.from === 'number' && typeof e.to === 'number') {
+    if (typeof e.from === "number" && typeof e.to === "number") {
       for (let i = e.from; i < e.to; i++) errorPositions.add(i);
     }
   }
@@ -975,8 +1086,8 @@ function renderPreview(value, errors) {
   let m;
   while ((m = re.exec(json)) !== null) {
     if (m.index > last) appendJsonColored(json.slice(last, m.index));
-    const span = document.createElement('span');
-    span.className = 'expr-error';
+    const span = document.createElement("span");
+    span.className = "expr-error";
     span.textContent = m[0];
     previewPane.appendChild(span);
     last = m.index + m[0].length;
@@ -984,11 +1095,11 @@ function renderPreview(value, errors) {
   if (last < json.length) appendJsonColored(json.slice(last));
 
   if (errors.length > 0) {
-    const errList = document.createElement('div');
-    errList.className = 'err-list';
+    const errList = document.createElement("div");
+    errList.className = "err-list";
     for (const e of errors) {
-      const line = document.createElement('div');
-      line.textContent = `⚠ ${e.message}${e.from !== undefined ? `  (col ${e.from}–${e.to})` : ''}`;
+      const line = document.createElement("div");
+      line.textContent = `⚠ ${e.message}${e.from !== undefined ? `  (col ${e.from}–${e.to})` : ""}`;
       errList.appendChild(line);
     }
     previewPane.appendChild(errList);
@@ -1013,15 +1124,15 @@ function appendJsonColored(text) {
       // 找下一个未转义的 "
       let j = i + 1;
       while (j < n) {
-        if (text[j] === '"' && text[j - 1] !== '\\') break;
+        if (text[j] === '"' && text[j - 1] !== "\\") break;
         j++;
       }
-      const lit = document.createElement('span');
+      const lit = document.createElement("span");
       // 判断是 key 还是 str：往前看，跳过空白，看前一个非空字符
       let k = i - 1;
       while (k >= 0 && /\s/.test(text[k])) k--;
-      const isKey = k >= 0 && text[k] === ':';
-      lit.className = isKey ? 'v-key' : 'v-str';
+      const isKey = k >= 0 && text[k] === ":";
+      lit.className = isKey ? "v-key" : "v-str";
       lit.textContent = text.slice(i, j + 1);
       previewPane.appendChild(lit);
       i = j + 1;
@@ -1029,26 +1140,29 @@ function appendJsonColored(text) {
       // 数字
       let j = i;
       while (j < n && /[0-9.eE+\-]/.test(text[j])) j++;
-      const span = document.createElement('span');
-      span.className = 'v-num';
+      const span = document.createElement("span");
+      span.className = "v-num";
       span.textContent = text.slice(i, j);
       previewPane.appendChild(span);
       i = j;
-    } else if (text.startsWith('true', i) || text.startsWith('false', i)) {
-      const span = document.createElement('span');
-      span.className = 'v-bool';
-      span.textContent = text.slice(i, i + (text.startsWith('true', i) ? 4 : 5));
+    } else if (text.startsWith("true", i) || text.startsWith("false", i)) {
+      const span = document.createElement("span");
+      span.className = "v-bool";
+      span.textContent = text.slice(
+        i,
+        i + (text.startsWith("true", i) ? 4 : 5),
+      );
       previewPane.appendChild(span);
-      i += text.startsWith('true', i) ? 4 : 5;
-    } else if (text.startsWith('null', i)) {
-      const span = document.createElement('span');
-      span.className = 'v-null';
-      span.textContent = 'null';
+      i += text.startsWith("true", i) ? 4 : 5;
+    } else if (text.startsWith("null", i)) {
+      const span = document.createElement("span");
+      span.className = "v-null";
+      span.textContent = "null";
       previewPane.appendChild(span);
       i += 4;
     } else if (/[{}\[\],:]/.test(c)) {
-      const span = document.createElement('span');
-      span.className = 'v-punct';
+      const span = document.createElement("span");
+      span.className = "v-punct";
       span.textContent = c;
       previewPane.appendChild(span);
       i++;
@@ -1059,7 +1173,7 @@ function appendJsonColored(text) {
   }
 }
 
-previewRefreshBtn.addEventListener('click', refreshPreview);
+previewRefreshBtn.addEventListener("click", refreshPreview);
 
 function updateDynamicValueBtnState(state) {
   const text = state.doc.toString();
@@ -1067,19 +1181,20 @@ function updateDynamicValueBtnState(state) {
   const anchor = findStringAnchorAt(text, sel.from, sel.to);
   if (!anchor) {
     dynamicValueToolbarBtn.disabled = true;
-    dynamicValueToolbarBtn.title = '把光标放进字段值里，或先选中字段值（双击字符串即可）';
+    dynamicValueToolbarBtn.title =
+      "把光标放进字段值里，或先选中字段值（双击字符串即可）";
   } else {
     dynamicValueToolbarBtn.disabled = false;
     const inner = text.slice(anchor.from, anchor.to);
     const hasExpr = /\{\{\$[a-zA-Z_]/.test(inner);
     let mode;
-    if (sel.from !== sel.to) mode = '选中的';
-    else if (anchor.hasQuotes) mode = '光标所在的';
-    else mode = '即将填入的';
+    if (sel.from !== sel.to) mode = "选中的";
+    else if (anchor.hasQuotes) mode = "光标所在的";
+    else mode = "即将填入的";
     dynamicValueToolbarBtn.title = hasExpr
       ? `编辑${mode}字段值的动态表达式`
       : `把${mode}字段值替换为动态表达式`;
-    dynamicValueToolbarBtn.textContent = hasExpr ? '编辑表达式' : '动态值';
+    dynamicValueToolbarBtn.textContent = hasExpr ? "编辑表达式" : "动态值";
   }
 }
 
@@ -1097,12 +1212,16 @@ function updateDynamicValueBtnState(state) {
 function findStringAnchorAt(text, from, to) {
   if (from !== to) {
     const selected = text.slice(from, to);
-    const left = from > 0 ? text[from - 1] : '';
-    const right = to < text.length ? text[to] : '';
+    const left = from > 0 ? text[from - 1] : "";
+    const right = to < text.length ? text[to] : "";
     if (left === '"' && right === '"') {
       return { from, to, hasQuotes: true };
     }
-    if (selected.length >= 2 && selected.startsWith('"') && selected.endsWith('"')) {
+    if (
+      selected.length >= 2 &&
+      selected.startsWith('"') &&
+      selected.endsWith('"')
+    ) {
       return { from: from + 1, to: to - 1, hasQuotes: true };
     }
     return null;
@@ -1116,14 +1235,20 @@ function findStringAtCursor(text, pos) {
   for (let i = pos - 1; i >= 0; i--) {
     if (text[i] === '"') {
       let bs = 0;
-      for (let j = i - 1; j >= 0 && text[j] === '\\'; j--) bs++;
-      if (bs % 2 === 0) { left = i; break; }
+      for (let j = i - 1; j >= 0 && text[j] === "\\"; j--) bs++;
+      if (bs % 2 === 0) {
+        left = i;
+        break;
+      }
     }
   }
   if (left < 0) return null;
   let right = -1;
   for (let i = left + 1; i < text.length; i++) {
-    if (text[i] === '"' && text[i - 1] !== '\\') { right = i; break; }
+    if (text[i] === '"' && text[i - 1] !== "\\") {
+      right = i;
+      break;
+    }
   }
   if (right < 0) return null;
   if (pos < left || pos > right) return null;
@@ -1135,8 +1260,8 @@ function findStringAtCursor(text, pos) {
  * 返回 hasQuotes=false 的空范围，插入时由模态框自动包引号。
  */
 function findEmptyValueAtCursor(text, pos) {
-  const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
-  const lineEndRaw = text.indexOf('\n', pos);
+  const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
+  const lineEndRaw = text.indexOf("\n", pos);
   const lineEnd = lineEndRaw < 0 ? text.length : lineEndRaw;
   const line = text.slice(lineStart, lineEnd);
   const col = pos - lineStart;
@@ -1144,8 +1269,11 @@ function findEmptyValueAtCursor(text, pos) {
   let colonCol = -1;
   for (let i = col - 1; i >= 0; i--) {
     const ch = line[i];
-    if (ch === ':') { colonCol = i; break; }
-    if (ch === ',' || ch === '{' || ch === '[' || ch === '}') break;
+    if (ch === ":") {
+      colonCol = i;
+      break;
+    }
+    if (ch === "," || ch === "{" || ch === "[" || ch === "}") break;
   }
   if (colonCol < 0) return null;
   // `:` 之后到光标必须只允许空白
@@ -1160,7 +1288,7 @@ function findEmptyValueAtCursor(text, pos) {
   return { from: pos, to: pos, hasQuotes: false };
 }
 
-dynamicValueToolbarBtn.addEventListener('click', () => {
+dynamicValueToolbarBtn.addEventListener("click", () => {
   const view = getEditorView();
   if (!view) return;
   const state = view.state;
@@ -1168,7 +1296,7 @@ dynamicValueToolbarBtn.addEventListener('click', () => {
   const text = state.doc.toString();
   const anchor = findStringAnchorAt(text, sel.from, sel.to);
   if (!anchor) {
-    flashToolbarHint(dynamicValueToolbarBtn, '先放进字段值');
+    flashToolbarHint(dynamicValueToolbarBtn, "先放进字段值");
     return;
   }
   const inner = text.slice(anchor.from, anchor.to);
@@ -1191,36 +1319,42 @@ function extractFirstExpr(s) {
 function flashToolbarHint(btn, hint) {
   const original = btn.textContent;
   btn.textContent = hint;
-  btn.classList.add('is-hint');
+  btn.classList.add("is-hint");
   setTimeout(() => {
     btn.textContent = original;
-    btn.classList.remove('is-hint');
+    btn.classList.remove("is-hint");
   }, 1400);
 }
 
 // ============================================================
 // Generator modal behavior
 // ============================================================
-const generatorModal = $('#generatorModal');
-const generatorBackdrop = $('#generatorBackdrop');
-const generatorCloseBtn = $('#generatorClose');
-const generatorBackBtn = $('#generatorBack');
-const generatorLocaleSelect = $('#generatorLocale');
-const generatorSearchInput = $('#generatorSearch');
-const generatorCategoriesEl = $('#generatorCategories');
-const generatorExprText = $('#generatorExprText');
-const generatorSampleText = $('#generatorSampleText');
-const generatorInsertBtn = $('#generatorInsertBtn');
+const generatorModal = $("#generatorModal");
+const generatorBackdrop = $("#generatorBackdrop");
+const generatorCloseBtn = $("#generatorClose");
+const generatorBackBtn = $("#generatorBack");
+const generatorLocaleSelect = $("#generatorLocale");
+const generatorSearchInput = $("#generatorSearch");
+const generatorCategoriesEl = $("#generatorCategories");
+const generatorExprText = $("#generatorExprText");
+const generatorSampleText = $("#generatorSampleText");
+const generatorInsertBtn = $("#generatorInsertBtn");
 
 let generatorCatalog = null;
 const generatorState = {
   selectedId: null,
   args: {},
   pendingRange: null,
-  filterText: '',
+  filterText: "",
 };
 
-async function openGeneratorModal({ from, to, currentValue, initialExpr, hasQuotes }) {
+async function openGeneratorModal({
+  from,
+  to,
+  currentValue,
+  initialExpr,
+  hasQuotes,
+}) {
   generatorState.pendingRange = { from, to, hasQuotes: hasQuotes !== false };
   if (!generatorCatalog) {
     generatorCatalog = await api.getGenerators();
@@ -1231,14 +1365,18 @@ async function openGeneratorModal({ from, to, currentValue, initialExpr, hasQuot
       generatorState.selectedId = parsed.id;
       const def = findGeneratorDef(parsed.id);
       generatorState.args = {};
-      if (def) for (const a of def.args) generatorState.args[a.name] = parsed.args[Object.keys(parsed.args)[def.args.indexOf(a)]] ?? a.default;
+      if (def)
+        for (const a of def.args)
+          generatorState.args[a.name] =
+            parsed.args[Object.keys(parsed.args)[def.args.indexOf(a)]] ??
+            a.default;
     }
   } else {
     generatorState.selectedId = null;
     generatorState.args = {};
   }
-  generatorSearchInput.value = '';
-  generatorState.filterText = '';
+  generatorSearchInput.value = "";
+  generatorState.filterText = "";
   renderGeneratorCategories();
   updateGeneratorExprAndSample();
   generatorModal.hidden = false;
@@ -1248,7 +1386,10 @@ function parseInlineExpression(s) {
   const m = /^\{\{\$([a-zA-Z_][a-zA-Z0-9_.]*)(?::([^}]*))?\}\}$/.exec(s.trim());
   if (!m) return null;
   const args = {};
-  if (m[2]) m[2].split(':').forEach((p, i) => { args[i] = p; });
+  if (m[2])
+    m[2].split(":").forEach((p, i) => {
+      args[i] = p;
+    });
   return { id: m[1], args };
 }
 
@@ -1263,31 +1404,36 @@ function findGeneratorDef(id) {
 
 function renderGeneratorCategories() {
   if (!generatorCatalog) return;
-  generatorCategoriesEl.innerHTML = '';
+  generatorCategoriesEl.innerHTML = "";
   const filter = generatorState.filterText.toLowerCase();
   for (const cat of generatorCatalog.categories) {
     const filtered = cat.generators.filter((g) => {
       if (!filter) return true;
-      return g.label.toLowerCase().includes(filter) || g.id.toLowerCase().includes(filter);
+      return (
+        g.label.toLowerCase().includes(filter) ||
+        g.id.toLowerCase().includes(filter)
+      );
     });
     if (filtered.length === 0) continue;
-    const catEl = document.createElement('div');
-    catEl.className = 'gen-cat';
-    const header = document.createElement('div');
-    header.className = 'gen-cat-header';
+    const catEl = document.createElement("div");
+    catEl.className = "gen-cat";
+    const header = document.createElement("div");
+    header.className = "gen-cat-header";
     header.innerHTML = `<span>› ${cat.label}</span>`;
     catEl.appendChild(header);
-    const list = document.createElement('div');
-    list.className = 'gen-cat-list';
+    const list = document.createElement("div");
+    list.className = "gen-cat-list";
     for (const g of filtered) {
-      const item = document.createElement('div');
-      item.className = 'gen-item' + (g.id === generatorState.selectedId ? ' is-selected' : '');
+      const item = document.createElement("div");
+      item.className =
+        "gen-item" + (g.id === generatorState.selectedId ? " is-selected" : "");
       item.innerHTML = `<span class="gen-item-label">${g.label}</span><span class="gen-item-type">$${g.id}</span>`;
-      item.addEventListener('click', () => {
+      item.addEventListener("click", () => {
         generatorState.selectedId = g.id;
         const def = findGeneratorDef(g.id);
         generatorState.args = {};
-        if (def) for (const a of def.args) generatorState.args[a.name] = a.default;
+        if (def)
+          for (const a of def.args) generatorState.args[a.name] = a.default;
         renderGeneratorCategories();
         updateGeneratorExprAndSample();
       });
@@ -1295,33 +1441,35 @@ function renderGeneratorCategories() {
       if (g.id === generatorState.selectedId) {
         const def = findGeneratorDef(g.id);
         if (def && def.args.length > 0) {
-          const argsEl = document.createElement('div');
-          argsEl.className = 'gen-args';
+          const argsEl = document.createElement("div");
+          argsEl.className = "gen-args";
           for (const a of def.args) {
-            const label = document.createElement('label');
-            const nameSpan = document.createElement('span');
+            const label = document.createElement("label");
+            const nameSpan = document.createElement("span");
             nameSpan.textContent = a.name;
             label.appendChild(nameSpan);
             let input;
-            if (a.type === 'locale') {
-              input = document.createElement('select');
-              for (const loc of ['zh_CN', 'en']) {
-                const opt = document.createElement('option');
+            if (a.type === "locale") {
+              input = document.createElement("select");
+              for (const loc of ["zh_CN", "en"]) {
+                const opt = document.createElement("option");
                 opt.value = loc;
                 opt.textContent = loc;
-                if (loc === (generatorState.args[a.name] || a.default)) opt.selected = true;
+                if (loc === (generatorState.args[a.name] || a.default))
+                  opt.selected = true;
                 input.appendChild(opt);
               }
-              input.addEventListener('change', () => {
+              input.addEventListener("change", () => {
                 generatorState.args[a.name] = input.value;
                 updateGeneratorExprAndSample();
               });
             } else {
-              input = document.createElement('input');
-              input.type = (a.type === 'int' || a.type === 'float') ? 'number' : 'text';
+              input = document.createElement("input");
+              input.type =
+                a.type === "int" || a.type === "float" ? "number" : "text";
               const cur = generatorState.args[a.name] ?? a.default;
-              input.value = (cur === undefined || cur === null) ? '' : cur;
-              input.addEventListener('input', () => {
+              input.value = cur === undefined || cur === null ? "" : cur;
+              input.addEventListener("input", () => {
                 generatorState.args[a.name] = input.value;
                 updateGeneratorExprAndSample();
               });
@@ -1340,19 +1488,19 @@ function renderGeneratorCategories() {
 
 function buildExprText(id, args) {
   const def = findGeneratorDef(id);
-  if (!def) return '';
+  if (!def) return "";
   const argVals = def.args.map((a) => args[a.name] ?? a.default);
-  const allFilled = argVals.every((v) => v !== undefined && v !== '');
+  const allFilled = argVals.every((v) => v !== undefined && v !== "");
   if (!allFilled) return `{{$${id}}}`;
-  return `{{$${id}:${argVals.join(':')}}}`;
+  return `{{$${id}:${argVals.join(":")}}}`;
 }
 
 let sampleTimer = null;
 function updateGeneratorExprAndSample() {
   const id = generatorState.selectedId;
   if (!id) {
-    generatorExprText.textContent = '—';
-    generatorSampleText.textContent = '—';
+    generatorExprText.textContent = "—";
+    generatorSampleText.textContent = "—";
     generatorInsertBtn.disabled = true;
     return;
   }
@@ -1361,8 +1509,13 @@ function updateGeneratorExprAndSample() {
   generatorExprText.textContent = expr;
   if (sampleTimer) clearTimeout(sampleTimer);
   sampleTimer = setTimeout(async () => {
-    const res = await api.getGeneratorSample(id, normalizeArgs(id, generatorState.args));
-    generatorSampleText.textContent = res.ok ? String(res.sample) : (res.error || '生成失败');
+    const res = await api.getGeneratorSample(
+      id,
+      normalizeArgs(id, generatorState.args),
+    );
+    generatorSampleText.textContent = res.ok
+      ? String(res.sample)
+      : res.error || "生成失败";
   }, 200);
 }
 
@@ -1372,11 +1525,11 @@ function normalizeArgs(id, args) {
   const out = {};
   for (const a of def.args) {
     const v = args[a.name];
-    if (v === undefined || v === '') continue;
-    if (a.type === 'int') {
+    if (v === undefined || v === "") continue;
+    if (a.type === "int") {
       const n = parseInt(v, 10);
       if (!Number.isNaN(n)) out[a.name] = n;
-    } else if (a.type === 'float') {
+    } else if (a.type === "float") {
       const n = parseFloat(v);
       if (!Number.isNaN(n)) out[a.name] = n;
     } else {
@@ -1390,18 +1543,18 @@ function closeGeneratorModal() {
   generatorModal.hidden = true;
 }
 
-generatorCloseBtn.addEventListener('click', closeGeneratorModal);
-generatorBackdrop.addEventListener('click', closeGeneratorModal);
-generatorBackBtn.addEventListener('click', closeGeneratorModal);
-generatorSearchInput.addEventListener('input', () => {
+generatorCloseBtn.addEventListener("click", closeGeneratorModal);
+generatorBackdrop.addEventListener("click", closeGeneratorModal);
+generatorBackBtn.addEventListener("click", closeGeneratorModal);
+generatorSearchInput.addEventListener("input", () => {
   generatorState.filterText = generatorSearchInput.value;
   renderGeneratorCategories();
 });
-generatorLocaleSelect.addEventListener('change', () => {
+generatorLocaleSelect.addEventListener("change", () => {
   // v1: locale 切换仅影响 person/location 类生成器显示的 label 提示
 });
 
-generatorInsertBtn.addEventListener('click', () => {
+generatorInsertBtn.addEventListener("click", () => {
   const id = generatorState.selectedId;
   if (!id || !generatorState.pendingRange) return;
   const expr = buildExprText(id, generatorState.args);

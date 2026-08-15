@@ -32,9 +32,10 @@ function mediaQuery() {
 function applyResolved(resolved) {
   document.documentElement.dataset.theme = resolved;
   if (window.__TAURI__) {
-    document.documentElement.classList.add('tauri');
     try {
-      window.__TAURI__.app.setTheme(resolved);
+      // system 模式传 null：macOS 上 setTheme 会锁死 NSApp appearance（可选外观），
+      // 使 WKWebView 的 prefers-color-scheme 不再跟随系统；null 恢复跟随系统。
+      window.__TAURI__.app.setTheme(current === 'system' ? null : resolved);
     } catch {
       /* 壳不支持时忽略（浏览器模式 / 旧壳） */
     }
