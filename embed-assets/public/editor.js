@@ -1,6 +1,6 @@
-// CodeMirror 6 bootstrap
+// CodeMirror 6 bootstrap（双主题：暗色/亮色随应用主题切换）
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { syntaxHighlighting, HighlightStyle, bracketMatching, indentOnInput } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
@@ -19,6 +19,70 @@ const darkHighlight = HighlightStyle.define([
   { tag: t.propertyName, color: '#5E6AD2' },
   { tag: t.punctuation, color: '#5A5F6A' },
 ]);
+
+// 亮色 JSON 语法高亮（浅色玻璃，与亮底语义色同族加深）
+const lightHighlight = HighlightStyle.define([
+  { tag: t.bool, color: '#b45309' },
+  { tag: t.null, color: '#dc2626', fontStyle: 'italic' },
+  { tag: t.number, color: '#b45309' },
+  { tag: t.string, color: '#16a34a' },
+  { tag: t.propertyName, color: '#4f46e5' },
+  { tag: t.punctuation, color: '#98a1b0' },
+]);
+
+const darkEditorTheme = {
+  '&': { height: '100%', backgroundColor: 'transparent' },
+  '.cm-scroller': { fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: '13px', lineHeight: '1.65' },
+  '.cm-content': { padding: '12px 16px' },
+  '.cm-gutters': { backgroundColor: 'transparent', borderRight: '1px solid rgba(255,255,255,0.08)', color: '#5A5F6A' },
+  '.cm-activeLineGutter': { backgroundColor: 'transparent', color: '#8A8F98' },
+  '.cm-activeLine': { backgroundColor: 'rgba(94,106,210,0.08)' },
+  '.cm-diagnostic-error': { borderLeft: '3px solid #ff5c5c' },
+  '.cm-diagnostic-warning': { borderLeft: '3px solid #ffc857' },
+};
+
+const lightEditorTheme = {
+  ...darkEditorTheme,
+  '.cm-gutters': { backgroundColor: 'transparent', borderRight: '1px solid rgba(15,23,42,0.10)', color: '#98a1b0' },
+  '.cm-activeLineGutter': { backgroundColor: 'transparent', color: '#6b7688' },
+  '.cm-activeLine': { backgroundColor: 'rgba(79,70,229,0.08)' },
+  '.cm-diagnostic-error': { borderLeft: '3px solid #dc2626' },
+  '.cm-diagnostic-warning': { borderLeft: '3px solid #d97706' },
+};
+
+const darkReadonlyTheme = {
+  '&': { backgroundColor: 'transparent' },
+  '.cm-scroller': { fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: '12px', lineHeight: '1.6' },
+  '.cm-content': { padding: '8px 12px' },
+  '.cm-gutters': { backgroundColor: 'transparent', borderRight: '1px solid rgba(255,255,255,0.08)', color: '#5A5F6A' },
+};
+
+const lightReadonlyTheme = {
+  ...darkReadonlyTheme,
+  '.cm-gutters': { backgroundColor: 'transparent', borderRight: '1px solid rgba(15,23,42,0.10)', color: '#98a1b0' },
+};
+
+function themeExtensions(theme, readonly) {
+  const dark = theme !== 'light';
+  return [
+    syntaxHighlighting(dark ? darkHighlight : lightHighlight),
+    EditorView.theme(dark ? (readonly ? darkReadonlyTheme : darkEditorTheme) : (readonly ? lightReadonlyTheme : lightEditorTheme), { dark }),
+  ];
+}
+
+// 主编辑器主题热切换；只读查看器（log 详情弹窗）在挂载时取当前值
+const themeCompartment = new Compartment();
+let currentEditorTheme = 'dark';
+
+/**
+ * @param {'light'|'dark'} theme
+ */
+export function setEditorTheme(theme) {
+  currentEditorTheme = theme === 'light' ? 'light' : 'dark';
+  if (view) {
+    view.dispatch({ effects: themeCompartment.reconfigure(themeExtensions(currentEditorTheme, false)) });
+  }
+}
 
 /**
  * @param {{ initialValue?: string, onChange?: (text: string) => void, onSelectionChange?: (state: any) => void }} opts
@@ -42,17 +106,7 @@ export function mountEditor({ initialValue = '', onChange, onSelectionChange } =
       lintGutter(),
       highlightActiveLine(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
-      syntaxHighlighting(darkHighlight),
-      EditorView.theme({
-        '&': { height: '100%', backgroundColor: 'transparent' },
-        '.cm-scroller': { fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: '13px', lineHeight: '1.65' },
-        '.cm-content': { padding: '12px 16px' },
-        '.cm-gutters': { backgroundColor: 'transparent', borderRight: '1px solid rgba(255,255,255,0.08)', color: '#5A5F6A' },
-        '.cm-activeLineGutter': { backgroundColor: 'transparent', color: '#8A8F98' },
-        '.cm-activeLine': { backgroundColor: 'rgba(94,106,210,0.08)' },
-        '.cm-diagnostic-error': { borderLeft: '3px solid #ff5c5c' },
-        '.cm-diagnostic-warning': { borderLeft: '3px solid #ffc857' },
-      }, { dark: true }),
+      themeCompartment.of(themeExtensions(currentEditorTheme, false)),
       updateListener,
     ],
   });
@@ -95,16 +149,10 @@ export function mountReadonlyEditor(parent, text) {
     doc: text,
     extensions: [
       lineNumbers(),
-      syntaxHighlighting(darkHighlight),
       json(),
       EditorView.editable.of(false),
       EditorState.readOnly.of(true),
-      EditorView.theme({
-        '&': { backgroundColor: 'transparent' },
-        '.cm-scroller': { fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: '12px', lineHeight: '1.6' },
-        '.cm-content': { padding: '8px 12px' },
-        '.cm-gutters': { backgroundColor: 'transparent', borderRight: '1px solid rgba(255,255,255,0.08)', color: '#5A5F6A' },
-      }, { dark: true }),
+      ...themeExtensions(currentEditorTheme, true),
     ],
   });
   return new EditorView({ state, parent });
