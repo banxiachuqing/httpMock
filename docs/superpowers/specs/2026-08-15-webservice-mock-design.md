@@ -90,6 +90,8 @@
 - 类型约束：往 ws 端口建 endpoint、往 http 端口建 service → 400 `PORT_TYPE_MISMATCH`。`ensurePortEntity` 补建端口时按调用来源显式带 `type`。
 - service `path` 不允许含 `?`（会破坏 `?wsdl` 判定）→ 400 `INVALID_PATH`。
 - `responseXml` 允许保存空串，但命中时返回 500 Fault（见 §7），不静默返回空响应。
+- 禁用语义与现有 endpoints 对齐：`enabled:false` 的 service 其 path 不提供服务（按「path 未命中」404）；`enabled:false` 的 operation 匹配时跳过（落入未命中 Fault）。
+- operation 匹配（soapAction 与 name）均为大小写敏感的精确比较（XML 惯例）。
 
 ## 4. mock 引擎行为
 
@@ -294,7 +296,7 @@
 | | 文件 |
 |---|---|
 | 新增后端 | `src/wsdl.js`、`src/soap-router.js`、`src/api-services.js` |
-| 修改后端 | `src/config-store.js`（v3 迁移 + checkServiceUniqueness）、`src/mock-engine.js`（start 第三参 + ws handler）、`src/api.js`（挂载/类型约束/config strip）、`src/api-ports.js`（type/级联）、`src/api-preview.js`（format:text）、`server.js`（如 start 调用签名涉及）、`package.json`（+fast-xml-parser） |
+| 修改后端 | `src/config-store.js`（v3 迁移 + checkServiceUniqueness）、`src/mock-engine.js`（start 第三参 + ws handler）、`src/api.js`（挂载/类型约束/config strip/runtime start 传参）、`src/api-ports.js`（type/级联）、`src/api-preview.js`（format:text）、`package.json`（+fast-xml-parser） |
 | 新增前端 | `public/views/ws-services.js`、`public/views/ws-detail.js` |
 | 修改前端 | `public/router.js`、`public/app.js`、`public/views/port-cards.js`、`public/views/port-detail.js`（如需）、`public/editor.js`（language 参数化）、`public/index.html`（importmap + 弹窗骨架）、`public/styles.css`（徽标等少量样式）、vendor 新增 `lang-xml`/`@lezer/xml` |
 | 同步 | `embed-assets/`（不变量 5） |
