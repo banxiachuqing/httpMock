@@ -134,9 +134,9 @@ jobs:
           node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync('package.json','utf8')).version;const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.version=v;fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n')"
 
       - name: 壳单元测试
-        # arm64 交叉编译腿无主机架构（x86_64）sidecar，cargo test 编译 build.rs 时
-        # tauri-build 校验 externalBin 会失败；单测为纯逻辑无平台差异，win-x64 腿已覆盖
-        if: matrix.triple != 'aarch64-pc-windows-msvc'
+        # 交叉编译腿的 sidecar 与主机架构不一致时，cargo test 编译 build.rs 会因
+        # tauri-build 校验 externalBin 失败；单测为纯逻辑无平台差异，同架构腿已覆盖
+        if: matrix.triple != 'aarch64-pc-windows-msvc' && matrix.triple != 'x86_64-apple-darwin'
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: tauri build
