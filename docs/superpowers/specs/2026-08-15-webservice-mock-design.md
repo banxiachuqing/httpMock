@@ -154,7 +154,7 @@
 **WSDL 解析细则**（`parseWsdl`）：
 
 - operation 名取自 `definitions > portType > operation[@name]`（多个 portType 全部合并）
-- soapAction 取自 `binding > operation > soap:operation[@soapAction]`，`soap12:binding` 同样认；按 operation name 关联 portType；1.1/1.2 binding 并存时 1.1 优先
+- soapAction 取自 `binding > operation > soap:operation[@soapAction]`，`soap12:binding` 同样认；按 operation name 关联 portType；多个 binding 并存时按**文档序**取首个带 soapAction 的（解析统一开 `removeNSPrefix` 后无法可靠区分 soap/soap12 前缀，且实践中同一 portType 的两个 binding 的 soapAction 一致——此为对初版「1.1 优先」表述的修正）
 - `targetNamespace` 取自 `definitions/@targetNamespace`，缺失时报 `INVALID_WSDL`
 - 解析不出任何 operation → 返回空列表（不算错误，UI 提示可手工添加）
 - 畸形 XML → 抛 `AppError(400, 'INVALID_WSDL', 解析器原始信息)`
