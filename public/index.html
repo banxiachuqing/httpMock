@@ -463,5 +463,15 @@
 
   <script src="editor.js" type="module"></script>
   <script src="app.js" type="module"></script>
+  <script>
+    // Tauri 壳：data-tauri-drag-region 标记区（品牌区/顶栏 spacer）→ 左键按下即进入窗口拖拽
+    document.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      const target = e.target.closest('[data-tauri-drag-region]');
+      if (target && window.__TAURI__?.window?.getCurrentWindow) {
+        window.__TAURI__.window.getCurrentWindow().startDragging();
+      }
+    });
+  </script>
 </body>
 </html>
