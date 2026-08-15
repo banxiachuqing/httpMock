@@ -1,7 +1,8 @@
 // Mock//Server — production UI
 // Talks to /api/* and /events.
 
-import { mountEditor, getValue, setValue, getEditorView } from './editor.js';
+import { mountEditor, getValue, setValue, getEditorView, setEditorTheme } from './editor.js';
+import { applyTheme, onThemeChange } from './theme.js';
 import { startRouter, navigate } from './router.js';
 import { renderPortCards, initNewPortDialog } from './views/port-cards.js';
 import { renderPortHeader, initPortDetail } from './views/port-detail.js';
@@ -127,6 +128,7 @@ const els = {
   uiPort: $('#uiPort'),
   maxBody: $('#settingsMaxBody'),
   maxBodyHint: $('#settingsMaxBodyHint'),
+  theme: $('#settingsTheme'),
 
   // Log detail dialog
   logDetail: $('#log-detail'),
@@ -560,6 +562,8 @@ async function refreshAll() {
 
 async function loadAll() {
   state.config = await api.getConfig();
+  onThemeChange((resolved) => setEditorTheme(resolved));
+  applyTheme(state.config.settings.theme ?? 'system');
   state.ports = await api.listPorts();
   state.endpoints = await api.listEndpoints();
   state.selectedId = state.endpoints[0]?.id || null;
@@ -774,6 +778,7 @@ function connectSSE() {
 function openSettings() {
   els.storagePath.value = state.config.settings.storagePath;
   els.uiPort.value = state.config.settings.uiPort;
+  els.theme.value = state.config.settings.theme ?? 'system';
   els.maxBody.value = state.config.settings.maxBodyBytes ?? 4194304;
   els.maxBodyHint.textContent = formatBytes(Number(els.maxBody.value));
   els.settingsModal.hidden = false;
@@ -794,8 +799,10 @@ async function saveSettings() {
     storagePath: newStoragePath,
     uiPort: newUiPort,
     maxBodyBytes: newMax,
+    theme: els.theme.value,
   });
   state.config = await api.getConfig();
+  applyTheme(state.config.settings.theme ?? 'system');
   closeSettings();
   flash(needsRestart ? '已保存 · 重启后生效' : '已保存 · 立即生效', 'green');
 }
