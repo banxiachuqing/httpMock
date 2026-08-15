@@ -61,7 +61,7 @@ export function registerPortRoutes(app, { configStore }) {
       let updated;
       await configStore.update((cfg) => {
         cfg.ports = sorted(cfg.ports.map((p) =>
-          p.port === oldPort ? { port: newPort, enabled: newEnabled } : p));
+          p.port === oldPort ? { ...p, port: newPort, enabled: newEnabled } : p));
         if (newPort !== oldPort) {
           cfg.endpoints = cfg.endpoints.map((e) =>
             e.port === oldPort ? { ...e, port: newPort } : e);

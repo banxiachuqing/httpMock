@@ -62,7 +62,7 @@ describe('PUT /api/ports/:port', () => {
     await ctx.request.post('/api/ports').send({ port: 8080 });
     const r = await ctx.request.put('/api/ports/8080').send({ enabled: false });
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ port: 8080, enabled: false });
+    expect(r.body).toEqual({ port: 8080, enabled: false, type: 'http' });
   });
 
   it('改号级联更新端点的 port 字段', async () => {
@@ -70,7 +70,7 @@ describe('PUT /api/ports/:port', () => {
     await ctx.request.post('/api/endpoints').send({ port: 8080, method: 'GET', path: '/a', statusCode: 200, response: {} });
     const r = await ctx.request.put('/api/ports/8080').send({ port: 9090 });
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ port: 9090, enabled: true });
+    expect(r.body).toEqual({ port: 9090, enabled: true, type: 'http' });
     const eps = await ctx.request.get('/api/endpoints');
     expect(eps.body.map((e) => e.port)).toEqual([9090]);
     const ports = await ctx.request.get('/api/ports');
@@ -168,5 +168,21 @@ describe('端口类型（v3）', () => {
     });
     await ctx.request.delete('/api/ports/8095');
     expect(store.config.services.map((s) => s.id)).toEqual(['s2']);
+  });
+
+  it('ws 端口切换启用后 type 保留', async () => {
+    await ctx.request.post('/api/ports').send({ port: 8096, type: 'ws' });
+    await ctx.request.put('/api/ports/8096').send({ enabled: false });
+    const r = await ctx.request.get('/api/ports');
+    expect(r.body).toEqual([{ port: 8096, enabled: false, type: 'ws' }]);
+  });
+
+  it('ws 端口改号后 type 保留', async () => {
+    await ctx.request.post('/api/ports').send({ port: 8097, type: 'ws' });
+    const r = await ctx.request.put('/api/ports/8097').send({ port: 8098 });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ port: 8098, enabled: true, type: 'ws' });
+    const list = await ctx.request.get('/api/ports');
+    expect(list.body).toEqual([{ port: 8098, enabled: true, type: 'ws' }]);
   });
 });
