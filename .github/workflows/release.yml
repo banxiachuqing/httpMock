@@ -186,7 +186,8 @@ jobs:
       - name: 生成 SHA256SUMS
         run: |
           cd artifacts
-          find . -type f | sort | xargs sha256sum > SHA256SUMS
+          # -print0/-0：产物名含空格（Mock Tools_2.0.0_*.dmg），默认 xargs 按空白分词会拆坏
+          find . -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
           cat SHA256SUMS
 
       - name: 创建 Release
