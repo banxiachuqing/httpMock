@@ -6,14 +6,20 @@ import {
   getValue,
   setValue,
   getEditorView,
+  getActiveEditorView,
   setEditorTheme,
 } from "./editor.js";
 import { applyTheme, onThemeChange } from "./theme.js";
 import { startRouter, navigate } from "./router.js";
 import { renderPortCards, initNewPortDialog } from "./views/port-cards.js";
 import { renderPortHeader, initPortDetail } from "./views/port-detail.js";
-import { renderServiceCards, initNewServiceDialog, serviceAddress } from "./views/ws-services.js";
+import {
+  renderServiceCards,
+  initNewServiceDialog,
+  serviceAddress,
+} from "./views/ws-services.js";
 import { initImportWsdlDialog } from "./views/ws-import.js";
+import { initServiceDetail, renderServiceDetail } from "./views/ws-detail.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -204,6 +210,7 @@ const state = {
   endpoints: [],
   services: [],
   selectedId: null,
+  selectedOperationId: null,
   dirty: false,
   runtime: "stopped",
   runtimeStatus: {}, // port -> { state, reason? }
@@ -326,6 +333,31 @@ const els = {
   wsEditorEmpty: $("#wsEditorEmpty"),
   wsEditorForm: $("#wsEditorForm"),
   wsEmptyNewBtn: $("#wsEmptyNewBtn"),
+
+  // WS 服务详情编辑区
+  xmlEditorHost: $("#xmlEditorHost"),
+  wsOperationId: $("#wsOperationId"),
+  wsOpName: $("#wsOpName"),
+  wsOpSoapAction: $("#wsOpSoapAction"),
+  wsOpStatus: $("#wsOpStatus"),
+  wsResponseType: $("#wsResponseType"),
+  wsValidationStatus: $("#wsValidationStatus"),
+  wsFormatBtn: $("#wsFormatBtn"),
+  wsValidateBtn: $("#wsValidateBtn"),
+  wsDynamicBtn: $("#wsDynamicBtn"),
+  wsLineCount: $("#wsLineCount"),
+  wsCharCount: $("#wsCharCount"),
+  wsPreviewMeta: $("#wsPreviewMeta"),
+  wsPreviewMetaLabel: $("#wsPreviewMetaLabel"),
+  wsPreviewExprStat: $("#wsPreviewExprStat"),
+  wsPreviewErrStat: $("#wsPreviewErrStat"),
+  wsPreviewRefreshBtn: $("#wsPreviewRefreshBtn"),
+  wsPreviewBanner: $("#wsPreviewBanner"),
+  wsPreviewPane: $("#wsPreviewPane"),
+  wsLastSaved: $("#wsLastSaved"),
+  wsDeleteOpBtn: $("#wsDeleteOpBtn"),
+  wsRevertBtn: $("#wsRevertBtn"),
+  wsSaveOpBtn: $("#wsSaveOpBtn"),
 
   // 新建服务弹窗
   newServiceModal: $("#newServiceModal"),
@@ -606,8 +638,10 @@ function renderWsPortPage() {
   });
 }
 
-// service 视图的渲染在 Task 12 由 ws-detail.js 提供；此处先占位
-function renderServicePage() {}
+// service 视图的渲染由 ws-detail.js 提供
+function renderServicePage() {
+  renderServiceDetail();
+}
 
 function renderLogEntry(entry) {
   const row = document.createElement("div");
@@ -625,9 +659,17 @@ function renderLogEntry(entry) {
     <span class="log-status" data-range="${range}">${entry.status}</span>
     <span class="log-duration">${entry.durationMs}</span>
     <span class="log-ip mono">${ip || "—"}</span>
-    <span class="log-result">${entry.matched ? "匹配" : "无路由"}</span>
+    <span class="log-result"></span>
   `;
   row.querySelector(".log-path").textContent = entry.path;
+  // operationName 来自请求数据，只能 textContent 赋值（不进 innerHTML）
+  row.querySelector(".log-result").textContent = entry.matched
+    ? entry.operationName
+      ? `✓ ${entry.operationName}`
+      : "匹配"
+    : entry.serviceId
+      ? `✗ Fault${entry.operationName ? ` · ${entry.operationName}` : ""}`
+      : "无路由";
   // 只有 HTTP 请求条目可点（过滤 resolver-warn）
   if (entry.method) {
     row.addEventListener("click", () => openLogDetail(entry.id));
@@ -1138,6 +1180,7 @@ document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "s") {
     e.preventDefault();
     if (!els.editorForm.hidden) saveEndpoint();
+    else if (!els.wsEditorForm.hidden) els.wsSaveOpBtn.click();
   }
   if (e.key === "Escape" && !els.settingsModal.hidden) closeSettings();
 });
@@ -1186,6 +1229,13 @@ loadAll().then(() => {
       if (state.route.view === "ws-port") renderWsPortPage();
       if (state.route.view === "service") renderServicePage();
     },
+  });
+  initServiceDetail({
+    els,
+    state,
+    api,
+    refreshAll,
+    importDialog: () => importWsdlDialog,
   });
   startRouter((route) => {
     if (suppressHash) {
@@ -1754,7 +1804,8 @@ generatorInsertBtn.addEventListener("click", () => {
   const id = generatorState.selectedId;
   if (!id || !generatorState.pendingRange) return;
   const expr = buildExprText(id, generatorState.args);
-  const view = getEditorView();
+  // 插入目标 = 最近聚焦的编辑器（WS XML 编辑器聚焦时插到 XML 里）
+  const view = getActiveEditorView();
   const { from, to, hasQuotes } = generatorState.pendingRange;
   const replacement = hasQuotes ? expr : `"${expr}"`;
   const newCursor = from + (hasQuotes ? 0 : 1);
