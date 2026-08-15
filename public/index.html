@@ -12,6 +12,15 @@
     rel="stylesheet"
   />
   <link rel="stylesheet" href="styles.css" />
+  <script>
+    // 主题防闪烁：首帧前按缓存/系统偏好设置 data-theme；app.js 加载后以服务端设置调和
+    (function () {
+      var s = 'system';
+      try { s = localStorage.getItem('mockserver.theme') || 'system'; } catch (e) {}
+      var dark = s === 'dark' || (s !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    })();
+  </script>
   <script type="importmap">
   {
     "imports": {
