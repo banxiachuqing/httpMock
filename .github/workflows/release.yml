@@ -186,7 +186,7 @@ jobs:
       - name: 生成 SHA256SUMS
         run: |
           cd artifacts
-          sha256sum mockserver-* *.dmg *-setup.exe > SHA256SUMS
+          find . -type f | sort | xargs sha256sum > SHA256SUMS
           cat SHA256SUMS
 
       - name: 创建 Release
@@ -201,8 +201,8 @@ jobs:
             artifacts/mockserver-mac-x64
             artifacts/mockserver-win-x64.exe
             artifacts/mockserver-win-arm64.exe
-            artifacts/*.dmg
-            artifacts/*-setup.exe
+            artifacts/**/*.dmg
+            artifacts/**/*-setup.exe
             artifacts/SHA256SUMS
           body: |
             ## 桌面版（推荐）
