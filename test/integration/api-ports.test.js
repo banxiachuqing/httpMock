@@ -31,9 +31,9 @@ describe('POST /api/ports', () => {
   it('创建端口，默认启用', async () => {
     const r = await ctx.request.post('/api/ports').send({ port: 8080 });
     expect(r.status).toBe(201);
-    expect(r.body).toEqual({ port: 8080, enabled: true });
+    expect(r.body).toEqual({ port: 8080, enabled: true, type: 'http' });
     const list = await ctx.request.get('/api/ports');
-    expect(list.body).toEqual([{ port: 8080, enabled: true }]);
+    expect(list.body).toEqual([{ port: 8080, enabled: true, type: 'http' }]);
   });
 
   it('按端口号升序保存', async () => {
@@ -124,5 +124,49 @@ describe('端点自动补建端口实体', () => {
     await ctx.request.put(`/api/endpoints/${created.body.id}`).send({ port: 7788, method: 'GET', path: '/x', statusCode: 200, response: {} });
     const r = await ctx.request.get('/api/ports');
     expect(r.body.map((p) => p.port).sort()).toEqual([7788, 8080]);
+  });
+});
+
+describe('端口类型（v3）', () => {
+  it('POST 显式 type=ws', async () => {
+    const r = await ctx.request.post('/api/ports').send({ port: 8090, type: 'ws' });
+    expect(r.status).toBe(201);
+    expect(r.body).toEqual({ port: 8090, enabled: true, type: 'ws' });
+  });
+
+  it('POST 非法 type → INVALID_VALUE', async () => {
+    const r = await ctx.request.post('/api/ports').send({ port: 8091, type: 'grpc' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_VALUE');
+  });
+
+  it('PUT 传 type → FIELD_IMMUTABLE', async () => {
+    await ctx.request.post('/api/ports').send({ port: 8092 });
+    const r = await ctx.request.put('/api/ports/8092').send({ type: 'ws' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('FIELD_IMMUTABLE');
+  });
+
+  it('改号级联 services', async () => {
+    await ctx.request.post('/api/ports').send({ port: 8093, type: 'ws' });
+    await store.update((cfg) => {
+      cfg.services = [{ id: 's1', port: 8093, path: '/ws/A', name: 'A', enabled: true, targetNamespace: 'urn:A', wsdl: null, operations: [] }];
+      return cfg;
+    });
+    await ctx.request.put('/api/ports/8093').send({ port: 8094 });
+    expect(store.config.services[0].port).toBe(8094);
+  });
+
+  it('删除端口连带删 services，不动其他端口', async () => {
+    await ctx.request.post('/api/ports').send({ port: 8095, type: 'ws' });
+    await store.update((cfg) => {
+      cfg.services = [
+        { id: 's1', port: 8095, path: '/ws/A', name: 'A', enabled: true, targetNamespace: 'urn:A', wsdl: null, operations: [] },
+        { id: 's2', port: 9999, path: '/ws/B', name: 'B', enabled: true, targetNamespace: 'urn:B', wsdl: null, operations: [] },
+      ];
+      return cfg;
+    });
+    await ctx.request.delete('/api/ports/8095');
+    expect(store.config.services.map((s) => s.id)).toEqual(['s2']);
   });
 });
