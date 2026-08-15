@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import os from 'node:os';
 import fs from 'node:fs/promises';
 import express from 'express';
@@ -150,7 +150,11 @@ function listenWithFallback(app, startPort, host) {
   });
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}` || !!process.env.MOCK_SERVER_DIR;
+// pathToFileURL 处理平台差异：Windows 上 argv[1] 是反斜杠盘符路径，
+// 手工拼 `file://${argv[1]}` 永远不等于 import.meta.url（file:///C:/...），会导致 isMain 误判
+const isMain =
+  import.meta.url === pathToFileURL(path.resolve(process.argv[1] || '')).href ||
+  !!process.env.MOCK_SERVER_DIR;
 if (isMain) {
   const desktop = !!process.env.MOCK_DESKTOP;
   startServer({ openBrowser: !desktop, desktop }).catch((e) => {
