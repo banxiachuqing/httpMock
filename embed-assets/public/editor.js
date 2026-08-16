@@ -41,7 +41,7 @@ const darkEditorTheme = {
   '.cm-content': { padding: '12px 16px' },
   '.cm-gutters': { backgroundColor: 'transparent', borderRight: '1px solid rgba(255,255,255,0.08)', color: '#5A5F6A' },
   '.cm-activeLineGutter': { backgroundColor: 'transparent', color: '#8A8F98' },
-  '.cm-activeLine': { backgroundColor: 'rgba(94,106,210,0.08)' },
+  '.cm-activeLine': { backgroundColor: 'rgba(10,132,255,0.08)' },
   '.cm-diagnostic-error': { borderLeft: '3px solid #ff5c5c' },
   '.cm-diagnostic-warning': { borderLeft: '3px solid #ffc857' },
 };
@@ -50,7 +50,7 @@ const lightEditorTheme = {
   ...darkEditorTheme,
   '.cm-gutters': { backgroundColor: 'transparent', borderRight: '1px solid rgba(15,23,42,0.10)', color: '#98a1b0' },
   '.cm-activeLineGutter': { backgroundColor: 'transparent', color: '#6b7688' },
-  '.cm-activeLine': { backgroundColor: 'rgba(79,70,229,0.08)' },
+  '.cm-activeLine': { backgroundColor: 'rgba(0,113,227,0.08)' },
   '.cm-diagnostic-error': { borderLeft: '3px solid #dc2626' },
   '.cm-diagnostic-warning': { borderLeft: '3px solid #d97706' },
 };
