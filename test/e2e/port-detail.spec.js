@@ -37,12 +37,12 @@ test('新建接口默认响应体为统一信封（code/msg/data/success）', as
   await enterPortDetail(page, server.baseURL, 17509);
 
   await page.click('#newEndpointBtn');
-  // 默认信封是产品约定：改回 {ok:true} 等旧值时必须失败
-  const body = await page.locator('.cm-content').textContent();
-  expect(body).toContain('"code": 200');
-  expect(body).toContain('"msg": "操作成功"');
-  expect(body).toContain('"data": null');
-  expect(body).toContain('"success": true');
+  // 默认信封是产品约定：改回 {ok:true} 等旧值时必须失败。
+  // createEndpoint 是异步的（POST 完成后才渲染编辑器），用自动重试断言避免竞态
+  await expect(page.locator('.cm-content')).toContainText('"code": 200');
+  await expect(page.locator('.cm-content')).toContainText('"msg": "操作成功"');
+  await expect(page.locator('.cm-content')).toContainText('"data": null');
+  await expect(page.locator('.cm-content')).toContainText('"success": true');
 });
 
 test('接口名称显示在列表，留空回落 URL', async ({ page }) => {
@@ -142,4 +142,7 @@ test('操作按钮在编辑区顶部，删除在最右', async ({ page }) => {
 
   // 意图 3：HTTP 底部按钮条已移除（限定 #editorForm，WS 表单共用 .editor-form 类）
   await expect(page.locator('#editorForm > .editor-footer')).toHaveCount(0);
+
+  // 意图 4：撤销按钮已从 HTTP 页移除（spec 2026-08-17 §5；WS 页 wsRevertBtn 不受影响）
+  await expect(page.locator('#editorForm #revertBtn')).toHaveCount(0);
 });

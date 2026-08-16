@@ -245,7 +245,6 @@ const els = {
   formatBtn: $("#formatBtn"),
   validateBtn: $("#validateBtn"),
   saveBtn: $("#saveBtn"),
-  revertBtn: $("#revertBtn"),
   deleteBtn: $("#deleteBtn"),
   lineCount: $("#lineCount"),
   charCount: $("#charCount"),
@@ -1133,10 +1132,6 @@ els.portNotFoundBack.addEventListener("click", () => navigate("#/"));
 els.newEndpointBtn.addEventListener("click", createEndpoint);
 els.emptyNewBtn.addEventListener("click", createEndpoint);
 els.saveBtn.addEventListener("click", saveEndpoint);
-els.revertBtn.addEventListener("click", () => {
-  state.dirty = false;
-  renderEditor();
-});
 els.deleteBtn.addEventListener("click", deleteEndpoint);
 els.formatBtn.addEventListener("click", tryFormat);
 els.validateBtn.addEventListener("click", validateJSON);
