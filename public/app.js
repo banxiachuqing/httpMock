@@ -494,9 +494,12 @@ function renderEndpointList() {
       requestAnimationFrame(() => li.classList.add("dragging"));
     });
     li.addEventListener("dragover", (e) => {
-      if (!state.draggingId || state.draggingId === ep.id) return;
+      if (!state.draggingId) return;
+      // 被拖项自身也必须 preventDefault：预览换位后鼠标常落在它上面，
+      // 否则浏览器取消 drop，松手回弹（spec 2026-08-17 §4.2）
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
+      if (state.draggingId === ep.id) return;
       const dragged = els.endpointList.querySelector(
         `.endpoint-item[data-id="${state.draggingId}"]`,
       );
@@ -508,32 +511,6 @@ function renderEndpointList() {
       if (!before && dragged.previousElementSibling === li) return;
       // 实时预览换位：其他项 FLIP 动画挤开，被拖项占位即「预留空间」
       flipListMove(els.endpointList, dragged, li, before);
-    });
-    li.addEventListener("drop", (e) => {
-      e.preventDefault();
-      const fromId = state.draggingId;
-      state.draggingId = null;
-      if (!fromId) {
-        renderEndpointList();
-        return;
-      }
-      // 预览已把 DOM 排成目标顺序，直接读取提交
-      const ids = [...els.endpointList.querySelectorAll(".endpoint-item")].map(
-        (el) => el.dataset.id,
-      );
-      const unchanged = ids.every((x, i) => x === state.endpoints[i].id);
-      if (unchanged) {
-        renderEndpointList();
-        return;
-      }
-      const byId = new Map(state.endpoints.map((x) => [x.id, x]));
-      state.endpoints = ids.map((x) => byId.get(x));
-      renderEndpointList();
-      api.reorderEndpoints(ids).catch(async (err) => {
-        alert("排序失败：" + (err?.message || "未知错误"));
-        state.endpoints = await api.listEndpoints();
-        renderEndpointList();
-      });
     });
     li.addEventListener("dragend", () => {
       li.classList.remove("dragging");
@@ -593,6 +570,33 @@ function flipListMove(container, draggedEl, targetEl, before) {
       { once: true },
     );
   }
+}
+
+// 拖拽落点提交：预览已把 DOM 排成目标顺序，读取后持久化。
+// 挂在列表容器上（li 的 drop 会冒泡到这里），项间 2px 缝隙与列表空白区也可落点。
+function commitDragOrder() {
+  const fromId = state.draggingId;
+  state.draggingId = null;
+  if (!fromId) {
+    renderEndpointList();
+    return;
+  }
+  const ids = [...els.endpointList.querySelectorAll(".endpoint-item")].map(
+    (el) => el.dataset.id,
+  );
+  const unchanged = ids.every((x, i) => x === state.endpoints[i].id);
+  if (unchanged) {
+    renderEndpointList();
+    return;
+  }
+  const byId = new Map(state.endpoints.map((x) => [x.id, x]));
+  state.endpoints = ids.map((x) => byId.get(x));
+  renderEndpointList();
+  api.reorderEndpoints(ids).catch(async (err) => {
+    alert("排序失败：" + (err?.message || "未知错误"));
+    state.endpoints = await api.listEndpoints();
+    renderEndpointList();
+  });
 }
 
 // 复制避撞：与 checkUniqueness 同谓词——只看 enabled !== false 的端点
@@ -1281,6 +1285,17 @@ async function saveSettings() {
 els.startStopBtn.addEventListener("click", toggleRuntime);
 els.backToHomeBtn.addEventListener("click", () => navigate("#/"));
 els.portNotFoundBack.addEventListener("click", () => navigate("#/"));
+// 拖拽排序：容器接受落点（li 的 drop 冒泡至此；项间缝隙与列表空白区同样可落）
+els.endpointList.addEventListener("dragover", (e) => {
+  if (state.draggingId) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }
+});
+els.endpointList.addEventListener("drop", (e) => {
+  e.preventDefault();
+  commitDragOrder();
+});
 els.newEndpointBtn.addEventListener("click", createEndpoint);
 els.emptyNewBtn.addEventListener("click", createEndpoint);
 els.saveBtn.addEventListener("click", saveEndpoint);
