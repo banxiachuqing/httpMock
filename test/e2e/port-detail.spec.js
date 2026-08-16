@@ -30,6 +30,21 @@ test('新建接口时端口字段只读且为当前端口', async ({ page }) => 
   await expect(page.locator('#port')).toHaveValue('17501');
 });
 
+test('新建接口默认响应体为统一信封（code/msg/data/success）', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await setup(page, 17509);
+  await enterPortDetail(page, server.baseURL, 17509);
+
+  await page.click('#newEndpointBtn');
+  // 默认信封是产品约定：改回 {ok:true} 等旧值时必须失败
+  const body = await page.locator('.cm-content').textContent();
+  expect(body).toContain('"code": 200');
+  expect(body).toContain('"msg": "操作成功"');
+  expect(body).toContain('"data": null');
+  expect(body).toContain('"success": true');
+});
+
 test('接口名称显示在列表，留空回落 URL', async ({ page }) => {
   await page.goto(server.baseURL, { waitUntil: 'load' });
   await page.waitForTimeout(1000);

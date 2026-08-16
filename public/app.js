@@ -915,7 +915,7 @@ async function createEndpoint() {
     port: state.route.port,
     path: "/api/new",
     statusCode: 200,
-    response: { ok: true },
+    response: { code: 200, msg: "操作成功", data: null, success: true },
     enabled: true,
   });
   state.endpoints.push(ep);
