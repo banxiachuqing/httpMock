@@ -5,10 +5,15 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { syntaxHighlighting, HighlightStyle, bracketMatching, indentOnInput } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
 import { json, jsonParseLinter } from '@codemirror/lang-json';
+import { xml } from '@codemirror/lang-xml';
 import { linter, lintGutter } from '@codemirror/lint';
 
 const host = document.getElementById('responseEditorHost');
 let view = null;
+
+// 所有 createEditor 实例（主题热切换遍历用）；activeView = 最近聚焦的编辑器（generator 插入目标）
+const liveEditors = new Set();
+let activeView = null;
 
 // 暗色 JSON 语法高亮（配合 Cinematic Dark Glass 主题；defaultHighlightStyle 是浅色配色）
 const darkHighlight = HighlightStyle.define([
@@ -79,21 +84,38 @@ let currentEditorTheme = 'dark';
  */
 export function setEditorTheme(theme) {
   currentEditorTheme = theme === 'light' ? 'light' : 'dark';
-  if (view) {
-    view.dispatch({ effects: themeCompartment.reconfigure(themeExtensions(currentEditorTheme, false)) });
+  for (const v of liveEditors) {
+    v.dispatch({ effects: themeCompartment.reconfigure(themeExtensions(currentEditorTheme, false)) });
   }
 }
 
+// XML 语法检查：DOMParser 报 parsererror；尽量从报错文本提取行列定位
+function xmlDomLinter(v) {
+  const text = v.state.doc.toString();
+  if (!text.trim()) return [];
+  const doc = new DOMParser().parseFromString(text, 'text/xml');
+  const err = doc.querySelector('parsererror');
+  if (!err) return [];
+  const m = /error on line (\d+) at column (\d+)/i.exec(err.textContent || '');
+  let from = 0;
+  if (m) {
+    const line = v.state.doc.line(Math.min(Number(m[1]), v.state.doc.lines));
+    from = Math.min(line.from + Number(m[2]) - 1, v.state.doc.length);
+  }
+  return [{ from, to: Math.min(from + 1, v.state.doc.length), severity: 'error', message: 'XML 语法错误' }];
+}
+
 /**
- * @param {{ initialValue?: string, onChange?: (text: string) => void, onSelectionChange?: (state: any) => void }} opts
+ * 通用编辑器工厂（JSON 主编辑器之外的场景，如 WS XML 响应编辑）。
+ * @param {{ host: HTMLElement, language?: 'json'|'xml', initialValue?: string,
+ *   onChange?: (text: string) => void, onSelectionChange?: (state: any) => void }} opts
  */
-export function mountEditor({ initialValue = '', onChange, onSelectionChange } = {}) {
-  if (view) return view;
+export function createEditor({ host: hostEl, language = 'json', initialValue = '', onChange, onSelectionChange }) {
   const updateListener = EditorView.updateListener.of((u) => {
     if (u.docChanged && !window.__editorProgrammatic) onChange?.(u.state.doc.toString());
     if (u.selectionSet || u.docChanged) onSelectionChange?.(u.state);
   });
-
+  const isXml = language === 'xml';
   const state = EditorState.create({
     doc: initialValue,
     extensions: [
@@ -101,17 +123,50 @@ export function mountEditor({ initialValue = '', onChange, onSelectionChange } =
       history(),
       bracketMatching(),
       indentOnInput(),
-      json(),
-      linter(jsonParseLinter(), { delay: 200 }),
+      isXml ? xml() : json(),
+      linter(isXml ? xmlDomLinter : jsonParseLinter(), { delay: 200 }),
       lintGutter(),
       highlightActiveLine(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       themeCompartment.of(themeExtensions(currentEditorTheme, false)),
+      EditorView.domEventHandlers({ focus: (_e, v) => { activeView = v; } }),
       updateListener,
     ],
   });
+  const v = new EditorView({ state, parent: hostEl });
+  liveEditors.add(v);
+  activeView = v;
+  return {
+    view: v,
+    getValue: () => v.state.doc.toString(),
+    setValue: (text) => {
+      window.__editorProgrammatic = true;
+      try {
+        v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: text } });
+      } finally {
+        queueMicrotask(() => { window.__editorProgrammatic = false; });
+      }
+    },
+    destroy: () => {
+      liveEditors.delete(v);
+      if (activeView === v) activeView = null;
+      v.destroy();
+    },
+  };
+}
 
-  view = new EditorView({ state, parent: host });
+/** generator 模态框的插入目标：最近聚焦的编辑器，缺省 JSON 主编辑器 */
+export function getActiveEditorView() {
+  return activeView || view;
+}
+
+/**
+ * @param {{ initialValue?: string, onChange?: (text: string) => void, onSelectionChange?: (state: any) => void }} opts
+ */
+export function mountEditor({ initialValue = '', onChange, onSelectionChange } = {}) {
+  if (view) return view;
+  const inst = createEditor({ host, language: 'json', initialValue, onChange, onSelectionChange });
+  view = inst.view;
   return view;
 }
 

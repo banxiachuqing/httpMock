@@ -69,3 +69,25 @@ describe('POST /api/preview', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('POST /api/preview format:text（WS XML 预览）', () => {
+  it('跳过 JSON.parse，直接字符串替换', async () => {
+    const r = await ctx.request.post('/api/preview')
+      .send({ text: '<name>{{$person.fullName}}</name>', format: 'text' });
+    expect(r.status).toBe(200);
+    expect(r.body.ok).toBe(true);
+    expect(r.body.resolved).toMatch(/^<name>.+<\/name>$/);
+    expect(r.body.resolved).not.toContain('{{');
+    expect(r.body.exprCount).toBe(1);
+    expect(r.body.errors).toEqual([]);
+  });
+
+  it('非 JSON 文本不报错；未知生成器进 errors 且保留原文', async () => {
+    const r = await ctx.request.post('/api/preview')
+      .send({ text: '<a>{{$nope.x}}</a>', format: 'text' });
+    expect(r.body.ok).toBe(true);
+    expect(r.body.resolved).toBe('<a>{{$nope.x}}</a>');
+    expect(r.body.errors).toHaveLength(1);
+    expect(r.body.errors[0].code).toBe('UNKNOWN_GENERATOR');
+  });
+});

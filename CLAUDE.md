@@ -111,18 +111,24 @@ MOCK_READY {"host","port"}，壳解析后 WebView 导航到该地址；关窗隐
 | `src/api.js` | Express 路由（CRUD + runtime + logs + SSE） | 末尾挂 `app.use((err,...)=>...)` 错误中间件；端点自动补建端口实体 |
 | `src/api-ports.js` | `/api/ports` CRUD（端口一等实体） | `registerPortRoutes(app, {configStore})`；改号级联 endpoints；删除连带 endpoints |
 | `src/paths.js` | 跨平台存储路径 | 默认 `~/Documents/MockServer`，回退 `~/MockServer` |
+| `src/wsdl.js` | WSDL 解析/骨架生成/地址重写 | `parseWsdl` 抛 `INVALID_WSDL`；`rewriteAddress` 纯正则改写 location，不重建 XML 树 |
+| `src/soap-router.js` | SOAP 版本识别/操作名提取/operation 匹配/Fault 生成 | 纯函数；匹配优先级：action 精确 > action 末段 > Body localName |
+| `src/api-services.js` | `/api/services` + `/api/wsdl` 路由 | `toPublicService` 剥 wsdl 原文换 `hasWsdl`；operations 路由返回整个 service |
 
 ### 前端（零构建）
 
 - `public/index.html` — import map 引入 CodeMirror；body 网格双视图（首页卡片区 / 端口详情页）。
 - `public/app.js` — `api` 客户端 + `state` 单例 + 详情页渲染层 + 路由接线。无框架。
-- `public/router.js` — hash 路由（`#/` 首页，`#/port/<port>` 详情）。
+- `public/router.js` — hash 路由（`#/` 首页，`#/port/<port>` 详情——ws 端口渲染服务网格，`#/port/<port>/svc/<id>` WS 服务详情）。
 - `public/views/port-cards.js` — 首页端口卡片渲染 + 新建端口弹窗。
 - `public/views/port-detail.js` — 详情页端口页头交互（启用/改号/删除）。
+- `public/views/ws-services.js` — WS 端口详情页服务卡片网格 + 新建服务弹窗。
+- `public/views/ws-import.js` — 导入 WSDL 弹窗（解析预览 + 合并确认）。
+- `public/views/ws-detail.js` — WS 服务详情页（operation 侧栏 + XML 响应编辑）。
 - `public/editor.js` — CodeMirror 6 bootstrap（lang-json + lint + commands）。
 - `public/styles.css` — Cinematic Dark Glass 视觉方向（深色渐变 + 玻璃面板 + 靛蓝主色 + 背景光斑）。
 
-**全局状态键**（`public/app.js` 的 `state`）：`config / ports / endpoints / selectedId / dirty / runtime / runtimeStatus / logs / autoScroll / route`。`runtimeStatus` 是 `{port: {state, reason?}}` 字典，每 5s 轮询 `/api/runtime/status`；`route` 是 `{view:'home'} | {view:'port', port}`，由 `router.js` 驱动。
+**全局状态键**（`public/app.js` 的 `state`）：`config / ports / endpoints / selectedId / dirty / runtime / runtimeStatus / logs / autoScroll / route / services / selectedOperationId`。`runtimeStatus` 是 `{port: {state, reason?}}` 字典，每 5s 轮询 `/api/runtime/status`；`route` 是 `{view:'home'} | {view:'port', port}`，由 `router.js` 驱动。
 
 ### 测试布局
 
@@ -150,12 +156,16 @@ test/
 6. **端口一等实体**：`data.json` v2 含 `ports: [{port, enabled}]`；v1 数据加载时自动迁移。禁用端口不随启动绑定；空端口绑定后全返回 404。
 7. **端点自动补建端口**：`POST/PUT /api/endpoints` 引用未知端口时自动创建 `{port, enabled: true}`，保证不存在"有接口但端口实体缺失"的状态。
 8. **桌面壳只碰进程生命周期**：src-tauri/ 不得引入 mock 业务逻辑；sidecar 协议行（MOCK_READY/MOCK_ERROR）改动必须同步更新 src-tauri/src/sidecar.rs 的 parse_handshake_line。
+9. **端口分类型**：`type: 'http'|'ws'` 创建后不可改；资源类型必须与端口类型匹配（`PORT_TYPE_MISMATCH`）。
+10. **WS 路由优先级**：`?wsdl` > SOAPAction 精确 > action 末段 > Body localName > Fault；匹配大小写敏感。
+11. **WSDL 分发必须重写地址**：`?wsdl` 返回时 `soap:address location` 重写为 mock 自身地址（含骨架生成场景）。
+12. **`GET /api/config` 不含 `services[].wsdl` 原文**（只有 `hasWsdl`）；存储层完整保留。
 
 ---
 
 ## 文件指纹（变更前用 codegraph 查 blast radius）
 
-- `MockEngine.start`（src/mock-engine.js:40）— 2 callers in `src/api.js`
+- `MockEngine.start`（src/mock-engine.js:66，签名 `start(endpoints, ports, services)`）— 1 caller in `src/api.js`
 - `ConfigStore.checkUniqueness`（src/config-store.js:67）— 在 `createApi` 里 2 处调用
 - `createApi`（src/api.js:34）— 2 callers（server.js + test/helpers/test-server.js）
 - `LogBuffer.subscribe`（src/log-buffer.js:23）— 1 caller in `src/api.js`

@@ -42,7 +42,7 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
 
   const app = createApi({ storagePath: finalStoragePath, configStore, logBuffer, mockEngine });
   // Serve CodeMirror ESM modules from node_modules
-  for (const pkg of ['view', 'state', 'lang-json', 'lint', 'commands', 'language']) {
+  for (const pkg of ['view', 'state', 'lang-json', 'lang-xml', 'lint', 'commands', 'language']) {
     app.use(`/vendor/codemirror/${pkg}`, express.static(path.join(__dirname, 'node_modules', `@codemirror/${pkg}`)));
   }
   // Serve CodeMirror transitive deps
@@ -55,6 +55,7 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
     '@lezer/highlight': '@lezer/highlight',
     '@lezer/json': '@lezer/json',
     '@lezer/lr': '@lezer/lr',
+    '@lezer/xml': '@lezer/xml',
   };
   for (const [route, pkg] of Object.entries(transitiveMap)) {
     app.use(`/vendor/${route}`, express.static(path.join(__dirname, 'node_modules', pkg)));

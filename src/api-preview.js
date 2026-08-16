@@ -46,9 +46,20 @@ export function registerPreviewRoutes(app) {
 
   app.post('/api/preview', (req, res, next) => {
     try {
-      const { text } = req.body || {};
+      const { text, format } = req.body || {};
       if (typeof text !== 'string') {
         throw new AppError(400, 'INVALID_TEXT', 'text must be a string');
+      }
+      // WS XML 预览：不做 JSON.parse，直接混合模式替换（spec §5）
+      if (format === 'text') {
+        const exprCount = countExpressions(text);
+        const { value, errors } = resolve(text);
+        return res.json({
+          ok: true,
+          resolved: typeof value === 'string' ? value : String(value),
+          exprCount,
+          errors: serializeErrors(errors),
+        });
       }
       let parsed;
       try {
@@ -63,15 +74,7 @@ export function registerPreviewRoutes(app) {
       }
       const exprCount = countExpressions(text);
       const { value, errors } = resolve(parsed);
-      // 把 ResolverError 实例序列化成 plain object（错误中间件会处理 status，但 ok=true 时不走它）
-      const errOut = errors.map((e) => ({
-        message: e.message,
-        code: e.code,
-        ...(e.generatorId !== undefined ? { generatorId: e.generatorId } : {}),
-        ...(e.from !== undefined ? { from: e.from } : {}),
-        ...(e.to !== undefined ? { to: e.to } : {}),
-      }));
-      res.json({ ok: true, resolved: value, exprCount, errors: errOut });
+      res.json({ ok: true, resolved: value, exprCount, errors: serializeErrors(errors) });
     } catch (e) { next(e); }
   });
 }
@@ -80,4 +83,15 @@ const EXPR_RE = /\{\{\$[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*(?::[^
 
 function countExpressions(text) {
   return (text.match(EXPR_RE) || []).length;
+}
+
+// ResolverError → plain object（ok=true 时不走错误中间件，需手动序列化）
+function serializeErrors(errors) {
+  return errors.map((e) => ({
+    message: e.message,
+    code: e.code,
+    ...(e.generatorId !== undefined ? { generatorId: e.generatorId } : {}),
+    ...(e.from !== undefined ? { from: e.from } : {}),
+    ...(e.to !== undefined ? { to: e.to } : {}),
+  }));
 }

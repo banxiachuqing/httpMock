@@ -41,10 +41,11 @@ export class ConfigStore {
         } catch {}
       }
       this.config = {
-        version: 2,
+        version: 3,
         settings: { storagePath: this.storagePath, uiPort: 5050, maxBodyBytes: 4 * 1024 * 1024, theme: 'system' },
         ports: [],
         endpoints: [],
+        services: [],
       };
       await this._writeAtomic();
     }
@@ -67,11 +68,24 @@ export class ConfigStore {
   }
 
   _migrate(cfg) {
-    if (Array.isArray(cfg.ports)) return cfg;
-    const ports = [...new Set((cfg.endpoints || []).map((e) => e.port))]
-      .sort((a, b) => a - b)
-      .map((port) => ({ port, enabled: true }));
-    return { ...cfg, ports, version: 2 };
+    let out = cfg;
+    // v1 → v2：从端点派生 ports
+    if (!Array.isArray(out.ports)) {
+      const ports = [...new Set((out.endpoints || []).map((e) => e.port))]
+        .sort((a, b) => a - b)
+        .map((port) => ({ port, enabled: true }));
+      out = { ...out, ports, version: 2 };
+    }
+    // v2 → v3：ports 补 type，补 services
+    if (typeof out.version !== 'number' || out.version < 3) {
+      out = {
+        ...out,
+        version: 3,
+        ports: out.ports.map((p) => ({ type: 'http', ...p })),
+        services: Array.isArray(out.services) ? out.services : [],
+      };
+    }
+    return out;
   }
 
   checkUniqueness(endpoints, excludeId = null) {
@@ -84,6 +98,20 @@ export class ConfigStore {
         throw new AppError(400, 'DUPLICATE_ENDPOINT', `duplicate ${e.method} ${e.path} on port ${e.port}`);
       }
       seen.set(key, e.id);
+    }
+  }
+
+  // WS 服务唯一性：(port, path) 在 enabled 服务间唯一（spec §3）
+  checkServiceUniqueness(services, excludeId = null) {
+    const seen = new Map();
+    for (const s of services) {
+      if (s.enabled === false) continue;
+      if (excludeId && s.id === excludeId) continue;
+      const key = `${s.port}|${s.path}`;
+      if (seen.has(key)) {
+        throw new AppError(400, 'DUPLICATE_SERVICE', `duplicate service ${s.path} on port ${s.port}`);
+      }
+      seen.set(key, s.id);
     }
   }
 }

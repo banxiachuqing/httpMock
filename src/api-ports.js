@@ -23,10 +23,14 @@ export function registerPortRoutes(app, { configStore }) {
   app.post('/api/ports', async (req, res, next) => {
     try {
       const port = parsePortNumber(req.body?.port);
+      const type = req.body?.type ?? 'http';
+      if (!['http', 'ws'].includes(type)) {
+        throw new AppError(400, 'INVALID_VALUE', "type must be 'http' | 'ws'");
+      }
       if (configStore.config.ports.some((p) => p.port === port)) {
         throw new AppError(400, 'DUPLICATE_PORT', `port ${port} already exists`);
       }
-      const entity = { port, enabled: true };
+      const entity = { port, enabled: true, type };
       await configStore.update((cfg) => {
         cfg.ports = sorted([...cfg.ports, entity]);
         return cfg;
@@ -41,7 +45,10 @@ export function registerPortRoutes(app, { configStore }) {
       const current = configStore.config.ports.find((p) => p.port === oldPort);
       if (!current) throw new AppError(404, 'NOT_FOUND', 'port not found');
 
-      const { port: newPortRaw, enabled } = req.body || {};
+      const { port: newPortRaw, enabled, type } = req.body || {};
+      if (type !== undefined) {
+        throw new AppError(400, 'FIELD_IMMUTABLE', 'port type cannot be changed');
+      }
       let newPort = oldPort;
       if (newPortRaw !== undefined) {
         newPort = parsePortNumber(newPortRaw);
@@ -54,10 +61,12 @@ export function registerPortRoutes(app, { configStore }) {
       let updated;
       await configStore.update((cfg) => {
         cfg.ports = sorted(cfg.ports.map((p) =>
-          p.port === oldPort ? { port: newPort, enabled: newEnabled } : p));
+          p.port === oldPort ? { ...p, port: newPort, enabled: newEnabled } : p));
         if (newPort !== oldPort) {
           cfg.endpoints = cfg.endpoints.map((e) =>
             e.port === oldPort ? { ...e, port: newPort } : e);
+          cfg.services = (cfg.services || []).map((s) =>
+            s.port === oldPort ? { ...s, port: newPort } : s);
         }
         updated = cfg.ports.find((p) => p.port === newPort);
         return cfg;
@@ -75,6 +84,7 @@ export function registerPortRoutes(app, { configStore }) {
       await configStore.update((cfg) => {
         cfg.ports = cfg.ports.filter((p) => p.port !== port);
         cfg.endpoints = cfg.endpoints.filter((e) => e.port !== port);
+        cfg.services = (cfg.services || []).filter((s) => s.port !== port);
         return cfg;
       });
       res.status(204).end();
