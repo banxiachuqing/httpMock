@@ -43,7 +43,7 @@ HTTP 接口管理页的接口列表目前只有「选中」和「删除」两个
 3. 名称：源有名称则加「(副本)」后缀；空则保持空（回落显示 `METHOD path`）
 4. `POST /api/endpoints`：`{ method, port, path: 候选, statusCode, response: structuredClone(源.response), name, enabled: true }`
 5. 成功后新端点插入 `state.endpoints` 中**源端点正后方**，自动选中并进入编辑态——沿用 `createEndpoint` 的强制重置行为（不拦截未保存编辑，与现有「新建」一致）
-6. 失败（含服务端 409 唯一性驳回）：`alert("复制失败：" + message)`，不改本地状态
+6. 失败（含服务端唯一性驳回，400 `DUPLICATE_ENDPOINT`）：`alert("复制失败：" + message)`，不改本地状态
 
 服务端唯一性校验是最终权威；客户端避撞只是让正常路径不触发报错。
 
