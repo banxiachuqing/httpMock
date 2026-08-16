@@ -460,12 +460,12 @@ button {
   background: var(--surface-2);
   color: var(--text-primary);
   border: 1px solid var(--border);
-  border-radius: var(--r-1);
-  transition: background var(--d-fast) var(--ease), border-color var(--d-fast) var(--ease), transform var(--d-fast) var(--ease);
+  border-radius: 999px; /* Apple Glass 胶囊按钮（spec §4.4） */
+  transition: background var(--d-fast) var(--ease), border-color var(--d-fast) var(--ease), color var(--d-fast) var(--ease), transform var(--d-fast) var(--ease), filter var(--d-fast) var(--ease), box-shadow var(--d-fast) var(--ease);
   white-space: nowrap;
 }
-.btn:hover { background: var(--surface-3); border-color: var(--border-bright); }
-.btn:active { transform: translateY(1px); }
+.btn:hover { background: var(--surface-3); border-color: var(--border-bright); transform: scale(1.02); }
+.btn:active { transform: scale(0.97); }
 .btn:focus-visible {
   border-color: var(--cyan);
   box-shadow: 0 0 0 2px var(--focus-ring);
@@ -489,32 +489,38 @@ button {
 }
 .btn-icon:hover { color: var(--text-primary); background: var(--surface-2); }
 
+/* 主操作：实心蓝胶囊；data-state 变体（启动/停止按钮三态）保留 wash 样式覆盖之 */
 .btn-primary {
-  background: var(--surface-3);
-  border-color: var(--border-bright);
+  background: var(--accent-fill);
+  border-color: transparent;
+  color: #fff;
   font-weight: 600;
+  box-shadow: 0 1px 4px var(--accent-fill-shadow);
   position: relative;
   overflow: hidden;
 }
+.btn-primary:hover { background: var(--accent-fill); border-color: transparent; filter: brightness(1.08); }
 .btn-primary .btn-led {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--amber);
-  box-shadow: var(--glow-amber);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
 }
 .btn-primary[data-state="stopped"] {
   background: linear-gradient(to bottom, var(--amber-wash-top), var(--amber-wash-bottom));
   border-color: var(--amber-dim);
   color: var(--amber);
+  box-shadow: none;
 }
-.btn-primary[data-state="stopped"] .btn-led { background: var(--amber); }
-.btn-primary[data-state="stopped"]:hover { border-color: var(--amber); }
+.btn-primary[data-state="stopped"] .btn-led { background: var(--amber); box-shadow: var(--glow-amber); }
+.btn-primary[data-state="stopped"]:hover { border-color: var(--amber); filter: brightness(1.05); }
 
 .btn-primary[data-state="starting"] {
   background: linear-gradient(to bottom, var(--amber-wash-top), var(--amber-wash-bottom));
   border-color: var(--amber);
   color: var(--amber);
+  box-shadow: none;
 }
 .btn-primary[data-state="starting"] .btn-led {
   animation: ledPulse 0.5s ease-in-out infinite;
@@ -524,15 +530,18 @@ button {
   background: linear-gradient(to bottom, var(--green-wash-top), var(--green-wash-bottom));
   border-color: var(--green-dim);
   color: var(--green);
+  box-shadow: none;
 }
 .btn-primary[data-state="running"] .btn-led { background: var(--green); box-shadow: var(--glow-green); animation: ledPulse 2s ease-in-out infinite; }
-.btn-primary[data-state="running"]:hover { border-color: var(--green); }
+.btn-primary[data-state="running"]:hover { border-color: var(--green); filter: brightness(1.05); }
 
+/* 危险操作：红色玻璃胶囊 */
 .btn-danger {
   color: var(--red);
-  border-color: var(--border);
+  background: var(--danger-fill-bg);
+  border-color: var(--danger-fill-border);
 }
-.btn-danger:hover { background: rgba(255, 92, 92, 0.08); border-color: var(--red-dim); }
+.btn-danger:hover { background: var(--danger-fill-bg); border-color: var(--red); filter: brightness(1.1); }
 
 .plus { font-size: 14px; line-height: 1; font-weight: 400; }
 
@@ -2059,4 +2068,42 @@ body[data-view='ws-port'] {
   padding: 8px 10px;
   font-size: 12px;
   white-space: pre-wrap;
+}
+
+/* ============================================================
+   Liquid Glass hover（spec 2026-08-16 §5）
+   面板/卡片/列表项：亮度 + 高光边 + 微浮起。
+   编辑器内部（.editor-pane / .code-editor-wrap）不加，避免干扰长文编辑。
+   ============================================================ */
+.port-card,
+.endpoint-item {
+  transition: background var(--d-norm) var(--ease), border-color var(--d-norm) var(--ease), box-shadow var(--d-norm) var(--ease), transform var(--d-norm) var(--ease), filter var(--d-norm) var(--ease);
+}
+.port-card:hover,
+.endpoint-item:hover {
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+  box-shadow: var(--glass-highlight), var(--shadow-panel);
+}
+
+/* ============================================================
+   Reduced motion（spec 2026-08-16 §5）
+   保留颜色变化，关闭位移/亮度动效与背景漂移
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .blobs::before,
+  .blobs::after { animation: none; }
+  [data-reveal] { animation: none; opacity: 1; transform: none; }
+  .btn,
+  .port-card,
+  .endpoint-item {
+    transition-property: background, border-color, color, box-shadow;
+  }
+  .btn:hover,
+  .btn:active,
+  .port-card:hover,
+  .endpoint-item:hover {
+    transform: none;
+    filter: none;
+  }
 }
