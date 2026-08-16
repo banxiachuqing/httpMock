@@ -61,7 +61,7 @@ test('操作按钮在编辑区顶部，删除在最右', async ({ page }) => {
   await page.locator('.endpoint-item').first().dispatchEvent('click');
 
   // 意图 1+2：保存/删除落在顶部 .editor-header 区域内，且删除在保存右侧
-  const headerBox = await page.locator('.editor-header').boundingBox();
+  const headerBox = await page.locator('#editorForm .editor-header').boundingBox();
   const saveBox = await page.locator('#saveBtn').boundingBox();
   const deleteBox = await page.locator('#deleteBtn').boundingBox();
   expect(headerBox).toBeTruthy();
@@ -88,7 +88,7 @@ test('操作按钮在编辑区顶部，删除在最右', async ({ page }) => {
 
 ```js
   // 守护：布局改造只删 HTTP 页底部条，WS 服务详情保留（spec 2026-08-16 §6）
-  await expect(page.locator('.editor-footer')).toBeVisible();
+  await expect(page.locator('#wsEditorForm .editor-footer')).toBeVisible();
 ```
 
 - [ ] **Step 3: 运行新用例，确认 RED**
