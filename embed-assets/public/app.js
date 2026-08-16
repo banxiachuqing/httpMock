@@ -64,6 +64,18 @@ const api = {
   async deleteEndpoint(id) {
     return await fetch(`/api/endpoints/${id}`, { method: "DELETE" });
   },
+  async reorderEndpoints(ids) {
+    const r = await fetch("/api/endpoints/order", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (!r.ok) {
+      const json = await r.json().catch(() => ({}));
+      throw new Error(json.error || "排序失败");
+    }
+    return r.json();
+  },
   async listPorts() {
     return (await fetch("/api/ports")).json();
   },
@@ -211,6 +223,7 @@ const state = {
   services: [],
   selectedId: null,
   selectedOperationId: null,
+  draggingId: null,
   dirty: false,
   runtime: "stopped",
   runtimeStatus: {}, // port -> { state, reason? }
@@ -245,7 +258,6 @@ const els = {
   formatBtn: $("#formatBtn"),
   validateBtn: $("#validateBtn"),
   saveBtn: $("#saveBtn"),
-  revertBtn: $("#revertBtn"),
   deleteBtn: $("#deleteBtn"),
   lineCount: $("#lineCount"),
   charCount: $("#charCount"),
@@ -395,6 +407,8 @@ function render() {
 }
 
 function renderEndpointList() {
+  // 拖拽期间不重建列表：5s 轮询会整体重渲染 DOM，抽走拖动中的元素（spec 2026-08-17 §4.3）
+  if (state.draggingId) return;
   els.endpointCount.textContent = state.endpoints.length;
   const ports = [...new Set(state.endpoints.map((e) => e.port))].sort(
     (a, b) => a - b,
@@ -435,6 +449,12 @@ function renderEndpointList() {
         <span class="endpoint-status">
           <span class="led led-mini" data-state="${ledState}" title="${ledTitle}"></span>
         </span>
+        <button class="endpoint-copy" type="button" aria-label="复制接口" title="复制接口">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+            <path d="M5 15V5a2 2 0 0 1 2-2h10"></path>
+          </svg>
+        </button>
         <button class="endpoint-delete" type="button" aria-label="删除" title="删除">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 6L6 18M6 6l12 12" />
@@ -452,13 +472,71 @@ function renderEndpointList() {
       ep.name || `${ep.method} ${ep.path}`;
     li.querySelector(".endpoint-path").textContent = ep.path;
     li.addEventListener("click", (e) => {
-      // Ignore clicks on the delete button
-      if (e.target.closest(".endpoint-delete")) return;
+      // Ignore clicks on the action buttons (delete / copy)
+      if (e.target.closest(".endpoint-delete, .endpoint-copy")) return;
       selectEndpoint(ep.id);
     });
     li.querySelector(".endpoint-delete").addEventListener("click", (e) => {
       e.stopPropagation();
       deleteEndpointById(ep.id);
+    });
+    li.querySelector(".endpoint-copy").addEventListener("click", (e) => {
+      e.stopPropagation();
+      copyEndpointById(ep.id);
+    });
+
+    // ---- 拖拽排序（原生 HTML5 DnD，spec 2026-08-17 §4.2） ----
+    li.draggable = true;
+    li.addEventListener("dragstart", (e) => {
+      state.draggingId = ep.id;
+      e.dataTransfer.setData("text/plain", ep.id);
+      e.dataTransfer.effectAllowed = "move";
+      requestAnimationFrame(() => li.classList.add("dragging"));
+    });
+    li.addEventListener("dragover", (e) => {
+      if (!state.draggingId || state.draggingId === ep.id) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const rect = li.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      li.classList.toggle("drop-above", before);
+      li.classList.toggle("drop-below", !before);
+    });
+    li.addEventListener("dragleave", () => {
+      li.classList.remove("drop-above", "drop-below");
+    });
+    li.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const fromId = state.draggingId;
+      state.draggingId = null;
+      if (!fromId || fromId === ep.id) {
+        renderEndpointList();
+        return;
+      }
+      const rect = li.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      const ids = state.endpoints.map((x) => x.id).filter((x) => x !== fromId);
+      ids.splice(ids.indexOf(ep.id) + (before ? 0 : 1), 0, fromId);
+      const unchanged = ids.every((x, i) => x === state.endpoints[i].id);
+      if (unchanged) {
+        renderEndpointList();
+        return;
+      }
+      const byId = new Map(state.endpoints.map((x) => [x.id, x]));
+      state.endpoints = ids.map((x) => byId.get(x));
+      renderEndpointList();
+      api.reorderEndpoints(ids).catch(async (err) => {
+        alert("排序失败：" + (err?.message || "未知错误"));
+        state.endpoints = await api.listEndpoints();
+        renderEndpointList();
+      });
+    });
+    li.addEventListener("dragend", () => {
+      li.classList.remove("dragging");
+      if (state.draggingId) {
+        state.draggingId = null;
+        renderEndpointList();
+      }
     });
     els.endpointList.appendChild(li);
   }
@@ -483,6 +561,47 @@ async function deleteEndpointById(id) {
   renderEndpointList();
   renderEditor();
   renderStatus();
+}
+
+// 复制避撞：与 checkUniqueness 同谓词——只看 enabled !== false 的端点
+function nextCopyPath(source) {
+  const taken = (candidate) =>
+    state.endpoints.some(
+      (e) =>
+        e.enabled !== false &&
+        e.port === source.port &&
+        e.method === source.method &&
+        e.path === candidate,
+    );
+  let candidate = `${source.path}-copy`;
+  let n = 2;
+  while (taken(candidate)) candidate = `${source.path}-copy-${n++}`;
+  return candidate;
+}
+
+async function copyEndpointById(id) {
+  const source = state.endpoints.find((e) => e.id === id);
+  if (!source) return;
+  try {
+    const ep = await api.createEndpoint({
+      method: source.method,
+      port: source.port,
+      path: nextCopyPath(source),
+      statusCode: source.statusCode,
+      response: structuredClone(source.response ?? null),
+      name: source.name ? `${source.name} (副本)` : "",
+      enabled: true,
+    });
+    // api.createEndpoint 不对非 2xx 抛错，这里自行校验（服务端 400 DUPLICATE_ENDPOINT 等）
+    if (!ep?.id) throw new Error(ep?.error || "未知错误");
+    const idx = state.endpoints.findIndex((e) => e.id === id);
+    state.endpoints.splice(idx + 1, 0, ep);
+    state.selectedId = ep.id;
+    renderEndpointList();
+    renderEditorForCreate(ep);
+  } catch (e) {
+    alert("复制失败：" + (e?.message || "未知错误"));
+  }
 }
 
 function renderEditor() {
@@ -1133,10 +1252,6 @@ els.portNotFoundBack.addEventListener("click", () => navigate("#/"));
 els.newEndpointBtn.addEventListener("click", createEndpoint);
 els.emptyNewBtn.addEventListener("click", createEndpoint);
 els.saveBtn.addEventListener("click", saveEndpoint);
-els.revertBtn.addEventListener("click", () => {
-  state.dirty = false;
-  renderEditor();
-});
 els.deleteBtn.addEventListener("click", deleteEndpoint);
 els.formatBtn.addEventListener("click", tryFormat);
 els.validateBtn.addEventListener("click", validateJSON);

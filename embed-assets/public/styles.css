@@ -87,6 +87,7 @@
   --green-wash-bottom: rgba(48, 209, 88, 0.08);
   --panel-bg: rgba(40, 40, 50, 0.45);
   --danger-wash: rgba(255, 69, 58, 0.12);
+  --cyan-wash: rgba(10, 132, 255, 0.12);
   --input-focus-bg: rgba(0, 0, 0, 0.40);
   --input-focus-ring: rgba(10, 132, 255, 0.45);
   --log-enter-bg: rgba(10, 132, 255, 0.18);
@@ -741,6 +742,50 @@ button {
   outline: none;
   border-color: var(--red);
 }
+
+/* 接口列表项：复制按钮（spec 2026-08-17 §3.1，显现逻辑与删除按钮一致） */
+.endpoint-copy {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-faint);
+  border: 1px solid transparent;
+  border-radius: var(--r-1);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--d-fast) var(--ease), background var(--d-fast) var(--ease), color var(--d-fast) var(--ease), border-color var(--d-fast) var(--ease);
+  flex-shrink: 0;
+}
+.endpoint-item:hover .endpoint-copy,
+.endpoint-item:focus-within .endpoint-copy { opacity: 1; }
+.endpoint-copy:hover {
+  background: var(--cyan-wash);
+  color: var(--cyan);
+}
+.endpoint-copy:focus-visible {
+  opacity: 1;
+  outline: none;
+  border-color: var(--cyan);
+}
+
+/* 接口列表：拖拽态（spec 2026-08-17 §4.2） */
+.endpoint-item.dragging { opacity: 0.4; }
+.endpoint-item.drop-above::after,
+.endpoint-item.drop-below::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+.endpoint-item.drop-above::after { top: -2px; }
+.endpoint-item.drop-below::after { bottom: -2px; }
 
 .sidebar-footer {
   border-top: 1px solid var(--border-soft);
@@ -1971,6 +2016,7 @@ dialog.log-detail::backdrop {
   --green-wash-bottom: rgba(52, 199, 89, 0.07);
   --panel-bg: rgba(255, 255, 255, 0.50);
   --danger-wash: rgba(255, 59, 48, 0.10);
+  --cyan-wash: rgba(0, 113, 227, 0.10);
   --input-focus-bg: rgba(255, 255, 255, 0.90);
   --input-focus-ring: rgba(0, 113, 227, 0.35);
   --log-enter-bg: rgba(0, 113, 227, 0.10);
