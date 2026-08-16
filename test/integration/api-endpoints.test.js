@@ -142,3 +142,44 @@ describe('端口类型约束', () => {
     expect(store.config.ports.find((p) => p.port === 8088)).toEqual({ port: 8088, enabled: true, type: 'http' });
   });
 });
+
+describe('PUT /api/endpoints/order', () => {
+  it('reorders endpoints by given id permutation and persists', async () => {
+    const a = await ctx.request.post('/api/endpoints').send(validBody);
+    const b = await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/api/y' });
+    const c = await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/api/z' });
+    const ids = [c.body.id, a.body.id, b.body.id];
+
+    const r = await ctx.request.put('/api/endpoints/order').send({ ids });
+    expect(r.status).toBe(200);
+    expect(r.body.map((e) => e.id)).toEqual(ids);
+
+    const list = await ctx.request.get('/api/endpoints');
+    expect(list.body.map((e) => e.id)).toEqual(ids);
+  });
+
+  it('rejects ids that are not a permutation of endpoint ids', async () => {
+    const a = await ctx.request.post('/api/endpoints').send(validBody);
+    await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/api/y' });
+
+    // 长度不对
+    let r = await ctx.request.put('/api/endpoints/order').send({ ids: [a.body.id] });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_ORDER');
+
+    // 未知 id
+    r = await ctx.request.put('/api/endpoints/order').send({ ids: [a.body.id, 'nope'] });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_ORDER');
+
+    // 重复 id
+    r = await ctx.request.put('/api/endpoints/order').send({ ids: [a.body.id, a.body.id] });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_ORDER');
+
+    // ids 不是数组
+    r = await ctx.request.put('/api/endpoints/order').send({ ids: 'nope' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_ORDER');
+  });
+});

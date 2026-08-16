@@ -150,6 +150,30 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
     } catch (e) { next(e); }
   });
 
+  // 列表排序：ids 必须是现有端点 id 的排列；顺序纯展示语义，不影响 mock 路由。
+  // 注意：必须注册在 /api/endpoints/:id 之前，否则 "order" 被当作 :id。
+  app.put('/api/endpoints/order', async (req, res, next) => {
+    try {
+      const { ids } = req.body || {};
+      const list = configStore.config.endpoints;
+      const invalid = () => new AppError(400, 'INVALID_ORDER', 'ids must be a permutation of endpoint ids');
+      if (!Array.isArray(ids) || ids.length !== list.length) throw invalid();
+      const byId = new Map(list.map((e) => [e.id, e]));
+      const seen = new Set();
+      const reordered = [];
+      for (const id of ids) {
+        if (seen.has(id) || !byId.has(id)) throw invalid();
+        seen.add(id);
+        reordered.push(byId.get(id));
+      }
+      await configStore.update((cfg) => {
+        cfg.endpoints = reordered;
+        return cfg;
+      });
+      res.json(configStore.config.endpoints);
+    } catch (e) { next(e); }
+  });
+
   app.put('/api/endpoints/:id', async (req, res, next) => {
     try {
       const list = configStore.config.endpoints;
