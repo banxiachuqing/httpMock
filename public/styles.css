@@ -771,6 +771,22 @@ button {
   border-color: var(--cyan);
 }
 
+/* 接口列表：拖拽态（spec 2026-08-17 §4.2） */
+.endpoint-item.dragging { opacity: 0.4; }
+.endpoint-item.drop-above::after,
+.endpoint-item.drop-below::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+.endpoint-item.drop-above::after { top: -2px; }
+.endpoint-item.drop-below::after { bottom: -2px; }
+
 .sidebar-footer {
   border-top: 1px solid var(--border-soft);
   padding: var(--s-3) var(--s-4);

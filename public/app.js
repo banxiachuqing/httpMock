@@ -64,6 +64,18 @@ const api = {
   async deleteEndpoint(id) {
     return await fetch(`/api/endpoints/${id}`, { method: "DELETE" });
   },
+  async reorderEndpoints(ids) {
+    const r = await fetch("/api/endpoints/order", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (!r.ok) {
+      const json = await r.json().catch(() => ({}));
+      throw new Error(json.error || "排序失败");
+    }
+    return r.json();
+  },
   async listPorts() {
     return (await fetch("/api/ports")).json();
   },
@@ -211,6 +223,7 @@ const state = {
   services: [],
   selectedId: null,
   selectedOperationId: null,
+  draggingId: null,
   dirty: false,
   runtime: "stopped",
   runtimeStatus: {}, // port -> { state, reason? }
@@ -394,6 +407,8 @@ function render() {
 }
 
 function renderEndpointList() {
+  // 拖拽期间不重建列表：5s 轮询会整体重渲染 DOM，抽走拖动中的元素（spec 2026-08-17 §4.3）
+  if (state.draggingId) return;
   els.endpointCount.textContent = state.endpoints.length;
   const ports = [...new Set(state.endpoints.map((e) => e.port))].sort(
     (a, b) => a - b,
@@ -468,6 +483,60 @@ function renderEndpointList() {
     li.querySelector(".endpoint-copy").addEventListener("click", (e) => {
       e.stopPropagation();
       copyEndpointById(ep.id);
+    });
+
+    // ---- 拖拽排序（原生 HTML5 DnD，spec 2026-08-17 §4.2） ----
+    li.draggable = true;
+    li.addEventListener("dragstart", (e) => {
+      state.draggingId = ep.id;
+      e.dataTransfer.setData("text/plain", ep.id);
+      e.dataTransfer.effectAllowed = "move";
+      requestAnimationFrame(() => li.classList.add("dragging"));
+    });
+    li.addEventListener("dragover", (e) => {
+      if (!state.draggingId || state.draggingId === ep.id) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const rect = li.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      li.classList.toggle("drop-above", before);
+      li.classList.toggle("drop-below", !before);
+    });
+    li.addEventListener("dragleave", () => {
+      li.classList.remove("drop-above", "drop-below");
+    });
+    li.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const fromId = state.draggingId;
+      state.draggingId = null;
+      if (!fromId || fromId === ep.id) {
+        renderEndpointList();
+        return;
+      }
+      const rect = li.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      const ids = state.endpoints.map((x) => x.id).filter((x) => x !== fromId);
+      ids.splice(ids.indexOf(ep.id) + (before ? 0 : 1), 0, fromId);
+      const unchanged = ids.every((x, i) => x === state.endpoints[i].id);
+      if (unchanged) {
+        renderEndpointList();
+        return;
+      }
+      const byId = new Map(state.endpoints.map((x) => [x.id, x]));
+      state.endpoints = ids.map((x) => byId.get(x));
+      renderEndpointList();
+      api.reorderEndpoints(ids).catch(async (err) => {
+        alert("排序失败：" + (err?.message || "未知错误"));
+        state.endpoints = await api.listEndpoints();
+        renderEndpointList();
+      });
+    });
+    li.addEventListener("dragend", () => {
+      li.classList.remove("dragging");
+      if (state.draggingId) {
+        state.draggingId = null;
+        renderEndpointList();
+      }
     });
     els.endpointList.appendChild(li);
   }

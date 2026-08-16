@@ -185,3 +185,41 @@ test('复制接口：-copy 避撞、插入源后方并选中、响应体同源',
   await itemByPath('/api/orig').locator('.endpoint-copy').click();
   await expect(itemByPath('/api/orig-copy-2')).toHaveCount(1);
 });
+
+test('拖拽排序：换序即时生效且刷新后保持', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await page.evaluate(async (port) => {
+    await fetch('/api/ports', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ port }),
+    });
+    for (const path of ['/api/a', '/api/b']) {
+      await fetch('/api/endpoints', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ port, method: 'GET', path, statusCode: 200, response: {} }),
+      });
+    }
+  }, 17511);
+  await enterPortDetail(page, server.baseURL, 17511);
+
+  // 列表全局混排，按路径定位；断言 a/b 相对顺序（初始 a 在前）
+  const itemByPath = (p) =>
+    page.locator('.endpoint-item').filter({ has: page.locator(`.endpoint-path:text-is("${p}")`) });
+  const orderFlipped = async () => {
+    const paths = await page.locator('.endpoint-item .endpoint-path').allTextContents();
+    return paths.indexOf('/api/b') < paths.indexOf('/api/a');
+  };
+  expect(await orderFlipped()).toBe(false);
+
+  // 把 a 拖到 b 的下半区 → a 落到 b 之后
+  const box = await itemByPath('/api/b').boundingBox();
+  await itemByPath('/api/a').dragTo(itemByPath('/api/b'), {
+    targetPosition: { x: box.width / 2, y: box.height - 5 },
+  });
+  await expect.poll(orderFlipped).toBe(true);
+
+  // 刷新后顺序保持（持久化意图）
+  await enterPortDetail(page, server.baseURL, 17511);
+  await expect.poll(orderFlipped).toBe(true);
+});
