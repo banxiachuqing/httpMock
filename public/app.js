@@ -434,6 +434,12 @@ function renderEndpointList() {
         <span class="endpoint-status">
           <span class="led led-mini" data-state="${ledState}" title="${ledTitle}"></span>
         </span>
+        <button class="endpoint-copy" type="button" aria-label="复制接口" title="复制接口">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+            <path d="M5 15V5a2 2 0 0 1 2-2h10"></path>
+          </svg>
+        </button>
         <button class="endpoint-delete" type="button" aria-label="删除" title="删除">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 6L6 18M6 6l12 12" />
@@ -451,13 +457,17 @@ function renderEndpointList() {
       ep.name || `${ep.method} ${ep.path}`;
     li.querySelector(".endpoint-path").textContent = ep.path;
     li.addEventListener("click", (e) => {
-      // Ignore clicks on the delete button
-      if (e.target.closest(".endpoint-delete")) return;
+      // Ignore clicks on the action buttons (delete / copy)
+      if (e.target.closest(".endpoint-delete, .endpoint-copy")) return;
       selectEndpoint(ep.id);
     });
     li.querySelector(".endpoint-delete").addEventListener("click", (e) => {
       e.stopPropagation();
       deleteEndpointById(ep.id);
+    });
+    li.querySelector(".endpoint-copy").addEventListener("click", (e) => {
+      e.stopPropagation();
+      copyEndpointById(ep.id);
     });
     els.endpointList.appendChild(li);
   }
@@ -482,6 +492,47 @@ async function deleteEndpointById(id) {
   renderEndpointList();
   renderEditor();
   renderStatus();
+}
+
+// 复制避撞：与 checkUniqueness 同谓词——只看 enabled !== false 的端点
+function nextCopyPath(source) {
+  const taken = (candidate) =>
+    state.endpoints.some(
+      (e) =>
+        e.enabled !== false &&
+        e.port === source.port &&
+        e.method === source.method &&
+        e.path === candidate,
+    );
+  let candidate = `${source.path}-copy`;
+  let n = 2;
+  while (taken(candidate)) candidate = `${source.path}-copy-${n++}`;
+  return candidate;
+}
+
+async function copyEndpointById(id) {
+  const source = state.endpoints.find((e) => e.id === id);
+  if (!source) return;
+  try {
+    const ep = await api.createEndpoint({
+      method: source.method,
+      port: source.port,
+      path: nextCopyPath(source),
+      statusCode: source.statusCode,
+      response: structuredClone(source.response ?? null),
+      name: source.name ? `${source.name} (副本)` : "",
+      enabled: true,
+    });
+    // api.createEndpoint 不对非 2xx 抛错，这里自行校验（服务端 400 DUPLICATE_ENDPOINT 等）
+    if (!ep?.id) throw new Error(ep?.error || "未知错误");
+    const idx = state.endpoints.findIndex((e) => e.id === id);
+    state.endpoints.splice(idx + 1, 0, ep);
+    state.selectedId = ep.id;
+    renderEndpointList();
+    renderEditorForCreate(ep);
+  } catch (e) {
+    alert("复制失败：" + (e?.message || "未知错误"));
+  }
 }
 
 function renderEditor() {

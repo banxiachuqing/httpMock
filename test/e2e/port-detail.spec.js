@@ -146,3 +146,42 @@ test('操作按钮在编辑区顶部，删除在最右', async ({ page }) => {
   // 意图 4：撤销按钮已从 HTTP 页移除（spec 2026-08-17 §5；WS 页 wsRevertBtn 不受影响）
   await expect(page.locator('#editorForm #revertBtn')).toHaveCount(0);
 });
+
+test('复制接口：-copy 避撞、插入源后方并选中、响应体同源', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await page.evaluate(async (port) => {
+    await fetch('/api/ports', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ port }),
+    });
+    await fetch('/api/endpoints', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        port, method: 'GET', path: '/api/orig', statusCode: 200,
+        name: '原接口', response: { marker: 42 },
+      }),
+    });
+  }, 17510);
+  await enterPortDetail(page, server.baseURL, 17510);
+
+  // 列表是全局混排（含其它用例的端点），按路径精确定位本用例的项
+  const itemByPath = (p) =>
+    page.locator('.endpoint-item').filter({ has: page.locator(`.endpoint-path:text-is("${p}")`) });
+
+  // 第一次复制：路径 -copy 避撞，名称加 (副本)，插入源正后方并选中
+  await itemByPath('/api/orig').hover();
+  await itemByPath('/api/orig').locator('.endpoint-copy').click();
+  await expect(itemByPath('/api/orig-copy')).toHaveCount(1);
+  await expect(itemByPath('/api/orig-copy').locator('.endpoint-name')).toHaveText('原接口 (副本)');
+  await expect(itemByPath('/api/orig-copy')).toHaveClass(/selected/);
+  await expect(page.locator('.cm-content')).toContainText('"marker": 42');
+  // 插入源正后方
+  const paths = await page.locator('.endpoint-item .endpoint-path').allTextContents();
+  expect(paths[paths.indexOf('/api/orig') + 1]).toBe('/api/orig-copy');
+
+  // 第二次复制：-copy 已占用，避撞到 -copy-2
+  await itemByPath('/api/orig').hover();
+  await itemByPath('/api/orig').locator('.endpoint-copy').click();
+  await expect(itemByPath('/api/orig-copy-2')).toHaveCount(1);
+});
