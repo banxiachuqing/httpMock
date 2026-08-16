@@ -497,26 +497,30 @@ function renderEndpointList() {
       if (!state.draggingId || state.draggingId === ep.id) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
+      const dragged = els.endpointList.querySelector(
+        `.endpoint-item[data-id="${state.draggingId}"]`,
+      );
+      if (!dragged || dragged === li) return;
       const rect = li.getBoundingClientRect();
       const before = e.clientY < rect.top + rect.height / 2;
-      li.classList.toggle("drop-above", before);
-      li.classList.toggle("drop-below", !before);
-    });
-    li.addEventListener("dragleave", () => {
-      li.classList.remove("drop-above", "drop-below");
+      // 已相邻且方位正确 → 不动（防抖）
+      if (before && dragged.nextElementSibling === li) return;
+      if (!before && dragged.previousElementSibling === li) return;
+      // 实时预览换位：其他项 FLIP 动画挤开，被拖项占位即「预留空间」
+      flipListMove(els.endpointList, dragged, li, before);
     });
     li.addEventListener("drop", (e) => {
       e.preventDefault();
       const fromId = state.draggingId;
       state.draggingId = null;
-      if (!fromId || fromId === ep.id) {
+      if (!fromId) {
         renderEndpointList();
         return;
       }
-      const rect = li.getBoundingClientRect();
-      const before = e.clientY < rect.top + rect.height / 2;
-      const ids = state.endpoints.map((x) => x.id).filter((x) => x !== fromId);
-      ids.splice(ids.indexOf(ep.id) + (before ? 0 : 1), 0, fromId);
+      // 预览已把 DOM 排成目标顺序，直接读取提交
+      const ids = [...els.endpointList.querySelectorAll(".endpoint-item")].map(
+        (el) => el.dataset.id,
+      );
       const unchanged = ids.every((x, i) => x === state.endpoints[i].id);
       if (unchanged) {
         renderEndpointList();
@@ -561,6 +565,34 @@ async function deleteEndpointById(id) {
   renderEndpointList();
   renderEditor();
   renderStatus();
+}
+
+// FLIP 动画换位：记录原位 → DOM 换位 → transform 反向补偿再播放，
+// 让拖拽预览时其他项呈现「被挤走」的动画（spec 2026-08-17 §4.2）
+function flipListMove(container, draggedEl, targetEl, before) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    container.insertBefore(draggedEl, before ? targetEl : targetEl.nextSibling);
+    return;
+  }
+  const items = [...container.querySelectorAll(".endpoint-item")];
+  const firstTop = new Map(items.map((el) => [el, el.getBoundingClientRect().top]));
+  container.insertBefore(draggedEl, before ? targetEl : targetEl.nextSibling);
+  for (const el of items) {
+    const delta = firstTop.get(el) - el.getBoundingClientRect().top;
+    if (!delta) continue;
+    el.style.transition = "none";
+    el.style.transform = `translateY(${delta}px)`;
+    el.getBoundingClientRect(); // 强制回流锁定起始位
+    el.style.transition = "transform var(--d-norm) var(--ease)";
+    el.style.transform = "";
+    el.addEventListener(
+      "transitionend",
+      () => {
+        el.style.transition = "";
+      },
+      { once: true },
+    );
+  }
 }
 
 // 复制避撞：与 checkUniqueness 同谓词——只看 enabled !== false 的端点

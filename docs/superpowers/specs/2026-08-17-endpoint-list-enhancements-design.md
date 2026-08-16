@@ -60,8 +60,8 @@ HTTP 接口管理页的接口列表目前只有「选中」和「删除」两个
 
 - `renderEndpointList` 给每个 `li` 设 `draggable = true`
 - `dragstart`：记录 `state.draggingId`，`dataTransfer.setData('text/plain', id)`（Firefox 必需），加 `.dragging`（半透明）
-- 目标项 `dragover`：`preventDefault()`，按指针位于项上/下半区设置 `.drop-above` / `.drop-below`（靛蓝指示线，CSS 伪元素实现，跟随 `--cyan`）
-- `drop`：计算新顺序 → 清除 `draggingId` 与所有拖拽态 class → 顺序没变则到此为止；变了则乐观重排 `state.endpoints`、`renderEndpointList()`、异步调 `api.reorderEndpoints(ids)`；失败 `alert` 且从服务端重拉列表回同步（不静默保留错误顺序）
+- 目标项 `dragover`：`preventDefault()`，按指针位于项上/下半区决定插入方位，**实时预览换位**——被拖项在 DOM 中移到目标位（FLIP 动画，其他项呈现「被挤走」的过渡；`prefers-reduced-motion` 下直接换位无动画）；已相邻且方位正确时不动（防抖）。被拖项自身留在流内作半透明虚线「预留槽位」
+- `drop`：读取当前 DOM 顺序（预览结果）→ 清除 `draggingId` → 顺序没变则到此为止；变了则更新 `state.endpoints`、`renderEndpointList()`、异步调 `api.reorderEndpoints(ids)`；失败 `alert` 且从服务端重拉列表回同步（不静默保留错误顺序）
 - `dragend`（drop 之后或拖拽取消时触发）：兜底清理——`draggingId` 仍在则清除并补一次 `renderEndpointList()`
 
 ### 4.3 与 5s 轮询的冲突处理
@@ -111,7 +111,7 @@ HTTP 接口管理页的接口列表目前只有「选中」和「删除」两个
 1. hover 列表项：复制与删除按钮同时显现，复制蓝 / 删除红
 2. 复制：新项出现在源正后方并选中；`-copy` 路径；响应体已拷贝；保存后 mock 端口可命中新路径
 3. 连拷：第二次复制路径为 `-copy-2`
-4. 拖拽：拖动半透明、目标位出现靛蓝指示线；放下即换序；刷新后保持
+4. 拖拽：被拖项变半透明虚线槽位，悬停位置实时挤开其他项（动画过渡）；放下即换序；刷新后保持
 5. 拖拽期间列表不闪跳（轮询守卫生效）
 6. 编辑区 header 无撤销按钮；保存/删除布局不受影响；WS 服务详情撤销按钮仍在
 7. 亮/暗双主题下复制按钮与指示线颜色正常

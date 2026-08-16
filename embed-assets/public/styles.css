@@ -771,21 +771,13 @@ button {
   border-color: var(--cyan);
 }
 
-/* 接口列表：拖拽态（spec 2026-08-17 §4.2） */
-.endpoint-item.dragging { opacity: 0.4; }
-.endpoint-item.drop-above::after,
-.endpoint-item.drop-below::after {
-  content: "";
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--cyan);
-  box-shadow: var(--glow-cyan);
+/* 接口列表：拖拽态（spec 2026-08-17 §4.2 实时预览排序）。
+   被拖项保留在原流内作为「预留槽位」：半透明 + 虚线边框（border 宽度不变，无布局跳动） */
+.endpoint-item.dragging {
+  opacity: 0.45;
+  border-style: dashed;
+  border-color: var(--border-bright);
 }
-.endpoint-item.drop-above::after { top: -2px; }
-.endpoint-item.drop-below::after { bottom: -2px; }
 
 .sidebar-footer {
   border-top: 1px solid var(--border-soft);
