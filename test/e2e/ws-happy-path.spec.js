@@ -97,6 +97,8 @@ test('WS happy path：建 WS 端口 → 建服务 → 导入 WSDL → 启动 →
   // 4. 选中 getUser（编辑器已有默认模板），直接保存
   await page.click('#operationList li:first-child');
   await page.waitForSelector('#wsEditorForm:not([hidden])');
+  // 守护：布局改造只删 HTTP 页底部条，WS 服务详情保留（spec 2026-08-16 §6）
+  await expect(page.locator('#wsEditorForm .editor-footer')).toBeVisible();
   const xml = await page.textContent('#xmlEditorHost .cm-content');
   expect(xml).toContain('getUserResponse');
   await page.click('#wsSaveOpBtn');

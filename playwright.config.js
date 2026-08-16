@@ -7,8 +7,9 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    headless: false,
-    slowMo: 50,
+    // 默认 headed（项目约定）；MOCK_E2E_HEADLESS=1 可切无头（CI/远程环境）
+    headless: process.env.MOCK_E2E_HEADLESS === '1',
+    slowMo: process.env.MOCK_E2E_HEADLESS === '1' ? 0 : 50,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

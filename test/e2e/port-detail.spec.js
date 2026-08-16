@@ -106,3 +106,25 @@ test('删除端口连带删除接口并回到首页', async ({ page }) => {
   const eps = await page.evaluate(async () => (await fetch('/api/endpoints')).json());
   expect(eps.filter((e) => e.port === 17507)).toHaveLength(0);
 });
+
+test('操作按钮在编辑区顶部，删除在最右', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await setup(page, 17508);
+  await enterPortDetail(page, server.baseURL, 17508);
+  await page.locator('.endpoint-item').first().dispatchEvent('click');
+
+  // 意图 1+2：保存/删除落在顶部 .editor-header 区域内，且删除在保存右侧
+  const headerBox = await page.locator('#editorForm .editor-header').boundingBox();
+  const saveBox = await page.locator('#saveBtn').boundingBox();
+  const deleteBox = await page.locator('#deleteBtn').boundingBox();
+  expect(headerBox).toBeTruthy();
+  expect(saveBox.y).toBeGreaterThanOrEqual(headerBox.y);
+  expect(saveBox.y + saveBox.height).toBeLessThanOrEqual(headerBox.y + headerBox.height);
+  expect(deleteBox.y).toBeGreaterThanOrEqual(headerBox.y);
+  expect(deleteBox.y + deleteBox.height).toBeLessThanOrEqual(headerBox.y + headerBox.height);
+  expect(deleteBox.x).toBeGreaterThan(saveBox.x);
+
+  // 意图 3：HTTP 底部按钮条已移除
+  await expect(page.locator('.editor-form > .editor-footer')).toHaveCount(0);
+});
