@@ -6,97 +6,106 @@
 :root {
   color-scheme: dark;
 
-  /* Surfaces — deep dark gradient base */
-  --bg: #0a0a0f;
-  --bg-deep: #020203;
-  --grid: rgba(255, 255, 255, 0.04);
-  --surface-1: rgba(255, 255, 255, 0.05);   /* glass panel */
-  --surface-2: rgba(255, 255, 255, 0.08);   /* elevated glass */
-  --surface-3: rgba(255, 255, 255, 0.12);   /* hover glass */
-  --surface-inset: rgba(0, 0, 0, 0.28);     /* inset field */
+  /* Surfaces — Apple Liquid Glass（暗） */
+  --bg: #101014;
+  --bg-deep: #0a0a0e;
+  --grid: rgba(255, 255, 255, 0.035);
+  --surface-1: rgba(40, 40, 50, 0.45);   /* glass panel */
+  --surface-2: rgba(48, 48, 60, 0.55);   /* elevated glass */
+  --surface-3: rgba(58, 58, 72, 0.65);   /* hover glass */
+  --surface-inset: rgba(0, 0, 0, 0.30);  /* inset field */
+  --editor-bg: rgba(0, 0, 0, 0.35);      /* 编辑器实底（spec §4.2） */
 
   /* Borders — hairline */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-bright: rgba(255, 255, 255, 0.18);
-  --border-soft: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.12);
+  --border-bright: rgba(255, 255, 255, 0.22);
+  --border-soft: rgba(255, 255, 255, 0.08);
 
-  /* Text */
-  --text-primary: #EDEDEF;
-  --text-secondary: #A9ADB8;
-  --text-tertiary: #8A8F98;
-  --text-faint: #5A5F6A;
+  /* Text（Apple dark） */
+  --text-primary: #F5F5F7;
+  --text-secondary: #A1A1A6;
+  --text-tertiary: #98989D;
+  --text-faint: #6C6C70;
 
-  /* Signal lights (brightened for dark bg) */
-  --green: #34D17B;
-  --green-dim: #4ADE80;
-  --amber: #F5B84C;
-  --amber-dim: #E8A33D;
-  --red: #F87171;
-  --red-dim: #EF4545;
+  /* Signal lights（iOS dark） */
+  --green: #30D158;
+  --green-dim: #248A3D;
+  --amber: #FFD60A;
+  --amber-dim: #B25000;
+  --red: #FF453A;
+  --red-dim: #C41E3A;
 
-  /* Accents */
-  --cyan: #5E6AD2;
-  --magenta: #B06AF0;
+  /* Accents（Apple Blue / iOS 紫） */
+  --cyan: #0A84FF;
+  --magenta: #BF5AF2;
 
   /* Preview JSON syntax (semantic keys) */
-  --ink: #EDEDEF;
-  --pencil: #8A8F98;
+  --ink: #F5F5F7;
+  --pencil: #98989D;
 
-  /* Method colors (semantic) */
-  --method-get: #34D17B;
-  --method-post: #5E6AD2;
-  --method-put: #F5B84C;
-  --method-patch: #B06AF0;
-  --method-delete: #F87171;
-  --method-head: #8A8F98;
-  --method-options: #8A8F98;
+  /* Method colors（iOS dark 色板） */
+  --method-get: #30D158;
+  --method-post: #0A84FF;
+  --method-put: #FFD60A;
+  --method-patch: #BF5AF2;
+  --method-delete: #FF453A;
+  --method-head: #98989D;
+  --method-options: #98989D;
 
   /* Shadows / glows */
-  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
-  --glow-green: 0 0 8px rgba(52, 209, 123, 0.5);
-  --glow-amber: 0 0 8px rgba(245, 184, 76, 0.5);
-  --glow-red: 0 0 8px rgba(248, 113, 113, 0.5);
-  --glow-cyan: 0 0 8px rgba(94, 106, 210, 0.5);
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.10) inset, 0 4px 18px rgba(0, 0, 0, 0.30);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  --glow-green: 0 0 8px rgba(48, 209, 88, 0.55);
+  --glow-amber: 0 0 8px rgba(255, 214, 10, 0.45);
+  --glow-red: 0 0 8px rgba(255, 69, 58, 0.50);
+  --glow-cyan: 0 0 8px rgba(10, 132, 255, 0.55);
 
   /* Glass */
   --glass-blur: 20px;
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-saturate: 180%;
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+
+  /* Accent fills（胶囊按钮用，Task 4 消费） */
+  --accent-fill: #0A84FF;
+  --accent-fill-shadow: rgba(10, 132, 255, 0.45);
+  --danger-fill-bg: rgba(255, 69, 58, 0.14);
+  --danger-fill-border: rgba(255, 69, 58, 0.40);
 
   /* Theme-sensitive composites (hoisted from component rules) */
-  --bg-gradient: linear-gradient(160deg, #0a0a0f 0%, #05060a 55%, #020203 100%);
-  --blob-1: rgba(94, 106, 210, 0.16);
-  --blob-2: rgba(176, 106, 240, 0.10);
-  --blob-3: rgba(52, 209, 123, 0.08);
-  --blob-1-strong: rgba(94, 106, 210, 0.35);
-  --blob-2-strong: rgba(176, 106, 240, 0.22);
-  --topbar-bg: rgba(10, 10, 15, 0.55);
-  --focus-ring: rgba(94, 106, 210, 0.35);
-  --amber-wash-top: rgba(245, 184, 76, 0.14);
-  --amber-wash-bottom: rgba(245, 184, 76, 0.08);
-  --green-wash-top: rgba(52, 209, 123, 0.14);
-  --green-wash-bottom: rgba(52, 209, 123, 0.07);
-  --panel-bg: rgba(255, 255, 255, 0.04);
-  --danger-wash: rgba(200, 48, 42, 0.1);
-  --input-focus-bg: rgba(10, 10, 15, 0.6);
-  --input-focus-ring: rgba(94, 106, 210, 0.4);
-  --log-enter-bg: rgba(94, 106, 210, 0.18);
-  --backdrop: rgba(0, 0, 0, 0.6);
-  --modal-bg: rgba(18, 18, 26, 0.82);
-  --ok-ring: rgba(26, 135, 84, 0.18);
-  --err-ring: rgba(200, 48, 42, 0.18);
-  --banner-bg: rgba(200, 48, 42, 0.05);
-  --expr-error-bg: rgba(200, 48, 42, 0.08);
-  --amber-ring: rgba(184, 120, 10, 0.15);
-  --dialog-bg: rgba(18, 18, 26, 0.88);
-  --dialog-backdrop: rgba(4, 6, 12, 0.6);
-  --warning-wash: rgba(255, 170, 0, 0.12);
+  --bg-gradient: #101014;
+  --blob-1: rgba(10, 132, 255, 0.28);
+  --blob-2: rgba(191, 90, 242, 0.20);
+  --blob-3: rgba(48, 209, 88, 0.12);
+  --blob-4: rgba(255, 55, 95, 0.08);
+  --blob-1-strong: rgba(10, 132, 255, 0.35);
+  --blob-2-strong: rgba(191, 90, 242, 0.25);
+  --topbar-bg: rgba(30, 30, 38, 0.5);
+  --focus-ring: rgba(10, 132, 255, 0.40);
+  --amber-wash-top: rgba(255, 214, 10, 0.16);
+  --amber-wash-bottom: rgba(255, 214, 10, 0.08);
+  --green-wash-top: rgba(48, 209, 88, 0.16);
+  --green-wash-bottom: rgba(48, 209, 88, 0.08);
+  --panel-bg: rgba(40, 40, 50, 0.45);
+  --danger-wash: rgba(255, 69, 58, 0.12);
+  --input-focus-bg: rgba(0, 0, 0, 0.40);
+  --input-focus-ring: rgba(10, 132, 255, 0.45);
+  --log-enter-bg: rgba(10, 132, 255, 0.18);
+  --backdrop: rgba(0, 0, 0, 0.55);
+  --modal-bg: rgba(28, 28, 34, 0.82);
+  --ok-ring: rgba(48, 209, 88, 0.22);
+  --err-ring: rgba(255, 69, 58, 0.22);
+  --banner-bg: rgba(255, 69, 58, 0.07);
+  --expr-error-bg: rgba(255, 69, 58, 0.10);
+  --amber-ring: rgba(255, 214, 10, 0.18);
+  --dialog-bg: rgba(28, 28, 34, 0.88);
+  --dialog-backdrop: rgba(0, 0, 0, 0.55);
+  --warning-wash: rgba(255, 214, 10, 0.12);
   --porthdr-bg: rgba(255, 255, 255, 0.06);
-  --card-bg: rgba(255, 255, 255, 0.05);
-  --card-hover: rgba(255, 255, 255, 0.08);
+  --card-bg: rgba(40, 40, 50, 0.45);
+  --card-hover: rgba(48, 48, 60, 0.58);
 
-  /* Typography */
-  --font-sans: 'Inter', 'Noto Sans SC', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* Typography（Apple 系字体优先） */
+  --font-sans: -apple-system, 'SF Pro Text', 'Inter', 'Noto Sans SC', system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* Spacing */
@@ -110,11 +119,11 @@
   --s-10: 40px;
   --s-12: 48px;
 
-  /* Radii (glass-friendly) */
+  /* Radii（Apple Glass 大圆角） */
   --r-0: 0;
-  --r-1: 6px;
-  --r-2: 10px;
-  --r-3: 16px;
+  --r-1: 10px;
+  --r-2: 14px;
+  --r-3: 20px;
 
   /* Motion */
   --d-fast: 140ms;
@@ -160,7 +169,8 @@ body {
   background-image:
     radial-gradient(ellipse 60% 40% at 15% 0%, var(--blob-1), transparent 60%),
     radial-gradient(ellipse 50% 35% at 90% 10%, var(--blob-2), transparent 60%),
-    radial-gradient(ellipse 55% 45% at 70% 100%, var(--blob-3), transparent 60%);
+    radial-gradient(ellipse 55% 45% at 70% 100%, var(--blob-3), transparent 60%),
+    radial-gradient(ellipse 45% 35% at 10% 90%, var(--blob-4), transparent 60%);
 }
 
 body[data-view='home'] {
@@ -285,8 +295,8 @@ button {
   justify-content: space-between;
   padding: 0 var(--s-4);
   background: var(--topbar-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   border-bottom: 1px solid var(--border);
   position: relative;
   z-index: 5;
@@ -541,8 +551,8 @@ button {
   display: flex;
   flex-direction: column;
   background: var(--panel-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   border-right: 1px solid var(--border);
   min-height: 0;
   position: relative;
@@ -947,7 +957,7 @@ button {
 .code-editor-wrap {
   flex: 1;
   position: relative;
-  background: var(--surface-inset);
+  background: var(--editor-bg);
   border: 1px solid var(--border);
   border-radius: var(--r-2);
   min-height: 0;
@@ -1006,8 +1016,8 @@ button {
   display: flex;
   flex-direction: column;
   background: var(--panel-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   border-top: 1px solid var(--border);
   position: relative;
   z-index: 2;
@@ -1217,8 +1227,8 @@ button {
   width: 480px;
   max-width: calc(100vw - 32px);
   background: var(--modal-bg);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(24px) saturate(var(--glass-saturate));
   border: 1px solid var(--border-bright);
   border-radius: var(--r-2);
   box-shadow: var(--shadow-modal), var(--glass-highlight);
@@ -1612,8 +1622,8 @@ button {
 dialog.log-detail {
   border: 1px solid var(--border);
   background: var(--dialog-bg);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(24px) saturate(var(--glass-saturate));
   color: var(--text-primary);
   border-radius: var(--r-2);
   max-width: 720px;
@@ -1735,8 +1745,8 @@ dialog.log-detail::backdrop {
   gap: var(--s-3);
   padding: var(--s-2) var(--s-4);
   background: var(--porthdr-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   border-bottom: 1px solid var(--border);
   position: relative;
   z-index: 2;
@@ -1760,8 +1770,8 @@ dialog.log-detail::backdrop {
   flex-direction: column;
   gap: var(--s-3);
   background: var(--card-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   border: 1px solid var(--border);
   border-radius: var(--r-3);
   padding: var(--s-4) var(--s-5);
@@ -1887,83 +1897,101 @@ dialog.log-detail::backdrop {
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #f4f6fb;
-  --bg-deep: #e9edf5;
-  --grid: rgba(15, 23, 42, 0.05);
-  --surface-1: rgba(255, 255, 255, 0.55);
-  --surface-2: rgba(255, 255, 255, 0.72);
-  --surface-3: rgba(255, 255, 255, 0.85);
-  --surface-inset: rgba(15, 23, 42, 0.05);
+  /* Surfaces — Apple Liquid Glass（亮） */
+  --bg: #F5F5F7;
+  --bg-deep: #ECECF0;
+  --grid: rgba(15, 15, 20, 0.045);
+  --surface-1: rgba(255, 255, 255, 0.50);
+  --surface-2: rgba(255, 255, 255, 0.62);
+  --surface-3: rgba(255, 255, 255, 0.78);
+  --surface-inset: rgba(255, 255, 255, 0.80);
+  --editor-bg: #FFFFFF;
 
-  --border: rgba(15, 23, 42, 0.10);
-  --border-bright: rgba(15, 23, 42, 0.20);
-  --border-soft: rgba(15, 23, 42, 0.06);
+  /* 面板/卡片用白亮边（mockup）；输入控件的浅黑边见本块末尾补丁 */
+  --border: rgba(255, 255, 255, 0.65);
+  --border-bright: rgba(255, 255, 255, 0.90);
+  --border-soft: rgba(15, 15, 20, 0.07);
 
-  --text-primary: #1a2233;
-  --text-secondary: #455064;
-  --text-tertiary: #6b7688;
-  --text-faint: #98a1b0;
+  --text-primary: #1D1D1F;
+  --text-secondary: #48484A;
+  --text-tertiary: #6E6E73;
+  --text-faint: #8E8E93;
 
-  --green: #15803d;
-  --green-dim: #16a34a;
-  --amber: #b45309;
-  --amber-dim: #d97706;
-  --red: #dc2626;
-  --red-dim: #b91c1c;
+  --green: #34C759;
+  --green-dim: #248A3D;
+  --amber: #FF9500;
+  --amber-dim: #B25000;
+  --red: #FF3B30;
+  --red-dim: #C41E3A;
 
-  --cyan: #4f46e5;
-  --magenta: #9333ea;
+  --cyan: #0071E3;
+  --magenta: #AF52DE;
 
-  --ink: #1a2233;
-  --pencil: #6b7688;
+  --ink: #1D1D1F;
+  --pencil: #6E6E73;
 
-  --method-get: #15803d;
-  --method-post: #4f46e5;
-  --method-put: #b45309;
-  --method-patch: #9333ea;
-  --method-delete: #dc2626;
-  --method-head: #6b7688;
-  --method-options: #6b7688;
+  --method-get: #34C759;
+  --method-post: #0071E3;
+  --method-put: #FF9500;
+  --method-patch: #AF52DE;
+  --method-delete: #FF3B30;
+  --method-head: #6E6E73;
+  --method-options: #6E6E73;
 
-  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 8px 24px rgba(15, 23, 42, 0.10);
-  --shadow-modal: 0 24px 64px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.06);
-  --glow-green: 0 0 8px rgba(21, 128, 61, 0.25);
-  --glow-amber: 0 0 8px rgba(180, 83, 9, 0.25);
-  --glow-red: 0 0 8px rgba(220, 38, 38, 0.25);
-  --glow-cyan: 0 0 8px rgba(79, 70, 229, 0.25);
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.70) inset, 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.60);
+  --glow-green: 0 0 8px rgba(52, 199, 89, 0.35);
+  --glow-amber: 0 0 8px rgba(255, 149, 0, 0.30);
+  --glow-red: 0 0 8px rgba(255, 59, 48, 0.30);
+  --glow-cyan: 0 0 8px rgba(0, 113, 227, 0.30);
 
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.70);
 
-  --bg-gradient: linear-gradient(160deg, #f6f8fc 0%, #eef1f7 55%, #e6ebf4 100%);
-  --blob-1: rgba(79, 70, 229, 0.10);
-  --blob-2: rgba(147, 51, 234, 0.07);
-  --blob-3: rgba(22, 163, 74, 0.06);
-  --blob-1-strong: rgba(79, 70, 229, 0.16);
-  --blob-2-strong: rgba(147, 51, 234, 0.12);
-  --topbar-bg: rgba(246, 248, 252, 0.65);
-  --focus-ring: rgba(79, 70, 229, 0.30);
-  --amber-wash-top: rgba(217, 119, 6, 0.10);
-  --amber-wash-bottom: rgba(217, 119, 6, 0.05);
-  --green-wash-top: rgba(22, 163, 74, 0.10);
-  --green-wash-bottom: rgba(22, 163, 74, 0.05);
+  --bg-gradient: #F5F5F7;
+  --blob-1: rgba(0, 122, 255, 0.22);
+  --blob-2: rgba(255, 45, 85, 0.13);
+  --blob-3: rgba(88, 86, 214, 0.18);
+  --blob-4: rgba(52, 199, 89, 0.12);
+  --blob-1-strong: rgba(0, 122, 255, 0.20);
+  --blob-2-strong: rgba(255, 45, 85, 0.14);
+  --topbar-bg: rgba(255, 255, 255, 0.55);
+  --focus-ring: rgba(0, 113, 227, 0.30);
+  --amber-wash-top: rgba(255, 149, 0, 0.14);
+  --amber-wash-bottom: rgba(255, 149, 0, 0.07);
+  --green-wash-top: rgba(52, 199, 89, 0.14);
+  --green-wash-bottom: rgba(52, 199, 89, 0.07);
   --panel-bg: rgba(255, 255, 255, 0.50);
-  --danger-wash: rgba(220, 38, 38, 0.08);
-  --input-focus-bg: rgba(255, 255, 255, 0.8);
-  --input-focus-ring: rgba(79, 70, 229, 0.35);
-  --log-enter-bg: rgba(79, 70, 229, 0.12);
-  --backdrop: rgba(15, 23, 42, 0.35);
+  --danger-wash: rgba(255, 59, 48, 0.10);
+  --input-focus-bg: rgba(255, 255, 255, 0.90);
+  --input-focus-ring: rgba(0, 113, 227, 0.35);
+  --log-enter-bg: rgba(0, 113, 227, 0.10);
+  --backdrop: rgba(0, 0, 0, 0.25);
   --modal-bg: rgba(255, 255, 255, 0.82);
-  --ok-ring: rgba(22, 163, 74, 0.20);
-  --err-ring: rgba(220, 38, 38, 0.18);
-  --banner-bg: rgba(220, 38, 38, 0.06);
-  --expr-error-bg: rgba(220, 38, 38, 0.08);
-  --amber-ring: rgba(217, 119, 6, 0.20);
+  --ok-ring: rgba(52, 199, 89, 0.25);
+  --err-ring: rgba(255, 59, 48, 0.22);
+  --banner-bg: rgba(255, 59, 48, 0.06);
+  --expr-error-bg: rgba(255, 59, 48, 0.08);
+  --amber-ring: rgba(255, 149, 0, 0.22);
   --dialog-bg: rgba(255, 255, 255, 0.90);
-  --dialog-backdrop: rgba(15, 23, 42, 0.30);
-  --warning-wash: rgba(217, 119, 6, 0.10);
-  --porthdr-bg: rgba(15, 23, 42, 0.04);
-  --card-bg: rgba(255, 255, 255, 0.55);
-  --card-hover: rgba(255, 255, 255, 0.75);
+  --dialog-backdrop: rgba(0, 0, 0, 0.20);
+  --warning-wash: rgba(255, 149, 0, 0.12);
+  --porthdr-bg: rgba(255, 255, 255, 0.50);
+  --card-bg: rgba(255, 255, 255, 0.50);
+  --card-hover: rgba(255, 255, 255, 0.70);
+
+  --accent-fill: #0071E3;
+  --accent-fill-shadow: rgba(0, 113, 227, 0.35);
+  --danger-fill-bg: rgba(255, 59, 48, 0.10);
+  --danger-fill-border: rgba(255, 59, 48, 0.30);
+}
+
+/* 亮色主题：输入控件保留浅黑细边（面板用白亮边，见 --border；spec §4.3） */
+:root[data-theme="light"] .input,
+:root[data-theme="light"] .select {
+  border-color: rgba(15, 15, 20, 0.08);
+}
+:root[data-theme="light"] .select option {
+  background: #ffffff;
 }
 
 /* ============================================================
