@@ -125,6 +125,6 @@ test('操作按钮在编辑区顶部，删除在最右', async ({ page }) => {
   expect(deleteBox.y + deleteBox.height).toBeLessThanOrEqual(headerBox.y + headerBox.height);
   expect(deleteBox.x).toBeGreaterThan(saveBox.x);
 
-  // 意图 3：HTTP 底部按钮条已移除
-  await expect(page.locator('.editor-form > .editor-footer')).toHaveCount(0);
+  // 意图 3：HTTP 底部按钮条已移除（限定 #editorForm，WS 表单共用 .editor-form 类）
+  await expect(page.locator('#editorForm > .editor-footer')).toHaveCount(0);
 });

@@ -806,6 +806,7 @@ button {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  overflow-y: auto;
 }
 
 .editor-header {
@@ -818,6 +819,14 @@ button {
 .editor-header-left, .editor-header-right { display: flex; align-items: center; gap: var(--s-3); }
 .endpoint-id, .last-saved { font-size: 11px; color: var(--text-tertiary); }
 .endpoint-id { letter-spacing: 0.04em; }
+
+/* 顶部操作区：常规操作与危险操作的分隔线（spec 2026-08-16 §3.1） */
+.header-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border-bright);
+  margin: 0 var(--s-1);
+}
 
 .form-grid {
   display: grid;
@@ -883,11 +892,12 @@ button {
    Editor body — JSON editor
    ============================================================ */
 .editor-body {
-  flex: 1;
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
   padding: var(--s-4) var(--s-6);
-  min-height: 0;
+  /* 不低于可用编辑高度（toolbar ~35 + split min 360 + padding 32）；容器更矮时由 .editor-form 滚动 */
+  min-height: 430px;
 }
 
 .editor-toolbar {
