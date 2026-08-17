@@ -21,6 +21,7 @@ import {
 import { initImportWsdlDialog } from "./views/ws-import.js";
 import { initServiceDetail, renderServiceDetail } from "./views/ws-detail.js";
 import { showToast } from "./toast.js";
+import { confirmDialog } from "./confirm-dialog.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -464,10 +465,10 @@ function renderEndpointList() {
     li.querySelector(".endpoint-name").textContent =
       ep.name || `${ep.method} ${ep.path}`;
     li.querySelector(".endpoint-path").textContent = ep.path;
-    li.addEventListener("click", (e) => {
+    li.addEventListener("click", async (e) => {
       // Ignore clicks on the action buttons (delete / copy)
       if (e.target.closest(".endpoint-delete, .endpoint-copy")) return;
-      selectEndpoint(ep.id);
+      await selectEndpoint(ep.id);
     });
     li.querySelector(".endpoint-delete").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -519,7 +520,15 @@ function renderEndpointList() {
 async function deleteEndpointById(id) {
   const ep = state.endpoints.find((e) => e.id === id);
   if (!ep) return;
-  if (!confirm(`确认删除 ${ep.method} ${ep.path}？`)) return;
+  if (
+    !(await confirmDialog({
+      title: "删除接口",
+      message: `确认删除 ${ep.method} ${ep.path}？`,
+      danger: true,
+      confirmText: "删除",
+    }))
+  )
+    return;
   try {
     await api.deleteEndpoint(id);
   } catch (e) {
@@ -720,7 +729,11 @@ async function applyRoute(route) {
   if (
     state.dirty &&
     (state.route.view === "port" || state.route.view === "service") &&
-    !confirm("有未保存的修改，是否放弃？")
+    !(await confirmDialog({
+      title: "放弃未保存的修改？",
+      message: "有未保存的修改，是否放弃？",
+      confirmText: "放弃修改",
+    }))
   ) {
     suppressHash = true;
     location.hash =
@@ -1043,8 +1056,16 @@ function deriveGlobalRuntime() {
   else state.runtime = "stopped";
 }
 
-function selectEndpoint(id) {
-  if (state.dirty && !confirm("有未保存的修改，是否放弃？")) return;
+async function selectEndpoint(id) {
+  if (
+    state.dirty &&
+    !(await confirmDialog({
+      title: "放弃未保存的修改？",
+      message: "有未保存的修改，是否放弃？",
+      confirmText: "放弃修改",
+    }))
+  )
+    return;
   state.selectedId = id;
   state.dirty = false;
   renderEndpointList();
@@ -1137,7 +1158,15 @@ async function saveEndpoint() {
 async function deleteEndpoint() {
   const ep = state.endpoints.find((e) => e.id === state.selectedId);
   if (!ep) return;
-  if (!confirm(`确认删除 ${ep.method} ${ep.path}？`)) return;
+  if (
+    !(await confirmDialog({
+      title: "删除接口",
+      message: `确认删除 ${ep.method} ${ep.path}？`,
+      danger: true,
+      confirmText: "删除",
+    }))
+  )
+    return;
   try {
     await api.deleteEndpoint(ep.id);
     state.endpoints = state.endpoints.filter((e) => e.id !== ep.id);

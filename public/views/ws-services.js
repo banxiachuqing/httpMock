@@ -1,6 +1,7 @@
 // WS 端口详情页：服务卡片网格 + 新建服务弹窗（spec §6.②）
 import { navigate } from '../router.js';
 import { showToast } from '../toast.js';
+import { confirmDialog } from '../confirm-dialog.js';
 
 /** 服务的访问地址（注意：UI 端口 ≠ mock 端口，必须用 service.port） */
 export function serviceAddress(s) {
@@ -64,7 +65,15 @@ function buildServiceCard(s, { api, onImport, onChanged }) {
     mkBtn('?wsdl', '复制 WSDL 地址', () => navigator.clipboard.writeText(`${serviceAddress(s)}?wsdl`)),
     mkBtn('导入', '导入 / 替换 WSDL', () => onImport(s)),
     mkBtn('删除', '删除服务', async () => {
-      if (!confirm(`确认删除服务 ${s.name}（${s.path}）？其下 ${opCount} 个操作将一并删除。`)) return;
+      if (
+        !(await confirmDialog({
+          title: '删除服务',
+          message: `确认删除服务 ${s.name}（${s.path}）？其下 ${opCount} 个操作将一并删除。`,
+          danger: true,
+          confirmText: '删除服务',
+        }))
+      )
+        return;
       try {
         await api.deleteService(s.id);
         await onChanged();

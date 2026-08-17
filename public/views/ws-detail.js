@@ -3,6 +3,7 @@ import { navigate } from "../router.js";
 import { createEditor } from "../editor.js";
 import { serviceAddress } from "./ws-services.js";
 import { showToast } from "../toast.js";
+import { confirmDialog } from "../confirm-dialog.js";
 
 let ctx = null; // { els, state, api }
 let xmlEditor = null; // createEditor 实例（懒挂载）
@@ -103,8 +104,16 @@ function renderOperationList() {
     meta.append(action);
 
     li.append(nameRow, meta);
-    li.addEventListener("click", () => {
-      if (state.dirty && !confirm("有未保存的修改，是否放弃？")) return;
+    li.addEventListener("click", async () => {
+      if (
+        state.dirty &&
+        !(await confirmDialog({
+          title: "放弃未保存的修改？",
+          message: "有未保存的修改，是否放弃？",
+          confirmText: "放弃修改",
+        }))
+      )
+        return;
       state.selectedOperationId = op.id;
       state.dirty = false;
       renderOperationList();
@@ -282,13 +291,21 @@ export function initServiceDetail({
     // 未保存的编辑必须保留（否则下次切换 operation 时会被 !state.dirty guard 静默丢弃）
     if (
       state.dirty &&
-      !confirm("有未保存的修改，删除服务将放弃这些修改。继续？")
+      !(await confirmDialog({
+        title: "删除服务",
+        message: "有未保存的修改，删除服务将放弃这些修改。继续？",
+        danger: true,
+        confirmText: "继续删除",
+      }))
     )
       return;
     if (
-      !confirm(
-        `确认删除服务 ${s.name}（${s.path}）？其下 ${(s.operations || []).length} 个操作将一并删除。`,
-      )
+      !(await confirmDialog({
+        title: "删除服务",
+        message: `确认删除服务 ${s.name}（${s.path}）？其下 ${(s.operations || []).length} 个操作将一并删除。`,
+        danger: true,
+        confirmText: "删除服务",
+      }))
     )
       return;
     try {
@@ -392,7 +409,15 @@ export function initServiceDetail({
     const s = currentService(state);
     const op = currentOperation(state);
     if (!s || !op) return;
-    if (!confirm(`确认删除操作 ${op.name}？`)) return;
+    if (
+      !(await confirmDialog({
+        title: "删除操作",
+        message: `确认删除操作 ${op.name}？`,
+        danger: true,
+        confirmText: "删除",
+      }))
+    )
+      return;
     try {
       const updated = await api.deleteOperation(s.id, op.id);
       replaceService(state, updated);

@@ -109,11 +109,10 @@ test('删除端口连带删除接口并回到首页', async ({ page }) => {
   await setup(page, 17507);
   await enterPortDetail(page, server.baseURL, 17507);
 
-  page.once('dialog', (d) => {
-    expect(d.message()).toContain('1 个接口');
-    d.accept();
-  });
   await page.click('#deletePortBtn');
+  // 自定义确认弹窗替代系统 confirm()（2026-08-17）：断言文案并点红色确认按钮
+  await expect(page.locator('.modal-confirm-body')).toContainText('1 个接口');
+  await page.click('.modal-confirm .btn-danger');
 
   await page.waitForSelector('#viewHome:not([hidden])');
   const ports = await page.evaluate(async () => (await fetch('/api/ports')).json());

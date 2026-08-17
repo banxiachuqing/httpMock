@@ -1,6 +1,7 @@
 // 端口详情页：页头交互（启用开关 / 改号 / 删除端口）
 import { navigate } from '../router.js';
 import { showToast } from '../toast.js';
+import { confirmDialog } from '../confirm-dialog.js';
 
 export function renderPortHeader(state, els) {
   const p = state.ports.find((x) => x.port === state.route.port);
@@ -27,7 +28,15 @@ export function initPortDetail({ els, state, api, refreshAll }) {
   });
 
   els.portRenameBtn.addEventListener('click', async () => {
-    if (state.dirty && !confirm('有未保存的修改，改号将放弃这些修改。继续？')) return;
+    if (
+      state.dirty &&
+      !(await confirmDialog({
+        title: '改号',
+        message: '有未保存的修改，改号将放弃这些修改。继续？',
+        confirmText: '继续改号',
+      }))
+    )
+      return;
     state.dirty = false;
     const oldPort = state.route.port;
     const newPort = Number(els.portNumberInput.value);
@@ -49,14 +58,31 @@ export function initPortDetail({ els, state, api, refreshAll }) {
   });
 
   els.deletePortBtn.addEventListener('click', async () => {
-    if (state.dirty && !confirm('有未保存的修改，删除端口将放弃这些修改。继续？')) return;
+    if (
+      state.dirty &&
+      !(await confirmDialog({
+        title: '删除端口',
+        message: '有未保存的修改，删除端口将放弃这些修改。继续？',
+        danger: true,
+        confirmText: '继续删除',
+      }))
+    )
+      return;
     state.dirty = false;
     const port = state.route.port;
     const count = state.endpoints.filter((e) => e.port === port).length;
     const msg = count > 0
       ? `确认删除端口 ${port}？将连同 ${count} 个接口一起删除。`
       : `确认删除端口 ${port}？`;
-    if (!confirm(msg)) return;
+    if (
+      !(await confirmDialog({
+        title: '删除端口',
+        message: msg,
+        danger: true,
+        confirmText: '删除端口',
+      }))
+    )
+      return;
     try {
       await api.deletePort(port);
       await refreshAll();
