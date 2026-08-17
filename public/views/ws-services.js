@@ -1,5 +1,6 @@
 // WS 端口详情页：服务卡片网格 + 新建服务弹窗（spec §6.②）
 import { navigate } from '../router.js';
+import { showToast } from '../toast.js';
 
 /** 服务的访问地址（注意：UI 端口 ≠ mock 端口，必须用 service.port） */
 export function serviceAddress(s) {
@@ -68,7 +69,7 @@ function buildServiceCard(s, { api, onImport, onChanged }) {
         await api.deleteService(s.id);
         await onChanged();
       } catch (e) {
-        alert('删除失败：' + (e?.message || '未知错误'));
+        showToast({ type: 'error', message: '删除失败：' + (e?.message || '未知错误') });
       }
     }),
   );
