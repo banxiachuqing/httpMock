@@ -13,6 +13,32 @@ import { buildSkeletonWsdl, rewriteAddress } from './wsdl.js';
 
 const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
 
+// 日志条目 body 预览上限：防止大请求体（最多 maxBodyBytes=4MB）随日志经 SSE 无限放大内存
+const MAX_LOG_PREVIEW_BYTES = 8192;
+
+/** 日志条目统一构建：id/timestamp 一次生成，两个 handler 共用避免字段漂移 */
+function buildLogEntry(extra) {
+  return { id: crypto.randomUUID(), timestamp: Date.now(), ...extra };
+}
+
+function previewBody(body) {
+  if (body.length <= MAX_LOG_PREVIEW_BYTES) return body;
+  return `${body.slice(0, MAX_LOG_PREVIEW_BYTES)}\n…[截断 ${body.length} 字符]`;
+}
+
+/**
+ * 引擎运行中：配置变更（端点/端口/服务 CRUD、改号、启停）即时同步——
+ * 重建各 mock 端口，让新配置立即生效。引擎未运行（running=false）时静默跳过。
+ */
+export async function syncMockEngine(mockEngine, configStore) {
+  if (!mockEngine?.running) return;
+  await mockEngine.start(
+    configStore.config.endpoints,
+    configStore.config.ports,
+    configStore.config.services || [],
+  );
+}
+
 /**
  * Read the request body up to maxBytes. Once the cumulative size exceeds
  * maxBytes, further chunks are dropped (and `truncated` is set to true).
@@ -61,9 +87,23 @@ export class MockEngine {
     this.configStore = configStore;
     this.servers = new Map();
     this.statuses = new Map();
+    this.running = false;  // 引擎是否处于运行意图（start 置真 / stop 置假；供 API 门控即时同步）
+    this._starting = null; // 串行化：进行中的 start promise
   }
 
   async start(endpoints, ports = null, services = []) {
+    // 并发 start 串行化（快速双击、请求与 5s 轮询交错）：后者等前者结束后再执行
+    if (this._starting) await this._starting.catch(() => {});
+    const run = this._doStart(endpoints, ports, services);
+    this._starting = run;
+    try {
+      return await run;
+    } finally {
+      if (this._starting === run) this._starting = null;
+    }
+  }
+
+  async _doStart(endpoints, ports = null, services = []) {
     const byPort = new Map();
     for (const e of endpoints) {
       if (!byPort.has(e.port)) byPort.set(e.port, []);
@@ -83,6 +123,9 @@ export class MockEngine {
     }
 
     await this.stop();
+    // statuses 重建：清除已删除/停用端口的陈旧状态，只保留本次绑定集合
+    this.statuses = new Map();
+    this.running = true;
 
     const running = [];
     const failed = [];
@@ -135,6 +178,7 @@ export class MockEngine {
     for (const port of this.statuses.keys()) {
       this.statuses.set(port, { state: 'stopped' });
     }
+    this.running = false;
   }
 
   getStatus() {
@@ -167,21 +211,22 @@ function createHttpHandler({ port, router, logBuffer, getMax }) {
     const { body, truncated } = await readBody(req, getMax());
 
     if (matched) {
-      res.statusCode = matched.statusCode || 200;
+      // statusCode 兜底：非法值（字符串/越界）会让 res.end 抛 ERR_HTTP_INVALID_STATUS_CODE
+      // 杀死整个进程（async handler 无 try/catch），这里收敛为 200
+      const sc = Number(matched.statusCode);
+      res.statusCode = Number.isInteger(sc) && sc >= 100 && sc <= 599 ? sc : 200;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       let responseBody;
       try {
         const { value } = resolve(matched.response);
         responseBody = JSON.stringify(value);
       } catch (err) {
-        logBuffer?.push({
-          id: crypto.randomUUID(),
-          timestamp: Date.now(),
+        logBuffer?.push(buildLogEntry({
           level: 'warn',
           source: 'resolver',
           message: `resolver failed: ${err.message}`,
           endpointId: matched.id,
-        });
+        }));
         responseBody = JSON.stringify(matched.response ?? null);
       }
       res.end(responseBody);
@@ -191,9 +236,7 @@ function createHttpHandler({ port, router, logBuffer, getMax }) {
       res.end(JSON.stringify({ error: `no mock for ${req.method} ${pathOnly}` }));
     }
 
-    logBuffer?.push({
-      id: crypto.randomUUID(),
-      timestamp: Date.now(),
+    logBuffer?.push(buildLogEntry({
       method: req.method,
       path: pathOnly,
       query: queryStr,
@@ -203,13 +246,13 @@ function createHttpHandler({ port, router, logBuffer, getMax }) {
       matched: !!matched,
       endpointId: matched?.id || null,
       requestHeaders: req.headers,
-      requestBodyPreview: body,
+      requestBodyPreview: previewBody(body),
       requestBodyTruncated: truncated,
       // Prefer X-Forwarded-For if behind a proxy, else socket remote address
       ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
           || req.socket.remoteAddress
           || '',
-    });
+    }));
   };
 }
 
@@ -232,7 +275,9 @@ function createWsHandler({ port, services, logBuffer, getMax }) {
     let operationName = null;
 
     const sendXml = (status, xml, version) => {
-      res.statusCode = status;
+      // statusCode 兜底：非法值会抛 ERR_HTTP_INVALID_STATUS_CODE 杀死进程（同 HTTP handler）
+      const sc = Number(status);
+      res.statusCode = Number.isInteger(sc) && sc >= 100 && sc <= 599 ? sc : 200;
       res.setHeader('Content-Type', version === '1.2'
         ? 'application/soap+xml; charset=utf-8'
         : 'text/xml; charset=utf-8');
@@ -291,9 +336,7 @@ function createWsHandler({ port, services, logBuffer, getMax }) {
       send404();
     }
 
-    logBuffer?.push({
-      id: crypto.randomUUID(),
-      timestamp: Date.now(),
+    logBuffer?.push(buildLogEntry({
       method: req.method,
       path: pathOnly,
       query: queryStr,
@@ -304,12 +347,12 @@ function createWsHandler({ port, services, logBuffer, getMax }) {
       serviceId: service?.id || null,
       operationName,
       requestHeaders: req.headers,
-      requestBodyPreview: body,
+      requestBodyPreview: previewBody(body),
       requestBodyTruncated: truncated,
       ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
           || req.socket.remoteAddress
           || '',
-    });
+    }));
   };
 }
 
@@ -317,14 +360,12 @@ function createWsHandler({ port, services, logBuffer, getMax }) {
 function renderXmlResponse(text, logBuffer, operationId) {
   const { value, errors } = resolve(text ?? '');
   for (const e of errors) {
-    logBuffer?.push({
-      id: crypto.randomUUID(),
-      timestamp: Date.now(),
+    logBuffer?.push(buildLogEntry({
       level: 'warn',
       source: 'resolver',
       message: `resolver failed: ${e.message}`,
       operationId,
-    });
+    }));
   }
   return typeof value === 'string' ? value : String(value);
 }

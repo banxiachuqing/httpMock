@@ -9,7 +9,11 @@ export function sseResponse(res) {
 export function broadcast(clients, event, data) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of clients) {
-    try { res.write(payload); } catch {}
+    try {
+      // write() 返回 false = 内核缓冲已满（慢/停读客户端）：不能无限累积，
+      // 主动断开——SSE 客户端会自动重连并从头拉取，日志流不会丢
+      if (!res.write(payload)) res.end();
+    } catch {}
   }
 }
 
