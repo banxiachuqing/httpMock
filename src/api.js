@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import { AppError, toErrorResponse, statusFor } from './errors.js';
 import { sseMiddleware, broadcast } from './sse.js';
+import { syncMockEngine } from './mock-engine.js';
 import { isValidStoragePath } from './paths.js';
 import { registerPreviewRoutes } from './api-preview.js';
 import { registerPortRoutes } from './api-ports.js';
@@ -29,6 +30,15 @@ function withNormalizedName(ep) {
     else delete ep.name;
   }
   return ep;
+}
+
+/** PATCH /api/config 的 settings 字段落库（迁移/普通保存共用，避免漂移） */
+function applyConfigSettings(cfg, settings) {
+  if (settings.uiPort !== undefined) cfg.settings.uiPort = settings.uiPort;
+  if (settings.storagePath !== undefined) cfg.settings.storagePath = settings.storagePath;
+  if (settings.maxBodyBytes !== undefined) cfg.settings.maxBodyBytes = settings.maxBodyBytes;
+  if (settings.theme !== undefined) cfg.settings.theme = settings.theme;
+  return cfg;
 }
 
 // GET/PATCH /api/config 响应层：services[].wsdl 原文不随全量配置往返（spec §5）
@@ -65,10 +75,19 @@ function validateEndpointBody(body, { partial = false } = {}) {
     }
   }
   if (!partial || body.path !== undefined) {
-    if (typeof body.path !== 'string' || !body.path.startsWith('/')) {
-      throw new AppError(400, 'INVALID_PATH', 'path must start with /');
+    // '?' 会破坏 mock 路由的 query 拆分（pathOnly 永远匹配不到），'#' 不会到达服务端——都在入库前拒绝
+    if (typeof body.path !== 'string' || !body.path.startsWith('/') || body.path.includes('?') || body.path.includes('#')) {
+      throw new AppError(400, 'INVALID_PATH', 'path must start with / and contain no ? or #');
     }
   }
+  // statusCode 可选（省略默认 200）：只在显式提供时校验。
+    // 非法 statusCode 会让 mock-engine 的 res.end 抛 ERR_HTTP_INVALID_STATUS_CODE 杀死进程
+    if (body.statusCode !== undefined) {
+      const sc = Number(body.statusCode);
+      if (!Number.isInteger(sc) || sc < 100 || sc > 599) {
+        throw new AppError(400, 'INVALID_STATUS', 'statusCode must be 100..599');
+      }
+    }
   if (body.response !== undefined && body.response !== null) {
     try { JSON.parse(JSON.stringify(body.response)); }
     catch { throw new AppError(400, 'INVALID_JSON', 'response must be JSON-serializable'); }
@@ -107,25 +126,49 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
           throw new AppError(400, 'INVALID_VALUE', "theme must be one of 'system' | 'light' | 'dark'");
         }
       }
-      if (settings.storagePath !== undefined) {
+      if (settings.uiPort !== undefined) {
+        const up = Number(settings.uiPort);
+        if (!Number.isInteger(up) || up < 1 || up > 65535) {
+          throw new AppError(400, 'INVALID_VALUE', 'uiPort must be 1..65535');
+        }
+        settings.uiPort = up;
+      }
+      // storagePath 分两种情况：未变更（前端每次保存都会带上该字段）→ 普通保存；
+      // 真正迁移目录 → 校验目标无 data.json 后 拷贝→写新路径→删旧文件（失败回滚）
+      const migrating = settings.storagePath !== undefined
+        && settings.storagePath !== configStore.storagePath;
+      if (migrating) {
         if (!isValidStoragePath(settings.storagePath)) {
           throw new AppError(400, 'INVALID_PATH', 'storagePath must be an absolute path');
         }
         const oldFile = `${configStore.storagePath}/data.json`;
         const newDir = settings.storagePath;
+        const oldDir = configStore.storagePath;
         await fs.mkdir(newDir, { recursive: true });
+        // 目标目录已有 data.json → 拒绝，不静默覆盖（copyFile 会无条件覆盖）
+        let targetHasData = true;
+        try { await fs.access(`${newDir}/data.json`); }
+        catch (e) {
+          if (e.code !== 'ENOENT') throw e;
+          targetHasData = false;
+        }
+        if (targetHasData) {
+          throw new AppError(409, 'DATA_EXISTS', 'target directory already has data.json');
+        }
+        // 顺序：先拷贝到目标 → 写新路径（失败则回滚 storagePath，旧文件仍完好）→ 最后删旧文件
         try { await fs.copyFile(oldFile, `${newDir}/data.json`); }
         catch (e) { if (e.code !== 'ENOENT') throw e; }
-        try { await fs.unlink(oldFile); } catch {}
         configStore.storagePath = newDir;
+        try {
+          await configStore.update((cfg) => applyConfigSettings(cfg, settings));
+        } catch (e) {
+          configStore.storagePath = oldDir;
+          throw e;
+        }
+        try { await fs.unlink(oldFile); } catch {}
+      } else {
+        await configStore.update((cfg) => applyConfigSettings(cfg, settings));
       }
-      await configStore.update((cfg) => {
-        if (settings.uiPort !== undefined) cfg.settings.uiPort = settings.uiPort;
-        if (settings.storagePath !== undefined) cfg.settings.storagePath = settings.storagePath;
-        if (settings.maxBodyBytes !== undefined) cfg.settings.maxBodyBytes = settings.maxBodyBytes;
-        if (settings.theme !== undefined) cfg.settings.theme = settings.theme;
-        return cfg;
-      });
       res.json(publicConfig(configStore.config));
     } catch (e) { next(e); }
   });
@@ -137,7 +180,16 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
     try {
       validateEndpointBody(req.body);
       const id = crypto.randomUUID();
-      const ep = withNormalizedName({ id, ...req.body, enabled: req.body.enabled !== false });
+      // 剔除保留字段 + 归一化：body 里的 id 不可覆盖服务端 UUID（否则重复 id 会让更新/删除错乱）；
+      // port/statusCode 按校验值 Number 落库（字符串 '8080' 与数字 8080 分裂会让端口绑定撞车）
+      const { id: _clientId, enabled: _rawEnabled, ...rest } = req.body;
+      const ep = withNormalizedName({
+        id,
+        ...rest,
+        port: Number(rest.port),
+        statusCode: rest.statusCode === undefined ? undefined : Number(rest.statusCode),
+        enabled: req.body.enabled !== false,
+      });
       const all = [...configStore.config.endpoints, ep];
       assertHttpPort(configStore.config, ep.port);
       configStore.checkUniqueness(all);
@@ -146,6 +198,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
         ensurePortEntity(cfg, ep.port);
         return cfg;
       });
+      await syncMockEngine(mockEngine, configStore);
       res.status(201).json(ep);
     } catch (e) { next(e); }
   });
@@ -180,7 +233,14 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
       const idx = list.findIndex((e) => e.id === req.params.id);
       if (idx < 0) throw new AppError(404, 'NOT_FOUND', 'endpoint not found');
       validateEndpointBody(req.body);
-      const updated = withNormalizedName({ ...list[idx], ...req.body, id: list[idx].id });
+      // port 按校验值 Number 落库（同 POST 的归一化）；id 已显式固定为既有端点 id
+      const updated = withNormalizedName({
+        ...list[idx],
+        ...req.body,
+        id: list[idx].id,
+        port: Number(req.body.port),
+        statusCode: req.body.statusCode === undefined ? undefined : Number(req.body.statusCode),
+      });
       const all = [...list];
       all[idx] = updated;
       assertHttpPort(configStore.config, updated.port);
@@ -190,6 +250,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
         ensurePortEntity(cfg, updated.port);
         return cfg;
       });
+      await syncMockEngine(mockEngine, configStore);
       res.json(updated);
     } catch (e) { next(e); }
   });
@@ -200,6 +261,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
       const next = list.filter((e) => e.id !== req.params.id);
       if (next.length === list.length) throw new AppError(404, 'NOT_FOUND', 'endpoint not found');
       await configStore.update((cfg) => { cfg.endpoints = next; return cfg; });
+      await syncMockEngine(mockEngine, configStore);
       res.status(204).end();
     } catch (e) { next(e); }
   });
@@ -237,7 +299,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
   registerPortRoutes(app, { configStore, mockEngine });
 
   // WebService services CRUD + WSDL 解析（spec §5）
-  registerServiceRoutes(app, { configStore });
+  registerServiceRoutes(app, { configStore, mockEngine });
 
   // Preview & generators (dynamic response values) —挂 createApi 末尾、错误中间件之前
   registerPreviewRoutes(app);

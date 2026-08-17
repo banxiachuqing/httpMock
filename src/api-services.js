@@ -1,7 +1,8 @@
 // /api/services + /api/wsdl —— WebService 一等实体（spec §5）
 import crypto from 'node:crypto';
 import { AppError } from './errors.js';
-import { parseWsdl } from './wsdl.js';
+import { parseWsdl, escapeXml } from './wsdl.js';
+import { syncMockEngine } from './mock-engine.js';
 
 const MAX_NAME_LENGTH = 50;
 
@@ -39,7 +40,10 @@ export function toPublicService(s) {
 }
 
 function defaultResponseXml(name, tns) {
-  return `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">\n  <soap:Body>\n    <tns:${name}Response xmlns:tns="${tns}">\n      <!-- TODO: 响应字段 -->\n    </tns:${name}Response>\n  </soap:Body>\n</soap:Envelope>`;
+  // name/targetNamespace 可能含 & < > 等字符（XML 属性值里合法），直接拼接会产生非法 XML
+  const safeName = escapeXml(name);
+  const safeTns = escapeXml(tns);
+  return `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">\n  <soap:Body>\n    <tns:${safeName}Response xmlns:tns="${safeTns}">\n      <!-- TODO: 响应字段 -->\n    </tns:${safeName}Response>\n  </soap:Body>\n</soap:Envelope>`;
 }
 
 function defaultOperation(name, soapAction, tns) {
@@ -72,7 +76,7 @@ function ensureWsPortEntity(cfg, port) {
   cfg.ports = [...cfg.ports, { port, enabled: true, type: 'ws' }].sort((a, b) => a.port - b.port);
 }
 
-export function registerServiceRoutes(app, { configStore }) {
+export function registerServiceRoutes(app, { configStore, mockEngine }) {
   // WSDL 解析预览（不落库，导入弹窗第一步）
   app.post('/api/wsdl/parse', (req, res, next) => {
     try {
@@ -118,6 +122,8 @@ export function registerServiceRoutes(app, { configStore }) {
         ensureWsPortEntity(cfg, port);
         return cfg;
       });
+      // 引擎运行中：服务变更即时同步（新建 ws 端点/更新路由）
+      await syncMockEngine(mockEngine, configStore);
       res.status(201).json(toPublicService(service));
     } catch (e) { next(e); }
   });
@@ -154,6 +160,7 @@ export function registerServiceRoutes(app, { configStore }) {
         cfg.services = all;
         return cfg;
       });
+      await syncMockEngine(mockEngine, configStore);
       res.json(toPublicService(updated));
     } catch (e) { next(e); }
   });
@@ -168,6 +175,7 @@ export function registerServiceRoutes(app, { configStore }) {
         cfg.services = (cfg.services || []).filter((s) => s.id !== req.params.id);
         return cfg;
       });
+      await syncMockEngine(mockEngine, configStore);
       res.status(204).end();
     } catch (e) { next(e); }
   });
@@ -196,6 +204,7 @@ export function registerServiceRoutes(app, { configStore }) {
         updated = svc;
         return cfg;
       });
+      await syncMockEngine(mockEngine, configStore);
       res.json(toPublicService(updated));
     } catch (e) { next(e); }
   });
@@ -218,6 +227,7 @@ export function registerServiceRoutes(app, { configStore }) {
         updated = svc;
         return cfg;
       });
+      await syncMockEngine(mockEngine, configStore);
       res.status(201).json(toPublicService(updated));
     } catch (e) { next(e); }
   });
@@ -271,6 +281,7 @@ export function registerServiceRoutes(app, { configStore }) {
         updated = svc;
         return cfg;
       });
+      await syncMockEngine(mockEngine, configStore);
       res.json(toPublicService(updated));
     } catch (e) { next(e); }
   });
@@ -287,6 +298,7 @@ export function registerServiceRoutes(app, { configStore }) {
         updated = svc;
         return cfg;
       });
+      await syncMockEngine(mockEngine, configStore);
       res.json(toPublicService(updated));
     } catch (e) { next(e); }
   });

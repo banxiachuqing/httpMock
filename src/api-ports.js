@@ -1,5 +1,6 @@
 // /api/ports CRUD —— 端口一等实体
 import { AppError } from './errors.js';
+import { syncMockEngine } from './mock-engine.js';
 
 function parsePortNumber(value) {
   const port = Number(value);
@@ -35,6 +36,8 @@ export function registerPortRoutes(app, { configStore, mockEngine }) {
         cfg.ports = sorted([...cfg.ports, entity]);
         return cfg;
       });
+      // 引擎运行中：新建端口立即绑定（空端口也监听，全 404）
+      await syncMockEngine(mockEngine, configStore);
       res.status(201).json(entity);
     } catch (e) { next(e); }
   });
@@ -71,14 +74,10 @@ export function registerPortRoutes(app, { configStore, mockEngine }) {
         updated = cfg.ports.find((p) => p.port === newPort);
         return cfg;
       });
-      // 引擎运行中：配置变更（改号/停用）立即同步——旧监听释放、新端口生效
-      if (mockEngine?.servers?.size) {
-        await mockEngine.start(
-          configStore.config.endpoints,
-          configStore.config.ports,
-          configStore.config.services || [],
-        );
-      }
+      // 引擎运行中：配置变更（改号/停用）立即同步——旧监听释放、新端口生效。
+      // 门控用 running（而非 servers.size）：上次全端口绑定失败时 servers 为空，
+      // 用户的改号/停用仍应触发一次重建重试
+      await syncMockEngine(mockEngine, configStore);
       res.json(updated);
     } catch (e) { next(e); }
   });
@@ -95,6 +94,8 @@ export function registerPortRoutes(app, { configStore, mockEngine }) {
         cfg.services = (cfg.services || []).filter((s) => s.port !== port);
         return cfg;
       });
+      // 引擎运行中：删除端口立即释放旧监听（否则旧 http.Server 泄漏并继续响应已删端点）
+      await syncMockEngine(mockEngine, configStore);
       res.status(204).end();
     } catch (e) { next(e); }
   });
