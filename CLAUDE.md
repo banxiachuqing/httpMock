@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 10. **遵循代码库的约定，即使不同意** — 一致性 > 个人偏好；认为有害时明确提出。
 11. **大声失败** — 任何步骤被静默跳过，"已完成"就是错的；任何测试被跳过，"测试通过"就是错的。
 
-> E2E 测试必须以前台方式运行 — `playwright.config.js` 已固定 `headless: false` + `slowMo: 50`，所有项目通用，不要切到 headless。
+> E2E 测试默认以无头（headless）模式运行 — `playwright.config.js` 已固定 `headless: true`（2026-08-17 起）；需要前台观察时设 `MOCK_E2E_HEADED=1`（此时自动启用 slowMo: 50）。
 
 ---
 
@@ -28,7 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **`mock-tools`（曾用名 mock-server-webui / Mock//Server，2026-08 正式更名）** — 本地 HTTP mock 服务，配 WebUI。零构建、原生 ESM + import map，单文件 Bun 可执行可打包。详细设计见 `docs/superpowers/specs/2026-06-08-mock-server-webui-design.md`。
 
-**栈**：Node ≥18 · 纯 JavaScript（无 TS）· Express 4 · 原生 `node:http`（mock 引擎）· CodeMirror 6（ESM via importmap）· SSE · vitest + supertest（单元/集成）· Playwright headed（E2E）· Bun（打包）。
+**栈**：Node ≥18 · 纯 JavaScript（无 TS）· Express 4 · 原生 `node:http`（mock 引擎）· CodeMirror 6（ESM via importmap）· SSE · vitest + supertest（单元/集成）· Playwright headless（E2E，`MOCK_E2E_HEADED=1` 可切前台）· Bun（打包）。
 
 ---
 
@@ -39,7 +39,7 @@ pnpm install              # 安装依赖
 pnpm start                # 启动（默认端口 5050，自动开浏览器）
 pnpm test                 # 跑单元 + 集成（vitest run）
 pnpm test:watch           # vitest watch 模式
-pnpm test:e2e             # Playwright headed（不要切 headless）
+pnpm test:e2e             # Playwright headless（无头默认；MOCK_E2E_HEADED=1 转前台）
 pnpm format               # Prettier write
 
 # 打包单文件可执行（需 Bun）
@@ -136,7 +136,7 @@ MOCK_READY {"host","port"}，壳解析后 WebView 导航到该地址；关窗隐
 test/
 ├── unit/           # vitest — 单模块 (config-store, log-buffer, errors, paths, sse, mock-engine)
 ├── integration/    # vitest + supertest — API 路由 (api.test, api-config, api-endpoints, api-logs, api-runtime)
-├── e2e/            # Playwright headed (happy-path, json-editor, port-conflict, port-cards, port-detail)
+├── e2e/            # Playwright headless（MOCK_E2E_HEADED=1 转前台）(happy-path, json-editor, port-conflict, port-cards, port-detail)
 └── helpers/
     ├── temp-dir.js     # tempDir(prefix) → {path, cleanup}
     └── test-server.js  # buildApp({storagePath, configStore, logBuffer, mockEngine}) → {app, request}
