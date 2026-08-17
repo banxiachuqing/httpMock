@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import os from 'node:os';
 import fs from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import express from 'express';
 import open from 'open';
 import { ConfigStore } from './src/config-store.js';
@@ -61,13 +62,17 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
     app.use(`/vendor/${route}`, express.static(path.join(__dirname, 'node_modules', pkg)));
   }
 
-  // Read package.json version once at startup and inject into index.html.
-  // Replaces `{{VERSION}}` placeholder so the topbar shows the real version
-  // in dev mode (build.mjs already does this for packaged builds).
+  // 版本号单源：优先最近 git tag（发版即打 tag，软件顶部栏版本自动跟随，见 CLAUDE.md「发版流程」）；
+  // 无 tag 回落 package.json；编译产物（无 .git、无 package.json）由 build.mjs 注入，此处保持 'unknown' 无操作。
   let pkgVersion = 'unknown';
   try {
-    const pkgPath = path.join(__dirname, 'package.json');
-    pkgVersion = JSON.parse(await fs.readFile(pkgPath, 'utf8')).version;
+    const gitVer = spawnSync('git', ['describe', '--tags', '--abbrev=0'], { encoding: 'utf8' });
+    if (gitVer.status === 0 && gitVer.stdout?.trim()) {
+      pkgVersion = gitVer.stdout.trim().replace(/^v/, '');
+    } else {
+      const pkgPath = path.join(__dirname, 'package.json');
+      pkgVersion = JSON.parse(await fs.readFile(pkgPath, 'utf8')).version;
+    }
   } catch { /* keep 'unknown' — packaged mode already has version baked in by build.mjs */ }
   const indexHtmlTemplate = await fs.readFile(path.join(finalPublicPath, 'index.html'), 'utf8');
   const indexHtml = indexHtmlTemplate.replaceAll('{{VERSION}}', pkgVersion);

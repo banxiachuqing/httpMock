@@ -42,6 +42,11 @@ pnpm test:watch           # vitest watch 模式
 pnpm test:e2e             # Playwright headless（无头默认；MOCK_E2E_HEADED=1 转前台）
 pnpm format               # Prettier write
 
+# 发版（软件内版本号 = git tag 版本号，二者自动一致）
+npm version 2.1.0 -m "release: v2.1.0"   # 同步 package.json + commit + 打 tag v2.1.0
+git push --tags                          # 推送 tag
+bun build.mjs                            # 交付产物，版本即 v2.1.0
+
 # 打包单文件可执行（需 Bun）
 bun build.mjs                                             # 当前平台，产物 mockserver
 bun build.mjs bun-darwin-x64 mockserver-intel             # macOS x64
@@ -59,6 +64,15 @@ pnpm sidecar:prepare        # 只重建 src-tauri/binaries/ 下的 sidecar
 - `MOCK_SERVER_DIR` — 编译产物的资源根目录（`launcher.js` 自动注入；dev 不需要）
 
 请求体大小上限（`settings.maxBodyBytes`，默认 4 MiB）由 Settings 面板运行时配置，mock-engine 每次请求实时读取；不再用环境变量。
+
+## 版本号一致性（发版约定）
+
+软件顶部栏版本（`v{{VERSION}}` 占位符）来源：
+
+1. **dev（`node server.js`）**：最近 git tag（`git describe --tags --abbrev=0`，去 `v` 前缀）→ 无 tag 回落 `package.json` version
+2. **打包（`bun build.mjs`）**：构建时 git tag 优先 → 回落 package.json → 版本固化进产物（分发后无 `.git` 也正确）
+
+**因此：git 发版 = 打 tag，软件版本自动跟随，不需要手改任何文件。** 流程：`npm version <版本> -m "release: v<版本>"`（一键同步 package.json + commit + tag）→ `git push --tags` → `bun build.mjs`。
 
 **单测 / 集成 / E2E**：
 ```bash

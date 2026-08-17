@@ -40,9 +40,19 @@ const outfile = process.argv[3] || 'mockserver';
 const files = scan('./embed-assets');
 console.log(`Embedding ${files.length} files...`);
 
-// 读 package.json 的版本号，注入到带 {{VERSION}} 占位符的文件
+// 版本号单源：优先最近 git tag（发版即打 tag，产物版本自动跟随）；无 tag 回落 package.json
+function gitDescribeVersion() {
+  try {
+    const out = Bun.spawnSync(['git', 'describe', '--tags', '--abbrev=0'], { stdout: 'pipe' });
+    if (out.exitCode === 0) {
+      const v = out.stdout.toString().trim().replace(/^v/, '');
+      if (v) return v;
+    }
+  } catch {}
+  return null;
+}
 const pkg = JSON.parse(await Bun.file('./package.json').text());
-const VERSION = pkg.version;
+const VERSION = gitDescribeVersion() ?? pkg.version;
 console.log(`Version: ${VERSION}`);
 
 const STAGING = './embed-staging';
