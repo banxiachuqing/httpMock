@@ -2184,7 +2184,7 @@ body[data-view='ws-port'] {
 }
 
 /* ============================================================
-   Toast 消息气泡（spec 2026-08-17）
+   Toast 消息气泡（spec 2026-08-17 · 视觉升级：徽章图标 + 倒计时进度条）
    ============================================================ */
 .toast-container {
   position: fixed;
@@ -2199,41 +2199,134 @@ body[data-view='ws-port'] {
   pointer-events: none;
 }
 .toast {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--s-2);
+  min-width: 260px;
   max-width: min(480px, calc(100vw - 48px));
-  padding: var(--s-2) var(--s-3);
+  padding: 10px var(--s-3) 12px;
   font-size: 12.5px;
   color: var(--text-primary);
-  background: rgba(14, 18, 30, 0.86);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  background: linear-gradient(180deg, rgba(48, 48, 60, 0.66), rgba(28, 28, 34, 0.60));
+  border: 1px solid var(--border-bright);
+  border-radius: 13px;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--shadow-modal), var(--glass-highlight);
+  overflow: hidden;
   pointer-events: auto;
   opacity: 0;
-  transform: translateY(-12px);
-  transition: opacity 160ms var(--ease), transform 160ms var(--ease);
+  transform: translateY(-14px) scale(0.96);
+  transition: opacity 140ms ease-in, transform 140ms ease-in;
 }
-.toast.show { opacity: 1; transform: translateY(0); }
-.toast-mark { font-size: 13px; font-weight: 700; flex-shrink: 0; }
-.toast-success .toast-mark { color: var(--green); }
-.toast-error .toast-mark { color: var(--red); }
-.toast-info .toast-mark { color: var(--cyan); }
+.toast.show { animation: toastIn 260ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-14px) scale(0.96); }
+  60%  { opacity: 1; transform: translateY(2px) scale(1.01); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 类型色氛围：微光阴影 + 彩色描边 */
+.toast-success {
+  border-color: rgba(48, 209, 88, 0.32);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 24px rgba(48, 209, 88, 0.12), var(--glass-highlight);
+}
+.toast-error {
+  border-color: rgba(255, 69, 58, 0.34);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 24px rgba(255, 69, 58, 0.14), var(--glass-highlight);
+}
+.toast-info {
+  border-color: rgba(10, 132, 255, 0.34);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 24px rgba(10, 132, 255, 0.14), var(--glass-highlight);
+}
+
+/* 徽章图标（内联 SVG，stroke 风格 + 类型色光晕） */
+.toast-badge {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.toast-badge svg { width: 100%; height: 100%; }
+.toast-success .toast-badge { color: var(--green); filter: drop-shadow(0 0 5px rgba(48, 209, 88, 0.55)); }
+.toast-error .toast-badge { color: var(--red); filter: drop-shadow(0 0 5px rgba(255, 69, 58, 0.55)); }
+.toast-info .toast-badge { color: var(--cyan); filter: drop-shadow(0 0 5px rgba(10, 132, 255, 0.55)); }
+
+.toast-msg { flex: 1; line-height: 1.45; overflow-wrap: anywhere; }
+
 .toast-close {
-  margin-left: 6px;
-  padding: 2px 4px;
+  margin-left: 4px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
   font-size: 10px;
   color: var(--text-tertiary);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 50%;
   border: none;
   background: none;
 }
 .toast-close:hover { color: var(--text-primary); background: var(--surface-3); }
+.toast-close:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+/* 倒计时进度条：与 JS 计时同步（hover 暂停） */
+.toast::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  transform-origin: left center;
+  transform: scaleX(1);
+  background: rgba(255, 255, 255, 0.30);
+  animation: toastTimer linear forwards;
+  animation-duration: var(--toast-duration, 2500ms);
+}
+.toast-success::after { background: rgba(48, 209, 88, 0.55); }
+.toast-error::after { background: rgba(255, 69, 58, 0.55); }
+.toast-info::after { background: rgba(10, 132, 255, 0.55); }
+.toast:hover::after { animation-play-state: paused; }
+@keyframes toastTimer { to { transform: scaleX(0); } }
+
 @media (prefers-reduced-motion: reduce) {
   .toast { transition: none; }
-  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.show { animation: none; opacity: 1; transform: none; }
+}
+
+/* ============================================================
+   Confirm 确认弹窗（替代系统 confirm()，复用 .modal 体系）
+   ============================================================ */
+.modal-confirm-panel { width: 400px; }
+.modal-confirm-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--border-soft);
+}
+.modal-confirm-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.modal-confirm-icon svg { width: 18px; height: 18px; }
+.modal-confirm-icon--danger { background: var(--danger-fill-bg); color: var(--red); }
+.modal-confirm-icon--info { background: var(--cyan-wash); color: var(--cyan); }
+.modal-confirm-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.modal-confirm-x { margin-left: auto; }
+.modal-confirm-body { padding: var(--s-5); font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+.modal-confirm-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-5);
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-deep);
 }

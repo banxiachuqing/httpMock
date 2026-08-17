@@ -1,6 +1,16 @@
-// 消息通知 toast —— 顶部居中横幅（spec 2026-08-17）
+// 消息通知 toast —— 顶部居中横幅（spec 2026-08-17，2026-08-17 视觉升级）
+// 零依赖；容器首次调用时动态创建，不改 index.html。
 const TOAST_DURATION = { success: 2500, error: 3500, info: 2500 };
-const MARK = { success: "✓", error: "✗", info: "·" };
+
+// 类型色徽章图标（内联 SVG，stroke 风格，与 Cinematic Dark Glass 色板一致）
+const ICONS = {
+  success:
+    '<svg class="toast-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.8 8.3l2.2 2.1 4.2-4.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  error:
+    '<svg class="toast-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  info:
+    '<svg class="toast-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.1v3.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="4.9" r="0.9" fill="currentColor"/></svg>',
+};
 
 let container = null;
 const timers = new Map(); // HTMLElement -> timeoutId
@@ -26,7 +36,7 @@ function dismiss(el) {
   clearTimeout(timers.get(el));
   timers.delete(el);
   el.classList.remove("show");
-  setTimeout(() => el.remove(), 200); // 匹配退场过渡时长
+  setTimeout(() => el.remove(), 140); // 匹配退场过渡时长
 }
 
 function scheduleDismiss(el) {
@@ -55,11 +65,11 @@ export function showToast({ type = "info", message } = {}) {
 
   const el = document.createElement("div");
   el.className = `toast toast-${type}`;
+  el.style.setProperty("--toast-duration", `${TOAST_DURATION[type]}ms`);
 
-  const mark = document.createElement("span");
-  mark.className = "toast-mark";
-  mark.setAttribute("aria-hidden", "true");
-  mark.textContent = MARK[type];
+  const icon = document.createElement("span");
+  icon.className = "toast-badge";
+  icon.innerHTML = ICONS[type];
 
   const msg = document.createElement("span");
   msg.className = "toast-msg";
@@ -72,9 +82,12 @@ export function showToast({ type = "info", message } = {}) {
   close.textContent = "✕";
   close.addEventListener("click", () => dismiss(el));
 
-  el.append(mark, msg, close);
+  el.append(icon, msg, close);
   el.addEventListener("mouseenter", () => clearTimeout(timers.get(el)));
   el.addEventListener("mouseleave", () => scheduleDismiss(el));
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") dismiss(el);
+  });
 
   c.appendChild(el);
   // 入场动画：下一帧补 .show 才有过渡效果
