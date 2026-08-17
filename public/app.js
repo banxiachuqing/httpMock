@@ -20,6 +20,7 @@ import {
 } from "./views/ws-services.js";
 import { initImportWsdlDialog } from "./views/ws-import.js";
 import { initServiceDetail, renderServiceDetail } from "./views/ws-detail.js";
+import { showToast } from "./toast.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -522,7 +523,7 @@ async function deleteEndpointById(id) {
   try {
     await api.deleteEndpoint(id);
   } catch (e) {
-    alert("删除失败：" + (e?.message || "未知错误"));
+    showToast({ type: "error", message: "删除失败：" + (e?.message || "未知错误") });
     return;
   }
   const wasSelected = state.selectedId === id;
@@ -534,6 +535,7 @@ async function deleteEndpointById(id) {
   renderEndpointList();
   renderEditor();
   renderStatus();
+  showToast({ type: "success", message: `已删除 ${ep.method} ${ep.path}` });
 }
 
 // FLIP 动画换位：记录原位 → DOM 换位 → transform 反向补偿再播放，
@@ -585,7 +587,7 @@ function commitDragOrder() {
   state.endpoints = ids.map((x) => byId.get(x));
   renderEndpointList();
   api.reorderEndpoints(ids).catch(async (err) => {
-    alert("排序失败：" + (err?.message || "未知错误"));
+    showToast({ type: "error", message: "排序失败：" + (err?.message || "未知错误") });
     state.endpoints = await api.listEndpoints();
     renderEndpointList();
   });
@@ -627,8 +629,9 @@ async function copyEndpointById(id) {
     state.selectedId = ep.id;
     renderEndpointList();
     renderEditorForCreate(ep);
+    showToast({ type: "success", message: `已复制 ${source.method} ${ep.path}` });
   } catch (e) {
-    alert("复制失败：" + (e?.message || "未知错误"));
+    showToast({ type: "error", message: "复制失败：" + (e?.message || "未知错误") });
   }
 }
 
@@ -1057,19 +1060,26 @@ function markDirty() {
 
 async function createEndpoint() {
   if (state.route.view !== "port") return;
-  const ep = await api.createEndpoint({
-    method: "GET",
-    port: state.route.port,
-    path: "/api/new",
-    statusCode: 200,
-    response: { code: 200, msg: "操作成功", data: null, success: true },
-    enabled: true,
-  });
-  state.endpoints.push(ep);
-  state.selectedId = ep.id;
-  // Force the form to fully reset, ignoring the !state.dirty guard.
-  renderEndpointList();
-  renderEditorForCreate(ep);
+  try {
+    const ep = await api.createEndpoint({
+      method: "GET",
+      port: state.route.port,
+      path: "/api/new",
+      statusCode: 200,
+      response: { code: 200, msg: "操作成功", data: null, success: true },
+      enabled: true,
+    });
+    // api.createEndpoint 不对非 2xx 抛错，这里自行校验（服务端 400 DUPLICATE_ENDPOINT 等）
+    if (!ep?.id) throw new Error(ep?.error || "未知错误");
+    state.endpoints.push(ep);
+    state.selectedId = ep.id;
+    // Force the form to fully reset, ignoring the !state.dirty guard.
+    renderEndpointList();
+    renderEditorForCreate(ep);
+    showToast({ type: "success", message: `已创建 ${ep.method} ${ep.path}` });
+  } catch (e) {
+    showToast({ type: "error", message: "创建失败：" + (e?.message || "未知错误") });
+  }
 }
 
 function renderEditorForCreate(ep) {
@@ -1117,8 +1127,10 @@ async function saveEndpoint() {
     state.dirty = false;
     renderEndpointList();
     flash("已保存", "green");
+    showToast({ type: "success", message: "已保存" });
   } catch (e) {
     flash("✗ 保存失败", "red");
+    showToast({ type: "error", message: "保存失败：" + (e?.message || "未知错误") });
   }
 }
 
@@ -1126,13 +1138,18 @@ async function deleteEndpoint() {
   const ep = state.endpoints.find((e) => e.id === state.selectedId);
   if (!ep) return;
   if (!confirm(`确认删除 ${ep.method} ${ep.path}？`)) return;
-  await api.deleteEndpoint(ep.id);
-  state.endpoints = state.endpoints.filter((e) => e.id !== ep.id);
-  state.selectedId = state.endpoints[0]?.id || null;
-  state.dirty = false;
-  renderEndpointList();
-  renderEditor();
-  renderStatus();
+  try {
+    await api.deleteEndpoint(ep.id);
+    state.endpoints = state.endpoints.filter((e) => e.id !== ep.id);
+    state.selectedId = state.endpoints[0]?.id || null;
+    state.dirty = false;
+    renderEndpointList();
+    renderEditor();
+    renderStatus();
+    showToast({ type: "success", message: `已删除 ${ep.method} ${ep.path}` });
+  } catch (e) {
+    showToast({ type: "error", message: "删除失败：" + (e?.message || "未知错误") });
+  }
 }
 
 async function toggleRuntime() {

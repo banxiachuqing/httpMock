@@ -1,5 +1,6 @@
 // 端口详情页：页头交互（启用开关 / 改号 / 删除端口）
 import { navigate } from '../router.js';
+import { showToast } from '../toast.js';
 
 export function renderPortHeader(state, els) {
   const p = state.ports.find((x) => x.port === state.route.port);
@@ -21,7 +22,7 @@ export function initPortDetail({ els, state, api, refreshAll }) {
       if (local) Object.assign(local, updated);
     } catch (e) {
       els.portEnabledToggle.checked = !els.portEnabledToggle.checked;
-      alert('切换失败：' + (e?.message || '未知错误'));
+      showToast({ type: 'error', message: '切换失败：' + (e?.message || '未知错误') });
     }
   });
 
@@ -31,18 +32,19 @@ export function initPortDetail({ els, state, api, refreshAll }) {
     const oldPort = state.route.port;
     const newPort = Number(els.portNumberInput.value);
     if (!Number.isInteger(newPort) || newPort < 1 || newPort > 65535) {
-      return alert('端口号必须是 1–65535 的整数');
+      return showToast({ type: 'error', message: '端口号必须是 1–65535 的整数' });
     }
     if (newPort === oldPort) return;
     if (state.ports.some((p) => p.port === newPort)) {
-      return alert(`端口 ${newPort} 已存在`);
+      return showToast({ type: 'error', message: `端口 ${newPort} 已存在` });
     }
     try {
       await api.updatePort(oldPort, { port: newPort });
       await refreshAll(); // 重新拉 ports + endpoints（port 字段已级联变化）
       navigate(`#/port/${newPort}`);
+      showToast({ type: 'success', message: `端口已改为 ${newPort}` });
     } catch (e) {
-      alert('改号失败：' + (e?.message || '未知错误'));
+      showToast({ type: 'error', message: '改号失败：' + (e?.message || '未知错误') });
     }
   });
 
@@ -59,8 +61,9 @@ export function initPortDetail({ els, state, api, refreshAll }) {
       await api.deletePort(port);
       await refreshAll();
       navigate('#/');
+      showToast({ type: 'success', message: `已删除端口 ${port}` });
     } catch (e) {
-      alert('删除失败：' + (e?.message || '未知错误'));
+      showToast({ type: 'error', message: '删除失败：' + (e?.message || '未知错误') });
     }
   });
 }
