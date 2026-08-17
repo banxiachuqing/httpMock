@@ -243,7 +243,6 @@ const els = {
   emptyNewBtn: $("#emptyNewBtn"),
   endpointList: $("#endpointList"),
   endpointCount: $("#endpointCount"),
-  portSummaryList: $("#portSummaryList"),
   editor: $("#editor"),
   editorEmpty: $("#editorEmpty"),
   editorForm: $("#editorForm"),
@@ -410,13 +409,6 @@ function renderEndpointList() {
   // 拖拽期间不重建列表：5s 轮询会整体重渲染 DOM，抽走拖动中的元素（spec 2026-08-17 §4.3）
   if (state.draggingId) return;
   els.endpointCount.textContent = state.endpoints.length;
-  const ports = [...new Set(state.endpoints.map((e) => e.port))].sort(
-    (a, b) => a - b,
-  );
-  els.portSummaryList.textContent = ports.length
-    ? ports.map((p) => `:${p}`).join("  ")
-    : "—";
-
   els.endpointList.innerHTML = "";
   for (const ep of state.endpoints) {
     const li = document.createElement("li");
@@ -658,7 +650,7 @@ function renderEditor() {
     els.status.value = ep.statusCode || 200;
     els.responseEditor.value = formatJSON(ep.response);
     if (window.__editorMounted) setValue(formatJSON(ep.response));
-    els.lastSaved.textContent = "saved";
+    els.lastSaved.textContent = "已保存";
     els.lastSaved.style.color = "";
   }
   updateEditorMeta();
@@ -1348,6 +1340,87 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ============================================================
+// 可拖拽分隔条：侧栏宽度 / 日志高度（localStorage 持久化）
+// ============================================================
+const SIDEBAR_W_MIN = 220;
+const SIDEBAR_W_MAX = 480;
+const LOGS_H_MIN = 120;
+const LOGS_H_MAX = () => Math.round(window.innerHeight * 0.7);
+
+function clampLayout(v, min, max) {
+  return Math.min(Math.max(v, min), max);
+}
+
+function initLayoutResizers() {
+  // 恢复上次的布局偏好
+  const sw = localStorage.getItem("ui.sidebarW");
+  const lh = localStorage.getItem("ui.logsH");
+  if (sw) document.body.style.setProperty("--sidebar-w", sw + "px");
+  if (lh) document.body.style.setProperty("--logs-h", lh + "px");
+
+  const attach = (el, cfg) => {
+    let start = 0;
+    let base = 0;
+    let lastV = 0;
+    let dragging = false;
+    el.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      start = cfg.vert ? e.clientY : e.clientX;
+      base = cfg.getValue();
+      lastV = base;
+      el.classList.add("dragging");
+      document.body.classList.add("resizing");
+      el.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const delta = cfg.vert ? start - e.clientY : e.clientX - start;
+      lastV = clampLayout(base + delta, cfg.min, cfg.max());
+      cfg.setValue(lastV);
+    });
+    const done = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove("dragging");
+      document.body.classList.remove("resizing");
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      cfg.onSave?.(lastV);
+    };
+    el.addEventListener("pointerup", done);
+    el.addEventListener("pointercancel", done);
+  };
+
+  // 侧栏宽度（仅端口详情视图有侧栏；hidden 时条随之不可见，无副作用）
+  const rv = document.createElement("div");
+  rv.className = "resizer-v";
+  rv.setAttribute("aria-hidden", "true");
+  attach(rv, {
+    vert: false,
+    getValue: () => els.sidebarPanel.getBoundingClientRect().width,
+    setValue: (w) => document.body.style.setProperty("--sidebar-w", w + "px"),
+    onSave: (w) => localStorage.setItem("ui.sidebarW", String(w)),
+    min: SIDEBAR_W_MIN,
+    max: () => SIDEBAR_W_MAX,
+  });
+  els.sidebarPanel.appendChild(rv);
+
+  // 日志高度（端口 / WS 端口视图共用）
+  const rh = document.createElement("div");
+  rh.className = "resizer-h";
+  rh.setAttribute("aria-hidden", "true");
+  attach(rh, {
+    vert: true,
+    getValue: () => els.logsPanel.getBoundingClientRect().height,
+    setValue: (h) => document.body.style.setProperty("--logs-h", h + "px"),
+    onSave: (h) => localStorage.setItem("ui.logsH", String(h)),
+    min: LOGS_H_MIN,
+    max: LOGS_H_MAX,
+  });
+  els.logsPanel.appendChild(rh);
+}
+
+// ============================================================
 // Boot
 // ============================================================
 loadAll().then(() => {
@@ -1372,6 +1445,7 @@ loadAll().then(() => {
   // Poll every 5s to catch external changes (e.g. someone else binds the port)
   setInterval(refreshRuntimeStatus, 5000);
   newPortDialog = initNewPortDialog({ els, state, api });
+  initLayoutResizers();
   initPortDetail({ els, state, api, refreshAll });
   newServiceDialog = initNewServiceDialog({
     els,
