@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { ConfigStore } from '../../src/config-store.js';
 import { buildApp } from '../helpers/test-server.js';
 import { tempDir } from '../helpers/temp-dir.js';
@@ -40,6 +42,37 @@ describe('PATCH /api/config', () => {
     const r = await ctx.request.patch('/api/config').send({ settings: { storagePath: 'relative' } });
     expect(r.status).toBe(400);
     expect(r.body.code).toBe('INVALID_PATH');
+  });
+
+  it('rejects invalid uiPort', async () => {
+    for (const bad of ['abc', 100000, 0, -1]) {
+      const r = await ctx.request.patch('/api/config').send({ settings: { uiPort: bad } });
+      expect(r.status, `value ${JSON.stringify(bad)}`).toBe(400);
+      expect(r.body.code, `value ${JSON.stringify(bad)}`).toBe('INVALID_VALUE');
+    }
+  });
+
+  it('同路径 storagePath 保存只更新设置（前端每次保存都带 storagePath 字段）', async () => {
+    // 目录里已有 data.json（用户已在使用），同路径保存不应触发迁移保护
+    const r = await ctx.request.patch('/api/config').send({ settings: { storagePath: dir.path, theme: 'light' } });
+    expect(r.status).toBe(200);
+    expect(r.body.settings.theme).toBe('light');
+    expect(r.body.settings.storagePath).toBe(dir.path);
+  });
+
+  it('迁移到已有 data.json 的目录 → 409 DATA_EXISTS 不覆盖', async () => {
+    const other = tempDir('mock-config-target-');
+    try {
+      await fs.writeFile(path.join(other.path, 'data.json'), '{"existing": true}');
+      const r = await ctx.request.patch('/api/config').send({ settings: { storagePath: other.path } });
+      expect(r.status).toBe(409);
+      expect(r.body.code).toBe('DATA_EXISTS');
+      // 既有配置与旧文件保持完好
+      expect((await fs.readFile(path.join(other.path, 'data.json'), 'utf8'))).toContain('existing');
+      expect(store.storagePath).toBe(dir.path);
+    } finally {
+      other.cleanup();
+    }
   });
 });
 

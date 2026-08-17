@@ -94,10 +94,10 @@ describe('配置变更同步引擎（改号/停用后立即生效）', () => {
     expect(afterNew.status).toBe(200);
     // 旧端口已释放（连接拒绝）
     await expect(httpGet('http://127.0.0.1:19101/a')).rejects.toThrow();
-    // 引擎状态同步
+    // 引擎状态同步：statuses 只反映当前有效端口集合，改号后旧端口键应清除
     const status = await ctx.request.get('/api/runtime/status');
     expect(status.body['19102']?.state).toBe('running');
-    expect(status.body['19101']?.state).toBe('stopped');
+    expect(status.body['19101']).toBeUndefined();
   });
 
   it('运行时停用端口后立即释放监听', async () => {
@@ -108,8 +108,58 @@ describe('配置变更同步引擎（改号/停用后立即生效）', () => {
     const r = await ctx.request.put('/api/ports/19103').send({ enabled: false });
     expect(r.status).toBe(200);
     await expect(httpGet('http://127.0.0.1:19103/a')).rejects.toThrow();
+    // 停用后该端口不再属于有效集合，statuses 中键应清除（不残留 stopped 条目）
     const status = await ctx.request.get('/api/runtime/status');
-    expect(status.body['19103']?.state).toBe('stopped');
+    expect(status.body['19103']).toBeUndefined();
+  });
+
+  it('运行中删除端口后旧监听立即释放、status 清除', async () => {
+    await ctx.request.post('/api/ports').send({ port: 19110 });
+    await ctx.request.post('/api/endpoints').send({ port: 19110, method: 'GET', path: '/a', statusCode: 200, response: { ok: 1 } });
+    await ctx.request.post('/api/runtime/start');
+    expect((await httpGet('http://127.0.0.1:19110/a')).status).toBe(200);
+
+    await ctx.request.delete('/api/ports/19110');
+    await expect(httpGet('http://127.0.0.1:19110/a')).rejects.toThrow();
+    const status = await ctx.request.get('/api/runtime/status');
+    expect(status.body['19110']).toBeUndefined();
+  });
+
+  it('运行中保存端点响应体后 mock 立即生效', async () => {
+    await ctx.request.post('/api/ports').send({ port: 19111 });
+    const created = await ctx.request.post('/api/endpoints')
+      .send({ port: 19111, method: 'GET', path: '/a', statusCode: 200, response: { ok: 1 } });
+    await ctx.request.post('/api/runtime/start');
+    expect((await httpGet('http://127.0.0.1:19111/a')).body).toContain('"ok":1');
+
+    // 引擎运行中修改响应体（工具最高频操作）→ 无需手动重启即生效
+    await ctx.request.put(`/api/endpoints/${created.body.id}`)
+      .send({ port: 19111, method: 'GET', path: '/a', statusCode: 200, response: { ok: 2 } });
+    const after = await httpGet('http://127.0.0.1:19111/a');
+    expect(after.status).toBe(200);
+    expect(after.body).toContain('"ok":2');
+  });
+
+  it('引擎停止后配置变更不再自动重启', async () => {
+    await ctx.request.post('/api/ports').send({ port: 19112 });
+    await ctx.request.post('/api/endpoints').send({ port: 19112, method: 'GET', path: '/a', statusCode: 200, response: { ok: 1 } });
+    await ctx.request.post('/api/runtime/start');
+    await ctx.request.post('/api/runtime/stop');
+    // 停止后建新端点：引擎未运行，不应被自动拉起（running=false 门控）
+    await ctx.request.post('/api/endpoints').send({ port: 19112, method: 'GET', path: '/b', statusCode: 200, response: {} });
+    await expect(httpGet('http://127.0.0.1:19112/a')).rejects.toThrow();
+  });
+
+  it('非法 statusCode 落库后请求不崩溃（mock-engine 兜底为 200）', async () => {
+    await ctx.request.post('/api/ports').send({ port: 19113 });
+    // 绕过 API 校验层面：直接写库旧数据（手改 data.json / 历史版本遗留）
+    await store.update((cfg) => {
+      cfg.endpoints.push({ id: 'legacy-boom', port: 19113, method: 'GET', path: '/boom', statusCode: 'abc', response: {}, enabled: true });
+      return cfg;
+    });
+    await ctx.request.post('/api/runtime/start');
+    const res = await httpGet('http://127.0.0.1:19113/boom');
+    expect(res.status).toBe(200); // 进程存活，状态码兜底为 200
   });
 });
 

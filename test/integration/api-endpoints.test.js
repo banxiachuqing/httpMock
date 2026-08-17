@@ -28,6 +28,32 @@ describe('POST /api/endpoints', () => {
     expect(r.body.id).toMatch(/[0-9a-f-]{36}/);
   });
 
+  it('ignores client-supplied id (server-generated UUID wins)', async () => {
+    const r = await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/api/id-test', id: 'client-fixed-id' });
+    expect(r.status).toBe(201);
+    expect(r.body.id).not.toBe('client-fixed-id');
+    expect(r.body.id).toMatch(/[0-9a-f-]{36}/);
+  });
+
+  it('rejects invalid statusCode that would crash mock engine', async () => {
+    const r = await ctx.request.post('/api/endpoints').send({ ...validBody, statusCode: 'abc' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_STATUS');
+  });
+
+  it('rejects path containing ? (would be an unmatchable route)', async () => {
+    const r = await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/search?q=1' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_PATH');
+  });
+
+  it('normalizes string port to number (no split entities)', async () => {
+    const r = await ctx.request.post('/api/endpoints').send({ ...validBody, port: '8080', path: '/api/str-port' });
+    expect(r.status).toBe(201);
+    expect(r.body.port).toBe(8080);
+    expect(store.config.endpoints.find((e) => e.path === '/api/str-port').port).toBe(8080);
+  });
+
   it('rejects invalid method', async () => {
     const r = await ctx.request.post('/api/endpoints').send({ ...validBody, method: 'BREW' });
     expect(r.status).toBe(400);
