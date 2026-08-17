@@ -2182,3 +2182,58 @@ body[data-view='ws-port'] {
     filter: none;
   }
 }
+
+/* ============================================================
+   Toast 消息气泡（spec 2026-08-17）
+   ============================================================ */
+.toast-container {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  z-index: 2000;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  max-width: min(480px, calc(100vw - 48px));
+  padding: var(--s-2) var(--s-3);
+  font-size: 12.5px;
+  color: var(--text-primary);
+  background: rgba(14, 18, 30, 0.86);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(-12px);
+  transition: opacity 160ms var(--ease), transform 160ms var(--ease);
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast-mark { font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.toast-success .toast-mark { color: var(--green); }
+.toast-error .toast-mark { color: var(--red); }
+.toast-info .toast-mark { color: var(--cyan); }
+.toast-close {
+  margin-left: 6px;
+  padding: 2px 4px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 4px;
+  border: none;
+  background: none;
+}
+.toast-close:hover { color: var(--text-primary); background: var(--surface-3); }
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition: none; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+}
