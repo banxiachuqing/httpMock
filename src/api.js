@@ -234,7 +234,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
   });
 
   // Ports CRUD（端口一等实体）
-  registerPortRoutes(app, { configStore });
+  registerPortRoutes(app, { configStore, mockEngine });
 
   // WebService services CRUD + WSDL 解析（spec §5）
   registerServiceRoutes(app, { configStore });

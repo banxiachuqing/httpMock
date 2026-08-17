@@ -65,6 +65,54 @@ describe('POST /api/runtime/stop', () => {
   });
 });
 
+// 直连 mock 端口探测（supertest 的 request 绑定 app，不能发外部 URL）
+function httpGet(url) {
+  return new Promise((resolve, reject) => {
+    http.get(url, (res) => {
+      let body = '';
+      res.on('data', (c) => (body += c));
+      res.on('end', () => resolve({ status: res.statusCode, body }));
+    }).on('error', reject);
+  });
+}
+
+describe('配置变更同步引擎（改号/停用后立即生效）', () => {
+  it('改号后旧端口释放、新端口生效', async () => {
+    await ctx.request.post('/api/ports').send({ port: 19101 });
+    await ctx.request.post('/api/endpoints').send({ port: 19101, method: 'GET', path: '/a', statusCode: 200, response: { ok: 1 } });
+    await ctx.request.post('/api/runtime/start');
+
+    // 前置：旧端口可访问
+    const before = await httpGet('http://127.0.0.1:19101/a');
+    expect(before.status).toBe(200);
+
+    const r = await ctx.request.put('/api/ports/19101').send({ port: 19102 });
+    expect(r.status).toBe(200);
+
+    // 新端口立即生效
+    const afterNew = await httpGet('http://127.0.0.1:19102/a');
+    expect(afterNew.status).toBe(200);
+    // 旧端口已释放（连接拒绝）
+    await expect(httpGet('http://127.0.0.1:19101/a')).rejects.toThrow();
+    // 引擎状态同步
+    const status = await ctx.request.get('/api/runtime/status');
+    expect(status.body['19102']?.state).toBe('running');
+    expect(status.body['19101']?.state).toBe('stopped');
+  });
+
+  it('运行时停用端口后立即释放监听', async () => {
+    await ctx.request.post('/api/ports').send({ port: 19103 });
+    await ctx.request.post('/api/endpoints').send({ port: 19103, method: 'GET', path: '/a', statusCode: 200, response: { ok: 1 } });
+    await ctx.request.post('/api/runtime/start');
+
+    const r = await ctx.request.put('/api/ports/19103').send({ enabled: false });
+    expect(r.status).toBe(200);
+    await expect(httpGet('http://127.0.0.1:19103/a')).rejects.toThrow();
+    const status = await ctx.request.get('/api/runtime/status');
+    expect(status.body['19103']?.state).toBe('stopped');
+  });
+});
+
 describe('GET /api/runtime/status', () => {
   it('returns empty object when never started', async () => {
     const r = await ctx.request.get('/api/runtime/status');

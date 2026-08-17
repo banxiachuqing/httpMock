@@ -17,7 +17,7 @@ function sorted(ports) {
  * @param {import('express').Express} app
  * @param {{ configStore: import('./config-store.js').ConfigStore }} deps
  */
-export function registerPortRoutes(app, { configStore }) {
+export function registerPortRoutes(app, { configStore, mockEngine }) {
   app.get('/api/ports', (_req, res) => res.json(configStore.config.ports));
 
   app.post('/api/ports', async (req, res, next) => {
@@ -71,6 +71,14 @@ export function registerPortRoutes(app, { configStore }) {
         updated = cfg.ports.find((p) => p.port === newPort);
         return cfg;
       });
+      // 引擎运行中：配置变更（改号/停用）立即同步——旧监听释放、新端口生效
+      if (mockEngine?.servers?.size) {
+        await mockEngine.start(
+          configStore.config.endpoints,
+          configStore.config.ports,
+          configStore.config.services || [],
+        );
+      }
       res.json(updated);
     } catch (e) { next(e); }
   });
