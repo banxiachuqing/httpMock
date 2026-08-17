@@ -159,8 +159,8 @@ html, body {
 
 body {
   display: grid;
-  grid-template-rows: 56px auto 1fr 260px;
-  grid-template-columns: 320px 1fr;
+  grid-template-rows: 56px auto 1fr var(--logs-h, 260px);
+  grid-template-columns: var(--sidebar-w, 320px) 1fr;
   grid-template-areas:
     "topbar  topbar"
     "porthdr porthdr"
@@ -569,6 +569,66 @@ button {
   height: 100%;
 }
 
+/* 可拖拽分隔条：侧栏宽度（.resizer-v）/ 日志高度（.resizer-h） */
+.resizer-v {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -4px;
+  width: 9px;
+  cursor: col-resize;
+  z-index: 8;
+  touch-action: none;
+}
+.resizer-v::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: var(--border-soft);
+  transition: background var(--d-fast) var(--ease), width var(--d-fast) var(--ease), left var(--d-fast) var(--ease);
+}
+.resizer-v:hover::after,
+.resizer-v.dragging::after {
+  left: 1px;
+  width: 7px;
+  border-radius: 4px;
+  background: rgba(10, 132, 255, 0.5);
+}
+.resizer-h {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  height: 9px;
+  cursor: row-resize;
+  z-index: 8;
+  touch-action: none;
+}
+.resizer-h::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 4px;
+  height: 1px;
+  background: var(--border-soft);
+  transition: background var(--d-fast) var(--ease), height var(--d-fast) var(--ease), top var(--d-fast) var(--ease);
+}
+.resizer-h:hover::after,
+.resizer-h.dragging::after {
+  top: 1px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(10, 132, 255, 0.5);
+}
+body.resizing {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -779,30 +839,6 @@ button {
   border-color: var(--border-bright);
 }
 
-.sidebar-footer {
-  border-top: 1px solid var(--border-soft);
-  padding: var(--s-3) var(--s-4);
-  background: var(--bg-deep);
-}
-
-.port-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  font-size: 11px;
-}
-.port-summary-label {
-  color: var(--text-tertiary);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 10px;
-}
-.port-summary-list {
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ============================================================
    Editor
    ============================================================ */
@@ -869,7 +905,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--s-4) var(--s-6);
+  padding: var(--s-2) var(--s-6);
   border-bottom: 1px solid var(--border-soft);
 }
 .editor-header-left, .editor-header-right { display: flex; align-items: center; gap: var(--s-3); }
@@ -1039,6 +1075,7 @@ button {
   align-items: center;
   gap: var(--s-2);
   margin-top: var(--s-2);
+  padding-left: var(--s-4); /* 与编辑器内容左对齐 */
   font-size: 10.5px;
   color: var(--text-tertiary);
 }
@@ -2046,7 +2083,7 @@ dialog.log-detail::backdrop {
    ============================================================ */
 /* WS 端口详情：topbar / 端口页头 / 服务网格 / 日志 */
 body[data-view='ws-port'] {
-  grid-template-rows: 56px auto 1fr 260px;
+  grid-template-rows: 56px auto 1fr var(--logs-h, 260px);
   grid-template-columns: 1fr;
   grid-template-areas:
     "topbar"
@@ -2144,4 +2181,59 @@ body[data-view='ws-port'] {
     transform: none;
     filter: none;
   }
+}
+
+/* ============================================================
+   Toast 消息气泡（spec 2026-08-17）
+   ============================================================ */
+.toast-container {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  z-index: 2000;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  max-width: min(480px, calc(100vw - 48px));
+  padding: var(--s-2) var(--s-3);
+  font-size: 12.5px;
+  color: var(--text-primary);
+  background: rgba(14, 18, 30, 0.86);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(-12px);
+  transition: opacity 160ms var(--ease), transform 160ms var(--ease);
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast-mark { font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.toast-success .toast-mark { color: var(--green); }
+.toast-error .toast-mark { color: var(--red); }
+.toast-info .toast-mark { color: var(--cyan); }
+.toast-close {
+  margin-left: 6px;
+  padding: 2px 4px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 4px;
+  border: none;
+  background: none;
+}
+.toast-close:hover { color: var(--text-primary); background: var(--surface-3); }
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition: none; }
+  .toast.show { opacity: 1; transform: translateY(0); }
 }

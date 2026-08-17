@@ -20,6 +20,7 @@ import {
 } from "./views/ws-services.js";
 import { initImportWsdlDialog } from "./views/ws-import.js";
 import { initServiceDetail, renderServiceDetail } from "./views/ws-detail.js";
+import { showToast } from "./toast.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -243,7 +244,6 @@ const els = {
   emptyNewBtn: $("#emptyNewBtn"),
   endpointList: $("#endpointList"),
   endpointCount: $("#endpointCount"),
-  portSummaryList: $("#portSummaryList"),
   editor: $("#editor"),
   editorEmpty: $("#editorEmpty"),
   editorForm: $("#editorForm"),
@@ -410,13 +410,6 @@ function renderEndpointList() {
   // 拖拽期间不重建列表：5s 轮询会整体重渲染 DOM，抽走拖动中的元素（spec 2026-08-17 §4.3）
   if (state.draggingId) return;
   els.endpointCount.textContent = state.endpoints.length;
-  const ports = [...new Set(state.endpoints.map((e) => e.port))].sort(
-    (a, b) => a - b,
-  );
-  els.portSummaryList.textContent = ports.length
-    ? ports.map((p) => `:${p}`).join("  ")
-    : "—";
-
   els.endpointList.innerHTML = "";
   for (const ep of state.endpoints) {
     const li = document.createElement("li");
@@ -530,7 +523,7 @@ async function deleteEndpointById(id) {
   try {
     await api.deleteEndpoint(id);
   } catch (e) {
-    alert("删除失败：" + (e?.message || "未知错误"));
+    showToast({ type: "error", message: "删除失败：" + (e?.message || "未知错误") });
     return;
   }
   const wasSelected = state.selectedId === id;
@@ -542,6 +535,7 @@ async function deleteEndpointById(id) {
   renderEndpointList();
   renderEditor();
   renderStatus();
+  showToast({ type: "success", message: `已删除 ${ep.method} ${ep.path}` });
 }
 
 // FLIP 动画换位：记录原位 → DOM 换位 → transform 反向补偿再播放，
@@ -593,7 +587,7 @@ function commitDragOrder() {
   state.endpoints = ids.map((x) => byId.get(x));
   renderEndpointList();
   api.reorderEndpoints(ids).catch(async (err) => {
-    alert("排序失败：" + (err?.message || "未知错误"));
+    showToast({ type: "error", message: "排序失败：" + (err?.message || "未知错误") });
     state.endpoints = await api.listEndpoints();
     renderEndpointList();
   });
@@ -635,8 +629,9 @@ async function copyEndpointById(id) {
     state.selectedId = ep.id;
     renderEndpointList();
     renderEditorForCreate(ep);
+    showToast({ type: "success", message: `已复制 ${source.method} ${ep.path}` });
   } catch (e) {
-    alert("复制失败：" + (e?.message || "未知错误"));
+    showToast({ type: "error", message: "复制失败：" + (e?.message || "未知错误") });
   }
 }
 
@@ -658,7 +653,7 @@ function renderEditor() {
     els.status.value = ep.statusCode || 200;
     els.responseEditor.value = formatJSON(ep.response);
     if (window.__editorMounted) setValue(formatJSON(ep.response));
-    els.lastSaved.textContent = "saved";
+    els.lastSaved.textContent = "已保存";
     els.lastSaved.style.color = "";
   }
   updateEditorMeta();
@@ -1065,19 +1060,26 @@ function markDirty() {
 
 async function createEndpoint() {
   if (state.route.view !== "port") return;
-  const ep = await api.createEndpoint({
-    method: "GET",
-    port: state.route.port,
-    path: "/api/new",
-    statusCode: 200,
-    response: { code: 200, msg: "操作成功", data: null, success: true },
-    enabled: true,
-  });
-  state.endpoints.push(ep);
-  state.selectedId = ep.id;
-  // Force the form to fully reset, ignoring the !state.dirty guard.
-  renderEndpointList();
-  renderEditorForCreate(ep);
+  try {
+    const ep = await api.createEndpoint({
+      method: "GET",
+      port: state.route.port,
+      path: "/api/new",
+      statusCode: 200,
+      response: { code: 200, msg: "操作成功", data: null, success: true },
+      enabled: true,
+    });
+    // api.createEndpoint 不对非 2xx 抛错，这里自行校验（服务端 400 DUPLICATE_ENDPOINT 等）
+    if (!ep?.id) throw new Error(ep?.error || "未知错误");
+    state.endpoints.push(ep);
+    state.selectedId = ep.id;
+    // Force the form to fully reset, ignoring the !state.dirty guard.
+    renderEndpointList();
+    renderEditorForCreate(ep);
+    showToast({ type: "success", message: `已创建 ${ep.method} ${ep.path}` });
+  } catch (e) {
+    showToast({ type: "error", message: "创建失败：" + (e?.message || "未知错误") });
+  }
 }
 
 function renderEditorForCreate(ep) {
@@ -1125,8 +1127,10 @@ async function saveEndpoint() {
     state.dirty = false;
     renderEndpointList();
     flash("已保存", "green");
+    showToast({ type: "success", message: "已保存" });
   } catch (e) {
     flash("✗ 保存失败", "red");
+    showToast({ type: "error", message: "保存失败：" + (e?.message || "未知错误") });
   }
 }
 
@@ -1134,13 +1138,18 @@ async function deleteEndpoint() {
   const ep = state.endpoints.find((e) => e.id === state.selectedId);
   if (!ep) return;
   if (!confirm(`确认删除 ${ep.method} ${ep.path}？`)) return;
-  await api.deleteEndpoint(ep.id);
-  state.endpoints = state.endpoints.filter((e) => e.id !== ep.id);
-  state.selectedId = state.endpoints[0]?.id || null;
-  state.dirty = false;
-  renderEndpointList();
-  renderEditor();
-  renderStatus();
+  try {
+    await api.deleteEndpoint(ep.id);
+    state.endpoints = state.endpoints.filter((e) => e.id !== ep.id);
+    state.selectedId = state.endpoints[0]?.id || null;
+    state.dirty = false;
+    renderEndpointList();
+    renderEditor();
+    renderStatus();
+    showToast({ type: "success", message: `已删除 ${ep.method} ${ep.path}` });
+  } catch (e) {
+    showToast({ type: "error", message: "删除失败：" + (e?.message || "未知错误") });
+  }
 }
 
 async function toggleRuntime() {
@@ -1348,6 +1357,87 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ============================================================
+// 可拖拽分隔条：侧栏宽度 / 日志高度（localStorage 持久化）
+// ============================================================
+const SIDEBAR_W_MIN = 220;
+const SIDEBAR_W_MAX = 480;
+const LOGS_H_MIN = 120;
+const LOGS_H_MAX = () => Math.round(window.innerHeight * 0.7);
+
+function clampLayout(v, min, max) {
+  return Math.min(Math.max(v, min), max);
+}
+
+function initLayoutResizers() {
+  // 恢复上次的布局偏好
+  const sw = localStorage.getItem("ui.sidebarW");
+  const lh = localStorage.getItem("ui.logsH");
+  if (sw) document.body.style.setProperty("--sidebar-w", sw + "px");
+  if (lh) document.body.style.setProperty("--logs-h", lh + "px");
+
+  const attach = (el, cfg) => {
+    let start = 0;
+    let base = 0;
+    let lastV = 0;
+    let dragging = false;
+    el.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      start = cfg.vert ? e.clientY : e.clientX;
+      base = cfg.getValue();
+      lastV = base;
+      el.classList.add("dragging");
+      document.body.classList.add("resizing");
+      el.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const delta = cfg.vert ? start - e.clientY : e.clientX - start;
+      lastV = clampLayout(base + delta, cfg.min, cfg.max());
+      cfg.setValue(lastV);
+    });
+    const done = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove("dragging");
+      document.body.classList.remove("resizing");
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      cfg.onSave?.(lastV);
+    };
+    el.addEventListener("pointerup", done);
+    el.addEventListener("pointercancel", done);
+  };
+
+  // 侧栏宽度（仅端口详情视图有侧栏；hidden 时条随之不可见，无副作用）
+  const rv = document.createElement("div");
+  rv.className = "resizer-v";
+  rv.setAttribute("aria-hidden", "true");
+  attach(rv, {
+    vert: false,
+    getValue: () => els.sidebarPanel.getBoundingClientRect().width,
+    setValue: (w) => document.body.style.setProperty("--sidebar-w", w + "px"),
+    onSave: (w) => localStorage.setItem("ui.sidebarW", String(w)),
+    min: SIDEBAR_W_MIN,
+    max: () => SIDEBAR_W_MAX,
+  });
+  els.sidebarPanel.appendChild(rv);
+
+  // 日志高度（端口 / WS 端口视图共用）
+  const rh = document.createElement("div");
+  rh.className = "resizer-h";
+  rh.setAttribute("aria-hidden", "true");
+  attach(rh, {
+    vert: true,
+    getValue: () => els.logsPanel.getBoundingClientRect().height,
+    setValue: (h) => document.body.style.setProperty("--logs-h", h + "px"),
+    onSave: (h) => localStorage.setItem("ui.logsH", String(h)),
+    min: LOGS_H_MIN,
+    max: LOGS_H_MAX,
+  });
+  els.logsPanel.appendChild(rh);
+}
+
+// ============================================================
 // Boot
 // ============================================================
 loadAll().then(() => {
@@ -1372,6 +1462,7 @@ loadAll().then(() => {
   // Poll every 5s to catch external changes (e.g. someone else binds the port)
   setInterval(refreshRuntimeStatus, 5000);
   newPortDialog = initNewPortDialog({ els, state, api });
+  initLayoutResizers();
   initPortDetail({ els, state, api, refreshAll });
   newServiceDialog = initNewServiceDialog({
     els,

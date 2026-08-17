@@ -1,5 +1,6 @@
 // 首页：端口卡片渲染 + 新建端口弹窗
 import { navigate } from '../router.js';
+import { showToast } from '../toast.js';
 
 function relativeTime(ts) {
   const diff = Date.now() - ts;
@@ -72,7 +73,7 @@ function buildCard(p, state, lastEntry, api) {
       card.dataset.enabled = String(p.enabled !== false);
     } catch (e) {
       checkbox.checked = !checkbox.checked;
-      alert('切换失败：' + (e?.message || '未知错误'));
+      showToast({ type: 'error', message: '切换失败：' + (e?.message || '未知错误') });
     } finally {
       checkbox.disabled = false;
     }

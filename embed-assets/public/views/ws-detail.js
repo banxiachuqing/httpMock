@@ -2,6 +2,7 @@
 import { navigate } from "../router.js";
 import { createEditor } from "../editor.js";
 import { serviceAddress } from "./ws-services.js";
+import { showToast } from "../toast.js";
 
 let ctx = null; // { els, state, api }
 let xmlEditor = null; // createEditor 实例（懒挂载）
@@ -260,7 +261,7 @@ export function initServiceDetail({
       replaceService(state, updated);
     } catch (e) {
       els.serviceEnabledToggle.checked = !els.serviceEnabledToggle.checked;
-      alert("切换失败：" + (e?.message || "未知错误"));
+      showToast({ type: "error", message: "切换失败：" + (e?.message || "未知错误") });
     }
   });
 
@@ -296,7 +297,7 @@ export function initServiceDetail({
       await refreshAll();
       navigate(`#/port/${s.port}`);
     } catch (e) {
-      alert("删除失败：" + (e?.message || "未知错误"));
+      showToast({ type: "error", message: "删除失败：" + (e?.message || "未知错误") });
     }
   });
 
@@ -315,7 +316,7 @@ export function initServiceDetail({
       state.dirty = false;
       renderServiceDetail();
     } catch (e) {
-      alert("新建操作失败：" + (e?.message || "未知错误"));
+      showToast({ type: "error", message: "新建操作失败：" + (e?.message || "未知错误") });
     }
   };
   els.newOperationBtn.addEventListener("click", createOp);
@@ -399,7 +400,7 @@ export function initServiceDetail({
       state.dirty = false;
       renderServiceDetail();
     } catch (e) {
-      alert("删除失败：" + (e?.message || "未知错误"));
+      showToast({ type: "error", message: "删除失败：" + (e?.message || "未知错误") });
     }
   });
 
