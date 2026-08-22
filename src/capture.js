@@ -58,3 +58,70 @@ export function createUdpCaptureSocket({ port, logBuffer, getMax }) {
   socket.on('error', () => {});
   return { socket };
 }
+
+// TCP：空闲聚合（spec §4）——连接上 idleMs 无新数据 → 累积字节落一条消息；
+// 连接关闭时残余也落一条；超出 maxBodyBytes 立即 flush 并标记截断（剩余字节丢弃，对齐 HTTP readBody 语义）。
+export function createTcpCaptureServer({ port, logBuffer, getMax, idleMs = DEFAULT_TCP_IDLE_MS, maxConnections = MAX_TCP_CONNECTIONS }) {
+  const sockets = new Set();
+  const server = net.createServer((socket) => {
+    const remote = `${stripIpv6Prefix(socket.remoteAddress)}:${socket.remotePort}`;
+    if (sockets.size >= maxConnections) {
+      logBuffer?.push({
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        level: 'warn',
+        source: 'capture',
+        message: `tcp :${port} 活动连接数超上限 ${maxConnections}，已拒绝 ${remote}`,
+      });
+      socket.destroy();
+      return;
+    }
+    sockets.add(socket);
+    const connectionId = crypto.randomUUID();
+    logBuffer?.push(buildCaptureEvent({ protocol: 'tcp', port, remote, connectionId, event: 'connect' }));
+
+    let chunks = [];
+    let bytes = 0;
+    let truncated = false;
+    let idleTimer = null;
+
+    const flush = () => {
+      if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+      if (bytes === 0) return;
+      const payload = Buffer.concat(chunks, bytes);
+      chunks = [];
+      const wasTruncated = truncated;
+      bytes = 0;
+      truncated = false;
+      logBuffer?.push(buildCaptureEntry({ protocol: 'tcp', port, remote, connectionId, payload, truncated: wasTruncated }));
+    };
+    const armIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(flush, idleMs);
+    };
+
+    socket.on('data', (chunk) => {
+      const room = getMax() - bytes;
+      if (chunk.length > room) {
+        if (room > 0) {
+          chunks.push(chunk.subarray(0, room));
+          bytes += room;
+        }
+        truncated = true;
+        flush();
+        return;
+      }
+      chunks.push(chunk);
+      bytes += chunk.length;
+      armIdle();
+    });
+    socket.on('close', () => {
+      flush();
+      sockets.delete(socket);
+      logBuffer?.push(buildCaptureEvent({ protocol: 'tcp', port, remote, connectionId, event: 'disconnect' }));
+    });
+    // RST 等错误不杀进程（spec §8）；收尾由随后的 'close' 统一处理
+    socket.on('error', () => {});
+  });
+  return { server, sockets };
+}

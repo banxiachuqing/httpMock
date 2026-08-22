@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import net from 'node:net';
 import dgram from 'node:dgram';
-import { buildCaptureEntry, buildCaptureEvent, createUdpCaptureSocket } from '../../src/capture.js';
+import { buildCaptureEntry, buildCaptureEvent, createUdpCaptureSocket, createTcpCaptureServer } from '../../src/capture.js';
 
 describe('buildCaptureEntry', () => {
   it('构建 hex + text 双预览条目', () => {
@@ -116,5 +117,124 @@ describe('createUdpCaptureSocket', () => {
     } finally {
       socket.close();
     }
+  });
+});
+
+function tcpConnect(port) {
+  return new Promise((resolve, reject) => {
+    const s = net.connect(port, '127.0.0.1');
+    s.once('connect', () => resolve(s));
+    s.once('error', reject);
+  });
+}
+
+function listenCaptureServer(server, port) {
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.once('listening', resolve);
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+describe('createTcpCaptureServer', () => {
+  it('快速连写在空闲后聚合为一条消息', async () => {
+    const logs = [];
+    const { server } = createTcpCaptureServer({ port: 18910, logBuffer: { push: (e) => logs.push(e) }, getMax: () => 1024, idleMs: 100 });
+    await listenCaptureServer(server, 18910);
+    try {
+      const s = await tcpConnect(18910);
+      s.write('hello, ');
+      s.write('world');
+      await sleep(250);
+      const msgs = logs.filter((e) => !e.event);
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].payloadText).toBe('hello, world');
+      expect(msgs[0].bytes).toBe(12);
+      expect(msgs[0].protocol).toBe('tcp');
+      expect(msgs[0].remote).toMatch(/^127\.0\.0\.1:\d+$/);
+      s.end();
+      await sleep(50);
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
+  });
+
+  it('间隔超过空闲阈值 → 两条消息；同连接 connectionId 稳定', async () => {
+    const logs = [];
+    const { server } = createTcpCaptureServer({ port: 18911, logBuffer: { push: (e) => logs.push(e) }, getMax: () => 1024, idleMs: 100 });
+    await listenCaptureServer(server, 18911);
+    try {
+      const s = await tcpConnect(18911);
+      s.write('aaa');
+      await sleep(250);
+      s.write('bbb');
+      await sleep(250);
+      const msgs = logs.filter((e) => !e.event);
+      expect(msgs).toHaveLength(2);
+      expect(msgs[0].payloadText).toBe('aaa');
+      expect(msgs[1].payloadText).toBe('bbb');
+      expect(msgs[0].connectionId).toBe(msgs[1].connectionId);
+      s.end();
+      await sleep(50);
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
+  });
+
+  it('连接断开 flush 残余，并落 connect/disconnect 事件', async () => {
+    const logs = [];
+    const { server } = createTcpCaptureServer({ port: 18912, logBuffer: { push: (e) => logs.push(e) }, getMax: () => 1024, idleMs: 100 });
+    await listenCaptureServer(server, 18912);
+    try {
+      const s = await tcpConnect(18912);
+      s.write('bye');
+      s.end();
+      await sleep(200);
+      const msgs = logs.filter((e) => !e.event);
+      const events = logs.filter((e) => e.event);
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].payloadText).toBe('bye');
+      expect(events.map((e) => e.event)).toEqual(['connect', 'disconnect']);
+      expect(events[0].connectionId).toBe(msgs[0].connectionId);
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
+  });
+
+  it('超出 maxBodyBytes 立即 flush 并标记截断', async () => {
+    const logs = [];
+    const { server } = createTcpCaptureServer({ port: 18913, logBuffer: { push: (e) => logs.push(e) }, getMax: () => 5, idleMs: 100 });
+    await listenCaptureServer(server, 18913);
+    try {
+      const s = await tcpConnect(18913);
+      s.write('123456789');
+      await sleep(200);
+      const msgs = logs.filter((e) => !e.event);
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].payloadText).toBe('12345');
+      expect(msgs[0].bytes).toBe(5);
+      expect(msgs[0].payloadTruncated).toBe(true);
+      s.end();
+      await sleep(50);
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
+  });
+
+  it('超过连接上限的新连接被拒绝并落 warn 日志', async () => {
+    const logs = [];
+    const { server } = createTcpCaptureServer({ port: 18914, logBuffer: { push: (e) => logs.push(e) }, getMax: () => 1024, maxConnections: 1 });
+    await listenCaptureServer(server, 18914);
+    const s1 = await tcpConnect(18914);
+    const s2 = await tcpConnect(18914);
+    await sleep(150);
+    expect(logs.some((e) => e.level === 'warn' && e.source === 'capture')).toBe(true);
+    // 被拒连接不计入 connect 事件
+    expect(logs.filter((e) => e.event === 'connect')).toHaveLength(1);
+    s1.end();
+    s2.destroy();
+    await new Promise((r) => server.close(r));
   });
 });
