@@ -56,8 +56,8 @@ test('click log row → dialog opens with 4 sections', async ({ page }) => {
   await page.locator('.log-entry').first().click();
   // dialog 出现
   await expect(page.locator('#log-detail')).toBeVisible();
-  // 4 section 都在
-  await expect(page.locator('.log-detail-section')).toHaveCount(4);
+  // 4 section 都在（捕获 section 对 HTTP 条目隐藏，只数可见的）
+  await expect(page.locator('.log-detail-section:visible')).toHaveCount(4);
   // 关闭
   await page.keyboard.press('Escape');
   await expect(page.locator('#log-detail')).toBeHidden();
