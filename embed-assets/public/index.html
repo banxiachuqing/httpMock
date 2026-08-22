@@ -599,12 +599,12 @@
       <div class="modal-body">
         <div class="field field-wide">
           <label>类型</label>
-          <div class="port-type-radios">
-            <label><input type="radio" name="newPortType" value="http" checked /> HTTP 接口</label>
-            <label><input type="radio" name="newPortType" value="ws" /> WebService (SOAP)</label>
-            <label><input type="radio" name="newPortType" value="tcp" /> TCP 抓包</label>
-            <label><input type="radio" name="newPortType" value="udp" /> UDP 抓包</label>
-          </div>
+          <select id="newPortType" class="input">
+            <option value="http" selected>HTTP 接口</option>
+            <option value="ws">WebService (SOAP)</option>
+            <option value="tcp">TCP 抓包</option>
+            <option value="udp">UDP 抓包</option>
+          </select>
           <p class="field-hint">创建后类型不可更改。TCP/UDP 抓包端口只接收并记录数据，不返回响应。</p>
         </div>
         <div class="field field-wide">

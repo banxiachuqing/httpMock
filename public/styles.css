@@ -2135,17 +2135,6 @@ body[data-view='capture-port'] {
     "logs";
 }
 
-.port-type-radios {
-  display: flex;
-  gap: 16px;
-}
-.port-type-radios label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-
 .service-header-path { color: var(--text-faint, #5a5f6a); font-size: 12px; }
 
 .service-card-actions {

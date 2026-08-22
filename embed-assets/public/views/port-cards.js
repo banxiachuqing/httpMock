@@ -181,7 +181,7 @@ export function initNewPortDialog({ els, state, api }) {
   const open = () => {
     els.newPortNumber.value = String(nextFreePort(state.ports));
     els.newPortError.hidden = true;
-    els.newPortModal.querySelector('input[name="newPortType"][value="http"]').checked = true;
+    els.newPortModal.querySelector('#newPortType').value = 'http';
     els.newPortModal.hidden = false;
     els.newPortNumber.focus();
     els.newPortNumber.select();
@@ -199,7 +199,7 @@ export function initNewPortDialog({ els, state, api }) {
     if (state.ports.some((p) => p.port === port)) {
       return fail(`端口 ${port} 已存在`);
     }
-    const type = els.newPortModal.querySelector('input[name="newPortType"]:checked')?.value || 'http';
+    const type = els.newPortModal.querySelector('#newPortType').value || 'http';
     try {
       await api.createPort(port, type);
       state.ports = await api.listPorts();

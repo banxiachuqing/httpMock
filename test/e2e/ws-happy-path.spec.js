@@ -61,7 +61,7 @@ test('WS happy path：建 WS 端口 → 建服务 → 导入 WSDL → 启动 →
 
   // 1. UI 新建 WS 端口（类型选择是本次入口改动的核心）
   await page.click('#newPortCard');
-  await page.check('input[name="newPortType"][value="ws"]');
+  await page.selectOption('#newPortType', 'ws');
   await page.fill('#newPortNumber', '18790');
   await page.click('#newPortCreate');
   await page.waitForFunction(() => location.hash === '#/port/18790');

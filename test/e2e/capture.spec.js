@@ -14,7 +14,7 @@ test('新建 TCP 抓包端口：弹窗选型 + 卡片徽标与统计', async ({ 
 
   await page.click('#newPortCard');
   await expect(page.locator('#newPortModal')).toBeVisible();
-  await page.check('input[name="newPortType"][value="tcp"]');
+  await page.selectOption('#newPortType', 'tcp');
   await page.fill('#newPortNumber', '19100');
   await page.click('#newPortCreate');
 
