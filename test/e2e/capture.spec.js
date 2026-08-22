@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import net from 'node:net';
+import dgram from 'node:dgram';
 import { bootServer } from './helpers.js';
 
 let server;
@@ -47,4 +49,61 @@ test('UDP 端口详情页为抓包视图：无接口侧栏/编辑器，日志区
   await expect(page.locator('#editor')).toBeHidden();
   await expect(page.locator('#logsPanel')).toBeVisible();
   await expect(page.locator('#portHeaderNumber')).toHaveText(':19101');
+});
+
+test('TCP 抓包数据出现在日志流，详情可切换 hex/文本', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await page.evaluate(async () => {
+    await fetch('/api/ports', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ port: 19102, type: 'tcp' }),
+    });
+    await fetch('/api/runtime/start', { method: 'POST' });
+  });
+
+  const s = net.connect(19102, '127.0.0.1');
+  await new Promise((res) => s.once('connect', res));
+  s.write('hello tcp');
+  await new Promise((r) => setTimeout(r, 500)); // 等空闲聚合 flush
+
+  await page.goto(`${server.baseURL}/#/port/19102`, { waitUntil: 'load' });
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+
+  const row = page.locator('.log-entry.capture', { hasText: '接收' });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('TCP');
+  await row.click();
+
+  await expect(page.locator('#logDetailPayload')).toHaveText('68 65 6c 6c 6f 20 74 63 70');
+  await page.click('#logDetailTextBtn');
+  await expect(page.locator('#logDetailPayload')).toHaveText('hello tcp');
+  await page.click('#logDetailClose');
+  s.end();
+});
+
+test('UDP 抓包数据出现在日志流', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await page.evaluate(async () => {
+    await fetch('/api/ports', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ port: 19103, type: 'udp' }),
+    });
+    await fetch('/api/runtime/start', { method: 'POST' });
+  });
+
+  const client = dgram.createSocket('udp4');
+  await new Promise((res, rej) => client.send('hello udp', 19103, '127.0.0.1', (e) => (e ? rej(e) : res())));
+  client.close();
+  await new Promise((r) => setTimeout(r, 300));
+
+  await page.goto(`${server.baseURL}/#/port/19103`, { waitUntil: 'load' });
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+
+  const row = page.locator('.log-entry.capture', { hasText: '接收' });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('UDP');
 });

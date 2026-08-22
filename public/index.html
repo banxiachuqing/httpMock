@@ -635,7 +635,7 @@
       <dl class="log-detail-meta" id="logDetailMeta"></dl>
     </section>
 
-    <section class="log-detail-section">
+    <section class="log-detail-section" id="logDetailQuerySection">
       <h3>查询参数 <span class="log-detail-count" id="logDetailQueryCount">0</span></h3>
       <table class="log-detail-table" id="logDetailQueryTable" hidden>
         <thead><tr><th>键</th><th>值</th></tr></thead>
@@ -644,7 +644,7 @@
       <p class="log-detail-empty" id="logDetailQueryEmpty">（无查询参数）</p>
     </section>
 
-    <section class="log-detail-section">
+    <section class="log-detail-section" id="logDetailHeadersSection">
       <h3>请求头 <span class="log-detail-count" id="logDetailHeadersCount">0</span></h3>
       <table class="log-detail-table" id="logDetailHeadersTable" hidden>
         <thead><tr><th>键</th><th>值</th></tr></thead>
@@ -653,12 +653,23 @@
       <p class="log-detail-empty" id="logDetailHeadersEmpty">（无请求头）</p>
     </section>
 
-    <section class="log-detail-section">
+    <section class="log-detail-section" id="logDetailBodySection">
       <h3>请求体</h3>
       <div class="log-detail-body-warning" id="logDetailBodyWarning" hidden>请求体已截断（超出配置上限）</div>
       <div class="log-detail-body" id="logDetailBody" hidden></div>
       <pre class="log-detail-body-plain" id="logDetailBodyPlain" hidden></pre>
       <p class="log-detail-empty" id="logDetailEmpty">（无请求体）</p>
+    </section>
+
+    <section class="log-detail-section" id="logDetailCaptureSection" hidden>
+      <h3>数据 <span class="log-detail-count" id="logDetailBytes">0 B</span>
+        <span class="payload-toggle" role="group" aria-label="数据格式">
+          <button type="button" class="toggle-btn is-active" id="logDetailHexBtn">HEX</button>
+          <button type="button" class="toggle-btn" id="logDetailTextBtn">文本</button>
+        </span>
+      </h3>
+      <div class="log-detail-body-warning" id="logDetailCaptureWarning" hidden>数据已截断（超出上限）</div>
+      <pre class="log-detail-body-plain mono" id="logDetailPayload"></pre>
     </section>
   </dialog>
 

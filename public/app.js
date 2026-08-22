@@ -296,6 +296,15 @@ const els = {
   logDetailBody: $("#logDetailBody"),
   logDetailBodyPlain: $("#logDetailBodyPlain"),
   logDetailEmpty: $("#logDetailEmpty"),
+  logDetailQuerySection: $("#logDetailQuerySection"),
+  logDetailHeadersSection: $("#logDetailHeadersSection"),
+  logDetailBodySection: $("#logDetailBodySection"),
+  logDetailCaptureSection: $("#logDetailCaptureSection"),
+  logDetailBytes: $("#logDetailBytes"),
+  logDetailHexBtn: $("#logDetailHexBtn"),
+  logDetailTextBtn: $("#logDetailTextBtn"),
+  logDetailCaptureWarning: $("#logDetailCaptureWarning"),
+  logDetailPayload: $("#logDetailPayload"),
 
   // 视图与路由
   viewHome: $("#viewHome"),
@@ -812,6 +821,9 @@ function renderServicePage() {
 }
 
 function renderLogEntry(entry) {
+  if (entry.protocol === "tcp" || entry.protocol === "udp") {
+    return renderCaptureLogEntry(entry);
+  }
   const row = document.createElement("div");
   row.className = `log-entry ${entry.matched ? "matched" : "missed"}`;
   const range = `${Math.floor(entry.status / 100)}xx`;
@@ -845,9 +857,39 @@ function renderLogEntry(entry) {
   return row;
 }
 
+// 抓包条目行：时间 / 协议 / 远端 / 端口 / 字节数 / — / 来源 IP / 事件或「接收」（spec 2026-08-22 §5/§7）
+function renderCaptureLogEntry(entry) {
+  const row = document.createElement("div");
+  row.className = "log-entry capture";
+  const time = new Date(entry.timestamp).toLocaleTimeString("zh-CN", {
+    hour12: false,
+  });
+  const remoteIp = (entry.remote || "").replace(/:\d+$/, "");
+  row.innerHTML = `
+    <span class="log-time">${time}</span>
+    <span class="log-method log-proto" data-protocol="${entry.protocol}">${entry.protocol.toUpperCase()}</span>
+    <span class="log-path"></span>
+    <span class="log-port">${entry.port}</span>
+    <span class="log-status" data-range="">${entry.event ? "—" : formatBytes(entry.bytes)}</span>
+    <span class="log-duration">—</span>
+    <span class="log-ip mono"></span>
+    <span class="log-result"></span>
+  `;
+  // remote 来自对端地址，只能 textContent 赋值（不进 innerHTML）
+  row.querySelector(".log-path").textContent = entry.remote || "—";
+  row.querySelector(".log-ip").textContent = remoteIp || "—";
+  row.querySelector(".log-result").textContent = entry.event
+    ? entry.event === "connect"
+      ? "连接建立"
+      : "连接断开"
+    : "接收";
+  row.addEventListener("click", () => openLogDetail(entry.id));
+  return row;
+}
+
 function openLogDetail(id) {
   const entry = state.logs.find((e) => e.id === id);
-  if (!entry || !entry.method) return;
+  if (!entry || (!entry.method && !entry.protocol)) return;
   renderLogDetail(entry);
   els.logDetail.showModal();
 }
@@ -857,6 +899,15 @@ function closeLogDetail() {
 }
 
 function renderLogDetail(entry) {
+  if (entry.protocol === "tcp" || entry.protocol === "udp") {
+    renderCaptureLogDetail(entry);
+    return;
+  }
+  // HTTP 条目：复位捕获区隐藏 + 三个既有 section 显示（弹窗是复用的）
+  els.logDetailCaptureSection.hidden = true;
+  els.logDetailQuerySection.hidden = false;
+  els.logDetailHeadersSection.hidden = false;
+  els.logDetailBodySection.hidden = false;
   // 1. Header
   els.logDetailMethod.textContent = entry.method;
   els.logDetailMethod.dataset.method = entry.method;
@@ -961,6 +1012,60 @@ function renderLogDetail(entry) {
       els.logDetailBodyPlain.hidden = false;
       els.logDetailBodyPlain.textContent = body;
     }
+  }
+}
+
+// 抓包条目详情：header 显示协议/远端/字节数或事件；数据区 hex/文本双视图切换（spec 2026-08-22 §7）
+function renderCaptureLogDetail(entry) {
+  els.logDetailMethod.textContent = entry.protocol.toUpperCase();
+  els.logDetailMethod.dataset.method = "";
+  els.logDetailPath.textContent = entry.remote || "—";
+  els.logDetailStatus.dataset.range = "";
+  els.logDetailStatus.textContent = entry.event
+    ? entry.event === "connect"
+      ? "连接"
+      : "断开"
+    : formatBytes(entry.bytes) || `${entry.bytes} B`;
+
+  const time = new Date(entry.timestamp).toLocaleString("zh-CN", {
+    hour12: false,
+  });
+  els.logDetailMeta.innerHTML = "";
+  const rows = [
+    ["时间", time],
+    ["端口", String(entry.port)],
+    ["远端", entry.remote || "—"],
+  ];
+  if (entry.event) {
+    rows.push(["事件", entry.event === "connect" ? "连接建立" : "连接断开"]);
+  } else {
+    rows.push(["字节数", `${entry.bytes} B`]);
+  }
+  if (entry.connectionId) rows.push(["连接", `${entry.connectionId.slice(0, 8)}…`]);
+  for (const [k, v] of rows) {
+    const dt = document.createElement("dt");
+    dt.textContent = k;
+    const dd = document.createElement("dd");
+    dd.textContent = v;
+    els.logDetailMeta.append(dt, dd);
+  }
+
+  els.logDetailQuerySection.hidden = true;
+  els.logDetailHeadersSection.hidden = true;
+  els.logDetailBodySection.hidden = true;
+  els.logDetailCaptureSection.hidden = !!entry.event;
+  if (!entry.event) {
+    els.logDetailBytes.textContent = formatBytes(entry.bytes) || `${entry.bytes} B`;
+    els.logDetailCaptureWarning.hidden = !entry.payloadTruncated;
+    let mode = "hex";
+    const apply = () => {
+      els.logDetailPayload.textContent = mode === "hex" ? entry.payloadHex : entry.payloadText;
+      els.logDetailHexBtn.classList.toggle("is-active", mode === "hex");
+      els.logDetailTextBtn.classList.toggle("is-active", mode === "text");
+    };
+    els.logDetailHexBtn.onclick = () => { mode = "hex"; apply(); };
+    els.logDetailTextBtn.onclick = () => { mode = "text"; apply(); };
+    apply();
   }
 }
 
