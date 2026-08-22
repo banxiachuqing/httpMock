@@ -69,7 +69,7 @@ function ensureWsPortEntity(cfg, port) {
   const existing = cfg.ports.find((p) => p.port === port);
   if (existing) {
     if (existing.type !== 'ws') {
-      throw new AppError(400, 'PORT_TYPE_MISMATCH', `port ${port} is an http port`);
+      throw new AppError(400, 'PORT_TYPE_MISMATCH', `port ${port} is a ${existing.type} port`);
     }
     return;
   }

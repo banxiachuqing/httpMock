@@ -238,3 +238,20 @@ describe('createTcpCaptureServer', () => {
     await new Promise((r) => server.close(r));
   });
 });
+
+describe('TCP 服务器级错误处理（spec §8）', () => {
+  it('服务器 error 事件落 warn 且不杀进程、服务仍可用', async () => {
+    const logs = [];
+    const { server } = createTcpCaptureServer({ port: 18915, logBuffer: { push: (e) => logs.push(e) }, getMax: () => 1024 });
+    await listenCaptureServer(server, 18915);
+    try {
+      server.emit('error', new Error('boom'));
+      expect(logs.some((e) => e.level === 'warn' && e.source === 'capture' && /boom/.test(e.message))).toBe(true);
+      const s = await tcpConnect(18915);
+      s.end();
+      await sleep(50);
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
+  });
+});

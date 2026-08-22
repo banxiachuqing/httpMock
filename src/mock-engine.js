@@ -196,11 +196,11 @@ export class MockEngine {  /**
           try { entry.socket.close(() => resolve()); } catch { resolve(); }
         }));
       } else if (entry.kind === 'tcp') {
-        // net.Server 无 closeIdleConnections：显式 destroy 活动连接，
-        // 否则 server.close() 回调一直等空闲连接不断（spec §4）
-        for (const s of entry.sockets) { try { s.destroy(); } catch {} }
+        // net.Server 无 closeIdleConnections：先 close() 停止接受新连接，
+        // 再 destroy 活动连接——否则 destroy→close 之间新进的连接会让 close 回调一直等（spec §4）
         promises.push(new Promise((resolve) => {
           entry.server.close(() => resolve());
+          for (const s of entry.sockets) { try { s.destroy(); } catch {} }
         }));
       } else {
         promises.push(new Promise((resolve) => {

@@ -63,8 +63,7 @@ export function createUdpCaptureSocket({ port, logBuffer, getMax }) {
 // 连接关闭时残余也落一条；超出 maxBodyBytes 立即 flush 并标记截断（剩余字节丢弃，对齐 HTTP readBody 语义）。
 export function createTcpCaptureServer({ port, logBuffer, getMax, idleMs = DEFAULT_TCP_IDLE_MS, maxConnections = MAX_TCP_CONNECTIONS }) {
   const sockets = new Set();
-  const server = net.createServer((socket) => {
-    const remote = `${stripIpv6Prefix(socket.remoteAddress)}:${socket.remotePort}`;
+  const server = net.createServer((socket) => {    const remote = `${stripIpv6Prefix(socket.remoteAddress)}:${socket.remotePort}`;
     if (sockets.size >= maxConnections) {
       logBuffer?.push({
         id: crypto.randomUUID(),
@@ -122,6 +121,17 @@ export function createTcpCaptureServer({ port, logBuffer, getMax, idleMs = DEFAU
     });
     // RST 等错误不杀进程（spec §8）；收尾由随后的 'close' 统一处理
     socket.on('error', () => {});
+  });
+  // 服务器级运行时错误（accept EMFILE 等）不杀进程（spec §8）；落 warn 供排查。
+  // bind 阶段的错误另由引擎的一次性 error 监听处理（两者并存不冲突）
+  server.on('error', (err) => {
+    logBuffer?.push({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      level: 'warn',
+      source: 'capture',
+      message: `tcp :${port} server error: ${err.message}`,
+    });
   });
   return { server, sockets };
 }
