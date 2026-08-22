@@ -38,3 +38,23 @@ export function buildCaptureEntry({ protocol, port, remote, connectionId = null,
 export function buildCaptureEvent({ protocol, port, remote, connectionId = null, event }) {
   return { id: crypto.randomUUID(), timestamp: Date.now(), protocol, port, remote, connectionId, event };
 }
+
+// UDP：一个 datagram = 一条消息日志（天然边界，无聚合）（spec §4）
+export function createUdpCaptureSocket({ port, logBuffer, getMax }) {
+  const socket = dgram.createSocket('udp4');
+  socket.on('message', (msg, rinfo) => {
+    const max = getMax();
+    const truncated = msg.length > max;
+    logBuffer?.push(buildCaptureEntry({
+      protocol: 'udp',
+      port,
+      remote: `${stripIpv6Prefix(rinfo.address)}:${rinfo.port}`,
+      connectionId: null,
+      payload: truncated ? msg.subarray(0, max) : msg,
+      truncated,
+    }));
+  });
+  // 运行时错误不杀进程（spec §8）；bind 阶段的错误由引擎挂的一次性 error 监听处理，两者并存不冲突
+  socket.on('error', () => {});
+  return { socket };
+}
