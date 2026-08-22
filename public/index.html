@@ -602,8 +602,10 @@
           <div class="port-type-radios">
             <label><input type="radio" name="newPortType" value="http" checked /> HTTP 接口</label>
             <label><input type="radio" name="newPortType" value="ws" /> WebService (SOAP)</label>
+            <label><input type="radio" name="newPortType" value="tcp" /> TCP 抓包</label>
+            <label><input type="radio" name="newPortType" value="udp" /> UDP 抓包</label>
           </div>
-          <p class="field-hint">创建后类型不可更改。WebService 端口下按路径挂多个 SOAP 服务。</p>
+          <p class="field-hint">创建后类型不可更改。TCP/UDP 抓包端口只接收并记录数据，不返回响应。</p>
         </div>
         <div class="field field-wide">
           <label for="newPortNumber">端口号</label>

@@ -2103,6 +2103,8 @@ body[data-view='ws-port'] {
 }
 .port-type-badge[data-type='http'] { color: #5e6ad2; }
 .port-type-badge[data-type='ws'] { color: var(--amber, #f5b84c); }
+.port-type-badge[data-type='tcp'] { color: var(--cyan); }
+.port-type-badge[data-type='udp'] { color: #b48ce8; }
 
 .port-type-radios {
   display: flex;
