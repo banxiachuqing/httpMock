@@ -10,6 +10,7 @@ import {
   buildFaultXml,
 } from './soap-router.js';
 import { buildSkeletonWsdl, rewriteAddress } from './wsdl.js';
+import { createTcpCaptureServer, createUdpCaptureSocket } from './capture.js';
 
 const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
 
@@ -74,8 +75,29 @@ function readBody(req, maxBytes) {
   });
 }
 
-export class MockEngine {
-  /**
+// listen 成败 Promise 化：error/listening 一次性竞速（http/net Server 通用）
+function listenOrFail(server, port, host) {
+  return new Promise((resolve, reject) => {
+    const onError = (err) => { server.removeListener('listening', onListening); reject(err); };
+    const onListening = () => { server.removeListener('error', onError); resolve(); };
+    server.once('error', onError);
+    server.once('listening', onListening);
+    server.listen(port, host);
+  });
+}
+
+// dgram 版本：bind + error/listening（dgram 绑定成功同样发 'listening'）
+function bindOrFail(socket, port, host) {
+  return new Promise((resolve, reject) => {
+    const onError = (err) => { socket.removeListener('listening', onListening); reject(err); };
+    const onListening = () => { socket.removeListener('error', onError); resolve(); };
+    socket.once('error', onError);
+    socket.once('listening', onListening);
+    socket.bind(port, host);
+  });
+}
+
+export class MockEngine {  /**
    * @param {object} opts
    * @param {{ push: (e: object) => void }} opts.logBuffer
    * @param {string} [opts.bindHost='127.0.0.1']
@@ -133,26 +155,33 @@ export class MockEngine {
     for (const [port, eps] of byPort.entries()) {
       const portEntity = Array.isArray(ports) ? ports.find((p) => p.port === port) : null;
       const getMax = () => this.configStore?.config?.settings?.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
-      const handler = portEntity?.type === 'ws'
-        ? createWsHandler({ port, services: services.filter((s) => s.port === port), logBuffer: this.logBuffer, getMax })
-        : createHttpHandler({ port, router: buildRouter(eps), logBuffer: this.logBuffer, getMax });
-      const server = http.createServer(handler);
-
+      const type = portEntity?.type ?? 'http';
+      let record = null;
       try {
-        await new Promise((resolve, reject) => {
-          const onError = (err) => { server.removeListener('listening', onListening); reject(err); };
-          const onListening = () => { server.removeListener('error', onError); resolve(); };
-          server.once('error', onError);
-          server.once('listening', onListening);
-          server.listen(port, this.bindHost);
-        });
-        this.servers.set(port, { server });
+        if (type === 'tcp') {
+          const { server, sockets } = createTcpCaptureServer({ port, logBuffer: this.logBuffer, getMax });
+          record = { kind: 'tcp', server, sockets };
+          await listenOrFail(server, port, this.bindHost);
+        } else if (type === 'udp') {
+          const { socket } = createUdpCaptureSocket({ port, logBuffer: this.logBuffer, getMax });
+          record = { kind: 'udp', socket };
+          await bindOrFail(socket, port, this.bindHost);
+        } else {
+          const handler = type === 'ws'
+            ? createWsHandler({ port, services: services.filter((s) => s.port === port), logBuffer: this.logBuffer, getMax })
+            : createHttpHandler({ port, router: buildRouter(eps), logBuffer: this.logBuffer, getMax });
+          const server = http.createServer(handler);
+          record = { kind: 'http', server };
+          await listenOrFail(server, port, this.bindHost);
+        }
+        this.servers.set(port, record);
         this.statuses.set(port, { state: 'running' });
         running.push({ port });
       } catch (e) {
         this.statuses.set(port, { state: 'failed', reason: e.code || 'EADDRINUSE' });
         failed.push({ port, reason: e.code || 'EADDRINUSE' });
-        try { server.close(); } catch {}
+        try { record?.server?.close(); } catch {}
+        try { record?.socket?.close(); } catch {}
       }
     }
 
@@ -161,13 +190,26 @@ export class MockEngine {
 
   async stop() {
     const promises = [];
-    for (const { server } of this.servers.values()) {
-      promises.push(new Promise((resolve) => {
-        server.close(() => resolve());
-        // server.close() 不关 keep-alive 空闲连接（回调不等它们）；显式关掉，
-        // 否则端口被重新绑定时旧连接残留（Node 18.2+ 才有的 API，低版本跳过）
-        if (typeof server.closeIdleConnections === 'function') server.closeIdleConnections();
-      }));
+    for (const entry of this.servers.values()) {
+      if (entry.kind === 'udp') {
+        promises.push(new Promise((resolve) => {
+          try { entry.socket.close(() => resolve()); } catch { resolve(); }
+        }));
+      } else if (entry.kind === 'tcp') {
+        // net.Server 无 closeIdleConnections：显式 destroy 活动连接，
+        // 否则 server.close() 回调一直等空闲连接不断（spec §4）
+        for (const s of entry.sockets) { try { s.destroy(); } catch {} }
+        promises.push(new Promise((resolve) => {
+          entry.server.close(() => resolve());
+        }));
+      } else {
+        promises.push(new Promise((resolve) => {
+          entry.server.close(() => resolve());
+          // server.close() 不关 keep-alive 空闲连接（回调不等它们）；显式关掉，
+          // 否则端口被重新绑定时旧连接残留（Node 18.2+ 才有的 API，低版本跳过）
+          if (typeof entry.server.closeIdleConnections === 'function') entry.server.closeIdleConnections();
+        }));
+      }
     }
     await Promise.all(promises);
     // 端口可能立刻被重新绑定（api.js 每次配置变更都会 stop→start 同端口）：

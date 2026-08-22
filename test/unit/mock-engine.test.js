@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import http from 'node:http';
+import net from 'node:net';
+import dgram from 'node:dgram';
 import { MockEngine } from '../../src/mock-engine.js';
 
 function get(port, path) {
@@ -292,5 +294,68 @@ describe('端口感知启动（ports 列表）', () => {
     const { running, failed } = await engine.start(endpoints, []);
     expect(running).toEqual([]);
     expect(failed).toEqual([]);
+  });
+});
+
+describe('MockEngine TCP/UDP 抓包端口', () => {
+  it('tcp 端口接收数据并落捕获日志', async () => {
+    engine = new MockEngine({ logBuffer });
+    const { running, failed } = await engine.start([], [{ port: 18920, enabled: true, type: 'tcp' }]);
+    expect(running.map((r) => r.port)).toEqual([18920]);
+    expect(failed).toEqual([]);
+    const s = net.connect(18920, '127.0.0.1');
+    await new Promise((res) => s.once('connect', res));
+    s.write('ping');
+    await new Promise((r) => setTimeout(r, 400)); // 等 200ms 空闲聚合 flush
+    s.end();
+    const msg = pushedLogs.find((e) => e.protocol === 'tcp' && !e.event);
+    expect(msg.payloadText).toBe('ping');
+  });
+
+  it('udp 端口接收 datagram 并落捕获日志', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([], [{ port: 18921, enabled: true, type: 'udp' }]);
+    const client = dgram.createSocket('udp4');
+    await new Promise((res, rej) => client.send('ping', 18921, '127.0.0.1', (e) => (e ? rej(e) : res())));
+    client.close();
+    await new Promise((r) => setTimeout(r, 150));
+    const msg = pushedLogs.find((e) => e.protocol === 'udp');
+    expect(msg.payloadText).toBe('ping');
+  });
+
+  it('tcp 端口 EADDRINUSE 隔离：不影响其他端口', async () => {
+    const blocker = net.createServer();
+    await new Promise((res) => blocker.listen(18922, '127.0.0.1', res));
+    try {
+      engine = new MockEngine({ logBuffer });
+      const { running, failed } = await engine.start(
+        [{ id: 'a', port: 18923, method: 'GET', path: '/x', statusCode: 200, response: { ok: 1 }, enabled: true }],
+        [{ port: 18922, enabled: true, type: 'tcp' }, { port: 18923, enabled: true, type: 'http' }],
+      );
+      expect(failed.find((f) => f.port === 18922)).toBeTruthy();
+      expect(running.find((r) => r.port === 18923)).toBeTruthy();
+      expect(engine.getStatus()['18922'].state).toBe('failed');
+      expect(engine.getStatus()['18923'].state).toBe('running');
+    } finally {
+      await new Promise((r) => blocker.close(r));
+    }
+  });
+
+  it('stop() 释放 tcp/udp 端口，可立即重绑', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([], [{ port: 18924, enabled: true, type: 'tcp' }, { port: 18925, enabled: true, type: 'udp' }]);
+    await engine.stop();
+    const again = await engine.start([], [{ port: 18924, enabled: true, type: 'tcp' }, { port: 18925, enabled: true, type: 'udp' }]);
+    expect(again.failed).toEqual([]);
+  });
+
+  it('stop() 销毁活动 tcp 连接（客户端收到 close）', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([], [{ port: 18926, enabled: true, type: 'tcp' }]);
+    const s = net.connect(18926, '127.0.0.1');
+    await new Promise((res) => s.once('connect', res));
+    const closed = new Promise((res) => s.once('close', res));
+    await engine.stop();
+    await closed;
   });
 });
