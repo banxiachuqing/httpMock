@@ -2106,6 +2106,16 @@ body[data-view='ws-port'] {
 .port-type-badge[data-type='tcp'] { color: var(--cyan); }
 .port-type-badge[data-type='udp'] { color: #b48ce8; }
 
+/* 抓包端口详情：topbar / 端口页头 / 日志区（占满剩余高度） */
+body[data-view='capture-port'] {
+  grid-template-rows: 56px auto 1fr;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "topbar"
+    "porthdr"
+    "logs";
+}
+
 .port-type-radios {
   display: flex;
   gap: 16px;

@@ -722,7 +722,9 @@ function effectiveView(route) {
     );
     return svc ? "service" : "not-found";
   }
-  return portEntity.type === "ws" ? "ws-port" : "port";
+  if (portEntity.type === "ws") return "ws-port";
+  if (portEntity.type === "tcp" || portEntity.type === "udp") return "capture-port";
+  return "port";
 }
 
 async function applyRoute(route) {
@@ -762,7 +764,7 @@ async function applyRoute(route) {
   document.body.dataset.view = ev === "not-found" ? "port" : ev;
   els.viewHome.hidden = ev !== "home";
   els.viewWsPort.hidden = ev !== "ws-port";
-  els.portHeader.hidden = !(ev === "port" || ev === "ws-port");
+  els.portHeader.hidden = !(ev === "port" || ev === "ws-port" || ev === "capture-port");
   els.serviceHeader.hidden = ev !== "service";
   els.portNotFound.hidden = ev !== "not-found";
   els.sidebarPanel.hidden = ev !== "port";
@@ -772,7 +774,7 @@ async function applyRoute(route) {
   els.logsPanel.hidden = ev === "home";
 
   if (ev === "home") renderHome();
-  if (ev === "port" || ev === "ws-port") renderPortHeader(state, els);
+  if (ev === "port" || ev === "ws-port" || ev === "capture-port") renderPortHeader(state, els);
   if (ev === "port") {
     // CodeMirror 在 hidden 容器里挂载过，显示后需要重新测量
     getEditorView()?.requestMeasure();
@@ -782,6 +784,9 @@ async function applyRoute(route) {
   }
   if (ev === "ws-port") {
     renderWsPortPage();
+    renderLogsInitial();
+  }
+  if (ev === "capture-port") {
     renderLogsInitial();
   }
   if (ev === "service") {
@@ -1021,7 +1026,7 @@ async function refreshAll() {
     state.dirty = false;
   }
   render();
-  if (state.route.view === "port" || state.route.view === "ws-port") {
+  if (state.route.view === "port" || state.route.view === "ws-port" || state.route.view === "capture-port") {
     renderPortHeader(state, els);
   }
   if (state.route.view === "ws-port") renderWsPortPage();
