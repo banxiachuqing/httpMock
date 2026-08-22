@@ -53,11 +53,11 @@ function ensurePortEntity(cfg, port) {
   }
 }
 
-// ws 型端口拒绝挂 HTTP 端点（spec §3 端口类型约束）
+// 非 http 型端口拒绝挂 HTTP 端点（spec §3 端口类型约束；ws/tcp/udp 一律拒）
 function assertHttpPort(cfg, port) {
   const p = cfg.ports.find((x) => x.port === port);
-  if (p && p.type === 'ws') {
-    throw new AppError(400, 'PORT_TYPE_MISMATCH', `port ${port} is a webservice port`);
+  if (p && p.type !== 'http') {
+    throw new AppError(400, 'PORT_TYPE_MISMATCH', `port ${port} is a ${p.type} port`);
   }
 }
 

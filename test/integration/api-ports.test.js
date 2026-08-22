@@ -186,3 +186,41 @@ describe('端口类型（v3）', () => {
     expect(list.body).toEqual([{ port: 8098, enabled: true, type: 'ws' }]);
   });
 });
+
+describe('TCP/UDP 端口类型（spec 2026-08-22 §3/§6）', () => {
+  it('创建 tcp/udp 端口', async () => {
+    const tcp = await ctx.request.post('/api/ports').send({ port: 9500, type: 'tcp' });
+    expect(tcp.status).toBe(201);
+    expect(tcp.body).toEqual({ port: 9500, enabled: true, type: 'tcp' });
+    const udp = await ctx.request.post('/api/ports').send({ port: 9501, type: 'udp' });
+    expect(udp.status).toBe(201);
+    expect(udp.body).toEqual({ port: 9501, enabled: true, type: 'udp' });
+  });
+
+  it('拒绝非法 type', async () => {
+    const r = await ctx.request.post('/api/ports').send({ port: 9502, type: 'sctp' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_VALUE');
+  });
+
+  it('type 创建后不可改', async () => {
+    await ctx.request.post('/api/ports').send({ port: 9503, type: 'tcp' });
+    const r = await ctx.request.put('/api/ports/9503').send({ type: 'http' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('FIELD_IMMUTABLE');
+  });
+
+  it('往 tcp 端口建 HTTP 端点 → PORT_TYPE_MISMATCH', async () => {
+    await ctx.request.post('/api/ports').send({ port: 9504, type: 'tcp' });
+    const r = await ctx.request.post('/api/endpoints').send({ port: 9504, method: 'GET', path: '/x', response: {} });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('PORT_TYPE_MISMATCH');
+  });
+
+  it('往 udp 端口建 WS 服务 → PORT_TYPE_MISMATCH（ensureWsPortEntity 覆盖）', async () => {
+    await ctx.request.post('/api/ports').send({ port: 9505, type: 'udp' });
+    const r = await ctx.request.post('/api/services').send({ port: 9505, path: '/ws/S', name: 'S' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('PORT_TYPE_MISMATCH');
+  });
+});
