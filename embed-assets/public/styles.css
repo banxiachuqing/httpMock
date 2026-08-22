@@ -2103,6 +2103,37 @@ body[data-view='ws-port'] {
 }
 .port-type-badge[data-type='http'] { color: #5e6ad2; }
 .port-type-badge[data-type='ws'] { color: var(--amber, #f5b84c); }
+.port-type-badge[data-type='tcp'] { color: var(--cyan); }
+.port-type-badge[data-type='udp'] { color: #b48ce8; }
+
+.log-proto[data-protocol='tcp'] { color: var(--cyan); }
+.log-proto[data-protocol='udp'] { color: #b48ce8; }
+
+.payload-toggle { margin-left: 10px; display: inline-flex; gap: 4px; }
+.payload-toggle .toggle-btn {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  opacity: 0.65;
+  cursor: pointer;
+}
+.payload-toggle .toggle-btn.is-active {
+  opacity: 1;
+  color: var(--cyan);
+  border-color: currentColor;
+}
+
+/* 抓包端口详情：topbar / 端口页头 / 日志区（占满剩余高度） */
+body[data-view='capture-port'] {
+  grid-template-rows: 56px auto 1fr;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "topbar"
+    "porthdr"
+    "logs";
+}
 
 .port-type-radios {
   display: flex;

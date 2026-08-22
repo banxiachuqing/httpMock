@@ -13,7 +13,7 @@ function relativeTime(ts) {
 function latestLogByPort(logs) {
   const latest = new Map();
   for (const entry of logs) {
-    if (!entry.method) continue; // 过滤 resolver-warn 条目
+    if (!entry.method && !entry.protocol) continue; // 过滤 resolver-warn 等无请求条目
     const prev = latest.get(entry.port);
     if (!prev || entry.timestamp > prev.timestamp) latest.set(entry.port, entry);
   }
@@ -21,6 +21,10 @@ function latestLogByPort(logs) {
 }
 
 function endpointLabel(entry, endpoints) {
+  if (entry.protocol) {
+    if (entry.event) return entry.event === 'connect' ? '连接建立' : '连接断开';
+    return `${entry.protocol.toUpperCase()} · ${entry.bytes} B`;
+  }
   if (entry.operationName) return entry.operationName === '?wsdl' ? '?wsdl' : entry.operationName;
   if (!entry.matched || !entry.endpointId) return `无路由 · ${entry.path}`;
   const ep = endpoints.find((e) => e.id === entry.endpointId);
@@ -30,6 +34,8 @@ function endpointLabel(entry, endpoints) {
 
 function buildCard(p, state, lastEntry, api) {
   const isWs = p.type === 'ws';
+  const isCapture = p.type === 'tcp' || p.type === 'udp';
+  const type = p.type || 'http';
   const card = document.createElement('article');
   card.className = 'port-card';
   card.dataset.port = String(p.port);
@@ -47,8 +53,8 @@ function buildCard(p, state, lastEntry, api) {
 
   const badge = document.createElement('span');
   badge.className = 'port-type-badge';
-  badge.dataset.type = isWs ? 'ws' : 'http';
-  badge.textContent = isWs ? 'WS' : 'HTTP';
+  badge.dataset.type = type;
+  badge.textContent = type.toUpperCase();
 
   const num = document.createElement('span');
   num.className = 'port-card-number mono';
@@ -91,7 +97,10 @@ function buildCard(p, state, lastEntry, api) {
   const epRow = document.createElement('div');
   const epDt = document.createElement('dt');
   const epDd = document.createElement('dd');
-  if (isWs) {
+  if (isCapture) {
+    epDt.textContent = '类型';
+    epDd.textContent = `${type.toUpperCase()} 抓包`;
+  } else if (isWs) {
     const svcs = (state.services || []).filter((s) => s.port === p.port);
     const opsCount = svcs.reduce((n, s) => n + (s.operations?.length || 0), 0);
     epDt.textContent = '服务';
