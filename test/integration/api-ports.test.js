@@ -224,3 +224,44 @@ describe('TCP/UDP 端口类型（spec 2026-08-22 §3/§6）', () => {
     expect(r.body.code).toBe('PORT_TYPE_MISMATCH');
   });
 });
+
+describe('Syslog 端口类型（spec 2026-08-22 §7）', () => {
+  it('创建 syslog 端口', async () => {
+    const r = await ctx.request.post('/api/ports').send({ port: 5514, type: 'syslog' });
+    expect(r.status).toBe(201);
+    expect(r.body).toEqual({ port: 5514, enabled: true, type: 'syslog' });
+  });
+
+  it('默认 type 仍为 http（不影响）', async () => {
+    const r = await ctx.request.post('/api/ports').send({ port: 5515 });
+    expect(r.body).toEqual({ port: 5515, enabled: true, type: 'http' });
+  });
+
+  it('PUT 传 type=syslog → FIELD_IMMUTABLE', async () => {
+    await ctx.request.post('/api/ports').send({ port: 5516 });
+    const r = await ctx.request.put('/api/ports/5516').send({ type: 'syslog' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('FIELD_IMMUTABLE');
+  });
+
+  it('往 syslog 端口建 HTTP 端点 → PORT_TYPE_MISMATCH', async () => {
+    await ctx.request.post('/api/ports').send({ port: 5517, type: 'syslog' });
+    const r = await ctx.request.post('/api/endpoints').send({ port: 5517, method: 'GET', path: '/x', response: {} });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('PORT_TYPE_MISMATCH');
+    expect(r.body.error).toContain('syslog');
+  });
+
+  it('往 syslog 端口建 WS 服务 → PORT_TYPE_MISMATCH', async () => {
+    await ctx.request.post('/api/ports').send({ port: 5518, type: 'syslog' });
+    const r = await ctx.request.post('/api/services').send({ port: 5518, path: '/ws/S', name: 'S' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('PORT_TYPE_MISMATCH');
+  });
+
+  it('非法 type（与既有列表不交集）→ INVALID_VALUE', async () => {
+    const r = await ctx.request.post('/api/ports').send({ port: 5519, type: 'snmp' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_VALUE');
+  });
+});

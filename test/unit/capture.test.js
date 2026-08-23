@@ -118,6 +118,111 @@ describe('createUdpCaptureSocket', () => {
       socket.close();
     }
   });
+
+  it('protocol="syslog" 时条目 protocol 字段为 syslog（无 parse）', async () => {
+    const logs = [];
+    const { socket } = createUdpCaptureSocket({
+      port: 18902, protocol: 'syslog',
+      logBuffer: { push: (e) => logs.push(e) }, getMax: () => 1024,
+    });
+    await bindCaptureSocket(socket, 18902);
+    try {
+      await sendUdp(18902, Buffer.from('<134>Aug 22 14:30:00 host app: hi'));
+      await sleep(100);
+      expect(logs).toHaveLength(1);
+      expect(logs[0].protocol).toBe('syslog');
+      // 无 parse 时不挂 syslog 字段
+      expect(logs[0].syslog).toBeUndefined();
+    } finally {
+      socket.close();
+    }
+  });
+
+  it('parse ok:true 时挂 entry.syslog 字段', async () => {
+    const logs = [];
+    const { socket } = createUdpCaptureSocket({
+      port: 18903, protocol: 'syslog',
+      parse: (buf) => ({
+        ok: true, format: 'rfc3164', facility: 16, severity: 6,
+        hostname: 'h', appName: 'a', procId: null, msgId: null,
+        timestamp: 'Aug 22 14:30:00', structuredData: null, message: buf.toString('utf8'),
+      }),
+      logBuffer: { push: (e) => logs.push(e) }, getMax: () => 1024,
+    });
+    await bindCaptureSocket(socket, 18903);
+    try {
+      await sendUdp(18903, Buffer.from('<134>Aug 22 14:30:00 host app: hi'));
+      await sleep(100);
+      expect(logs).toHaveLength(1);
+      expect(logs[0].protocol).toBe('syslog');
+      expect(logs[0].syslog).toMatchObject({
+        ok: true, format: 'rfc3164', facility: 16, severity: 6,
+        hostname: 'h', appName: 'a',
+      });
+    } finally {
+      socket.close();
+    }
+  });
+
+  it('parse ok:false 时不挂 syslog 字段，条目正常落日志', async () => {
+    const logs = [];
+    const { socket } = createUdpCaptureSocket({
+      port: 18904, protocol: 'syslog',
+      parse: () => ({ ok: false, format: 'raw', facility: null, severity: null }),
+      logBuffer: { push: (e) => logs.push(e) }, getMax: () => 1024,
+    });
+    await bindCaptureSocket(socket, 18904);
+    try {
+      await sendUdp(18904, Buffer.from('garbage'));
+      await sleep(100);
+      expect(logs).toHaveLength(1);
+      expect(logs[0].syslog).toBeUndefined();
+      expect(logs[0].payloadText).toBe('garbage');
+    } finally {
+      socket.close();
+    }
+  });
+
+  it('parse 抛错时不杀进程、不挂 syslog 字段', async () => {
+    const logs = [];
+    const { socket } = createUdpCaptureSocket({
+      port: 18905, protocol: 'syslog',
+      parse: () => { throw new Error('parser boom'); },
+      logBuffer: { push: (e) => logs.push(e) }, getMax: () => 1024,
+    });
+    await bindCaptureSocket(socket, 18905);
+    try {
+      await sendUdp(18905, Buffer.from('<134>x'));
+      await sendUdp(18905, Buffer.from('<13>y')); // 第二条仍要能落
+      await sleep(100);
+      expect(logs).toHaveLength(2);
+      expect(logs[0].syslog).toBeUndefined();
+      expect(logs[1].syslog).toBeUndefined();
+      expect(logs[1].payloadText).toBe('<13>y');
+    } finally {
+      socket.close();
+    }
+  });
+
+  it('parse 在截断后 payload 上执行；payloadTruncated 标志仍保留', async () => {
+    const logs = [];
+    const { socket } = createUdpCaptureSocket({
+      port: 18906, protocol: 'syslog',
+      parse: (buf) => ({ ok: true, format: 'rfc3164', message: buf.toString('utf8') }),
+      logBuffer: { push: (e) => logs.push(e) }, getMax: () => 8,
+    });
+    await bindCaptureSocket(socket, 18906);
+    try {
+      await sendUdp(18906, Buffer.from('123456789ABCDEF'));
+      await sleep(100);
+      expect(logs).toHaveLength(1);
+      expect(logs[0].payloadTruncated).toBe(true);
+      expect(logs[0].bytes).toBe(8);
+      expect(logs[0].syslog.message).toBe('12345678');
+    } finally {
+      socket.close();
+    }
+  });
 });
 
 function tcpConnect(port) {

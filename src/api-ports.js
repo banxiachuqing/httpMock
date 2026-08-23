@@ -25,8 +25,8 @@ export function registerPortRoutes(app, { configStore, mockEngine }) {
     try {
       const port = parsePortNumber(req.body?.port);
       const type = req.body?.type ?? 'http';
-      if (!['http', 'ws', 'tcp', 'udp'].includes(type)) {
-        throw new AppError(400, 'INVALID_VALUE', "type must be 'http' | 'ws' | 'tcp' | 'udp'");
+      if (!['http', 'ws', 'tcp', 'udp', 'syslog'].includes(type)) {
+        throw new AppError(400, 'INVALID_VALUE', "type must be 'http' | 'ws' | 'tcp' | 'udp' | 'syslog'");
       }
       if (configStore.config.ports.some((p) => p.port === port)) {
         throw new AppError(400, 'DUPLICATE_PORT', `port ${port} already exists`);

@@ -40,19 +40,31 @@ export function buildCaptureEvent({ protocol, port, remote, connectionId = null,
 }
 
 // UDP：一个 datagram = 一条消息日志（天然边界，无聚合）（spec §4）
-export function createUdpCaptureSocket({ port, logBuffer, getMax }) {
+// `protocol` 覆盖默认 'udp'（syslog 等协议复用同一 socket）；`parse` 存在时对截断后的 payload
+// 执行并把 ok:true 结果挂到 entry.syslog；parse 抛错被吞掉不挂字段（spec §5 铁律）
+export function createUdpCaptureSocket({ port, logBuffer, getMax, protocol = 'udp', parse = null }) {
   const socket = dgram.createSocket('udp4');
   socket.on('message', (msg, rinfo) => {
     const max = getMax();
     const truncated = msg.length > max;
-    logBuffer?.push(buildCaptureEntry({
-      protocol: 'udp',
+    const kept = truncated ? msg.subarray(0, max) : msg;
+    const entry = buildCaptureEntry({
+      protocol,
       port,
       remote: `${stripIpv6Prefix(rinfo.address)}:${rinfo.port}`,
       connectionId: null,
-      payload: truncated ? msg.subarray(0, max) : msg,
+      payload: kept,
       truncated,
-    }));
+    });
+    if (parse) {
+      try {
+        const result = parse(kept);
+        if (result && result.ok) entry.syslog = result;
+      } catch (_err) {
+        // 解析路径异常不杀进程；条目照常落日志，无 syslog 字段
+      }
+    }
+    logBuffer?.push(entry);
   });
   // 运行时错误不杀进程（spec §8）；bind 阶段的错误由引擎挂的一次性 error 监听处理，两者并存不冲突
   socket.on('error', () => {});

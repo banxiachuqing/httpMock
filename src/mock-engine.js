@@ -11,6 +11,7 @@ import {
 } from './soap-router.js';
 import { buildSkeletonWsdl, rewriteAddress } from './wsdl.js';
 import { createTcpCaptureServer, createUdpCaptureSocket } from './capture.js';
+import { parseSyslog } from './syslog.js';
 
 const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
 
@@ -162,8 +163,15 @@ export class MockEngine {  /**
           const { server, sockets } = createTcpCaptureServer({ port, logBuffer: this.logBuffer, getMax });
           record = { kind: 'tcp', server, sockets };
           await listenOrFail(server, port, this.bindHost);
-        } else if (type === 'udp') {
-          const { socket } = createUdpCaptureSocket({ port, logBuffer: this.logBuffer, getMax });
+        } else if (type === 'udp' || type === 'syslog') {
+          // syslog 复用 UDP 捕获路径：注入 protocol + parseSyslog 让条目挂 entry.syslog；
+          // record 仍记 'udp'，stop/隔离/状态零改动（spec 2026-08-22 §5）
+          const { socket } = createUdpCaptureSocket({
+            port,
+            logBuffer: this.logBuffer,
+            getMax,
+            ...(type === 'syslog' ? { protocol: 'syslog', parse: parseSyslog } : {}),
+          });
           record = { kind: 'udp', socket };
           await bindOrFail(socket, port, this.bindHost);
         } else {

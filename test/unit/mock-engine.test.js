@@ -358,4 +358,44 @@ describe('MockEngine TCP/UDP 抓包端口', () => {
     await engine.stop();
     await closed;
   });
+
+  it('syslog 端口收 RFC 3164 datagram → entry.protocol=syslog 且 entry.syslog 正确', async () => {
+    engine = new MockEngine({ logBuffer });
+    const { running } = await engine.start([], [{ port: 18927, enabled: true, type: 'syslog' }]);
+    expect(running.map((r) => r.port)).toEqual([18927]);
+    const client = dgram.createSocket('udp4');
+    await new Promise((res, rej) =>
+      client.send('<134>Aug 22 14:30:00 myhost myapp[123]: link up on eth0', 18927, '127.0.0.1', (e) => (e ? rej(e) : res()))
+    );
+    client.close();
+    await new Promise((r) => setTimeout(r, 150));
+    const msg = pushedLogs.find((e) => e.protocol === 'syslog' && e.syslog);
+    expect(msg).toBeTruthy();
+    expect(msg.syslog).toMatchObject({
+      ok: true, format: 'rfc3164',
+      facility: 16, severity: 6,
+      hostname: 'myhost', appName: 'myapp', procId: '123',
+      message: 'link up on eth0',
+    });
+  });
+
+  it('syslog 端口收畸形 datagram → 无 syslog 字段、条目照常落', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([], [{ port: 18928, enabled: true, type: 'syslog' }]);
+    const client = dgram.createSocket('udp4');
+    await new Promise((res, rej) => client.send('not a syslog line', 18928, '127.0.0.1', (e) => (e ? rej(e) : res())));
+    client.close();
+    await new Promise((r) => setTimeout(r, 150));
+    const msg = pushedLogs.find((e) => e.protocol === 'syslog' && e.payloadText === 'not a syslog line');
+    expect(msg).toBeTruthy();
+    expect(msg.syslog).toBeUndefined();
+  });
+
+  it('syslog 端口 stop 后可立即重绑（与 udp 端口同一 record 生命周期）', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([], [{ port: 18929, enabled: true, type: 'syslog' }]);
+    await engine.stop();
+    const { failed } = await engine.start([], [{ port: 18929, enabled: true, type: 'syslog' }]);
+    expect(failed).toEqual([]);
+  });
 });
