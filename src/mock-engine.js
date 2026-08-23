@@ -188,8 +188,23 @@ export class MockEngine {  /**
       } catch (e) {
         this.statuses.set(port, { state: 'failed', reason: e.code || 'EADDRINUSE' });
         failed.push({ port, reason: e.code || 'EADDRINUSE' });
-        try { record?.server?.close(); } catch {}
-        try { record?.socket?.close(); } catch {}
+        // L5：与 TCP server-level error 对称——bind 失败落 warn 进 logBuffer，便于排查
+        this.logBuffer?.push({
+          id: crypto.randomUUID(),
+          timestamp: Date.now(),
+          level: 'warn',
+          source: 'engine',
+          message: `port ${port} bind failed: ${e.code || e.message}`,
+        });
+        // L6：record 在不同 type 下结构不同（http→server / tcp→server+sockets / udp|syslog→socket）
+        if (record?.kind === 'tcp') {
+          try { record.server.close(); } catch {}
+          for (const s of record.sockets || []) try { s.destroy(); } catch {}
+        } else if (record?.kind === 'udp') {
+          try { record.socket.close(); } catch {}
+        } else if (record?.kind === 'http') {
+          try { record.server.close(); } catch {}
+        }
       }
     }
 

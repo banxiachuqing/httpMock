@@ -2125,7 +2125,9 @@ body[data-view='ws-port'] {
 .severity-badge[data-level='error'] { color: #ff5a72; }
 .severity-badge[data-level='warning'] { color: var(--amber, #f5b84c); }
 .severity-badge[data-level='notice'] { color: #6da8ff; }
-.severity-badge[data-level='debug'] { color: var(--text-tertiary); }
+.severity-badge[data-level='debug'] { color: var(--text-tertiary); background: color-mix(in srgb, currentColor 12%, transparent); }
+/* L10：亮色主题下默认 --text-tertiary (#6E6E73) 在白底上对比度勉强；debug 加一层淡淡背景 + 略深颜色 */
+:root[data-theme='light'] .severity-badge[data-level='debug'] { color: #4a4a4e; }
 
 .payload-toggle { margin-left: 10px; display: inline-flex; gap: 4px; }
 .payload-toggle .toggle-btn {

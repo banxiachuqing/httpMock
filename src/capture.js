@@ -45,29 +45,46 @@ export function buildCaptureEvent({ protocol, port, remote, connectionId = null,
 export function createUdpCaptureSocket({ port, logBuffer, getMax, protocol = 'udp', parse = null }) {
   const socket = dgram.createSocket('udp4');
   socket.on('message', (msg, rinfo) => {
-    const max = getMax();
-    const truncated = msg.length > max;
-    const kept = truncated ? msg.subarray(0, max) : msg;
-    const entry = buildCaptureEntry({
-      protocol,
-      port,
-      remote: `${stripIpv6Prefix(rinfo.address)}:${rinfo.port}`,
-      connectionId: null,
-      payload: kept,
-      truncated,
-    });
-    if (parse) {
-      try {
-        const result = parse(kept);
-        if (result && result.ok) entry.syslog = result;
-      } catch (_err) {
-        // 解析路径异常不杀进程；条目照常落日志，无 syslog 字段
+    // 整个 handler 包 try/catch：buildCaptureEntry / randomUUID / toString('hex') 等任何抛出都不能让
+    // EventEmitter 把后续 datagram 静默 drop（M3 审查发现：原 try 只包 parse，buildCaptureEntry 抛错会
+    // 透过到 on('error') 空 handler，之后所有 datagram 都被吞掉）
+    try {
+      const max = getMax();
+      const truncated = msg.length > max;
+      const kept = truncated ? msg.subarray(0, max) : msg;
+      const entry = buildCaptureEntry({
+        protocol,
+        port,
+        remote: `${stripIpv6Prefix(rinfo.address)}:${rinfo.port}`,
+        connectionId: null,
+        payload: kept,
+        truncated,
+      });
+      if (parse) {
+        try {
+          const result = parse(kept);
+          if (result && result.ok) entry.syslog = result;
+        } catch (_err) {
+          // 解析路径异常不杀进程；条目照常落日志，无 syslog 字段（spec §5 铁律）
+        }
       }
+      logBuffer?.push(entry);
+    } catch (_err) {
+      // spec §8：捕获路径任何异常不杀进程；连 entry 都构建失败时整条 datagram 静默丢失
+      // （socket.on('error') 兜底但 datagram 计数不减，所以不可观察——这是协议层面的权衡）
     }
-    logBuffer?.push(entry);
   });
-  // 运行时错误不杀进程（spec §8）；bind 阶段的错误由引擎挂的一次性 error 监听处理，两者并存不冲突
-  socket.on('error', () => {});
+  // 运行时错误（ICMP unreachable、EMFILE 等）不杀进程（spec §8）；bind 阶段的错误由引擎挂的一次性
+  // error 监听处理，两者并存不冲突。L4：syslog 等纯抓包路径无协议层响应，留 warn log 镜像 TCP server
+  socket.on('error', (err) => {
+    logBuffer?.push({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      level: 'warn',
+      source: 'capture',
+      message: `${protocol} :${port} socket error: ${err?.message || err}`,
+    });
+  });
   return { socket };
 }
 

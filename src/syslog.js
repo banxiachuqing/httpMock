@@ -42,7 +42,7 @@ function parseRfc5424(afterVersion) {
   const parts = afterVersion.split(' ');
   if (parts.length < 6) return null;
 
-  const timestamp = parts[0];
+  const timestamp = nilOr(parts[0]);
   const hostname = parts[1];
   const appName = parts[2];
   const procId = parts[3];
@@ -124,12 +124,9 @@ function parseRfc3164(rest) {
  * }}
  */
 export function parseSyslog(buf) {
-  let text;
-  try {
-    text = buf.toString('utf8');
-  } catch (_err) {
-    return rawResult('', null, null);
-  }
+  // Node 的 Buffer.toString('utf8') 对损坏字节是替换 U+FFFD 不抛，故无需包内层 try/catch；
+  // 整个解析路径包外层 try/catch 满足 spec §4 铁律"永不抛错"
+  const text = buf.toString('utf8');
 
   try {
     let facility = null;
@@ -138,9 +135,12 @@ export function parseSyslog(buf) {
     const priMatch = text.match(/^<(\d+)>/);
     if (priMatch) {
       const pri = Number(priMatch[1]);
-      facility = pri >> 3;
-      severity = pri & 7;
-      rest = text.slice(priMatch[0].length);
+      // PRI 有效范围 0..191（facility 0..23 × 8 + severity 0..7）；超出视为畸形，兜底 raw
+      if (pri >= 0 && pri <= 191) {
+        facility = pri >> 3;
+        severity = pri & 7;
+        rest = text.slice(priMatch[0].length);
+      }
     }
 
     // 5424 判定：PRI 后匹配 /^1 / → VERSION=1 SP ...
@@ -149,6 +149,8 @@ export function parseSyslog(buf) {
       if (r5424) {
         return { ok: true, format: 'rfc5424', facility, severity, ...r5424 };
       }
+      // 5424 fail（SD 未闭合等）：剥掉 "1 "（5424 版本标识），让后续 raw 兜底不出 "1 " 前缀
+      rest = rest.slice(2);
     }
 
     // 3164 判定
@@ -157,8 +159,8 @@ export function parseSyslog(buf) {
       return { ok: true, format: 'rfc3164', facility, severity, ...r3164 };
     }
 
-    // 兜底 raw：保留 PRI（如有）的 facility/severity
-    return rawResult(text, facility, severity);
+    // 兜底 raw：保留 PRI（如有）的 facility/severity；message 用去除 PRI 的文本，避免 5424 路径残留 "1 "
+    return rawResult(rest, facility, severity);
   } catch (_err) {
     // 解析路径异常不抛错（spec §4 铁律）
     return rawResult(text, null, null);

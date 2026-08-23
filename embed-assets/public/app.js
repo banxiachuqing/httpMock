@@ -22,6 +22,7 @@ import { initImportWsdlDialog } from "./views/ws-import.js";
 import { initServiceDetail, renderServiceDetail } from "./views/ws-detail.js";
 import { showToast } from "./toast.js";
 import { confirmDialog } from "./confirm-dialog.js";
+import { SYSLOG_SEVERITY_NAMES, SYSLOG_FACILITY_NAMES } from "./syslog-names.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -732,7 +733,7 @@ function effectiveView(route) {
     return svc ? "service" : "not-found";
   }
   if (portEntity.type === "ws") return "ws-port";
-  if (portEntity.type === "tcp" || portEntity.type === "udp") return "capture-port";
+  if (portEntity.type === "tcp" || portEntity.type === "udp" || portEntity.type === "syslog") return "capture-port";
   return "port";
 }
 
@@ -821,7 +822,7 @@ function renderServicePage() {
 }
 
 function renderLogEntry(entry) {
-  if (entry.protocol === "tcp" || entry.protocol === "udp") {
+  if (entry.protocol === "tcp" || entry.protocol === "udp" || entry.protocol === "syslog") {
     return renderCaptureLogEntry(entry);
   }
   const row = document.createElement("div");
@@ -858,6 +859,21 @@ function renderLogEntry(entry) {
 }
 
 // 抓包条目行：时间 / 协议 / 远端 / 端口 / 字节数 / — / 来源 IP / 事件或「接收」（spec 2026-08-22 §5/§7）
+// Syslog 条目（spec 2026-08-22 §8）：路径列 `${hostname} · ${message摘要}`，状态列 severity 着色徽标
+function syslogSeverityLevel(severity) {
+  if (typeof severity !== "number") return "debug";
+  if (severity <= 3) return "error";
+  if (severity === 4) return "warning";
+  if (severity <= 6) return "notice";
+  return "debug";
+}
+
+function syslogMessagePreview(message) {
+  if (!message) return "";
+  const MAX = 80;
+  return message.length > MAX ? message.slice(0, MAX) + "…" : message;
+}
+
 function renderCaptureLogEntry(entry) {
   const row = document.createElement("div");
   row.className = "log-entry capture";
@@ -865,18 +881,32 @@ function renderCaptureLogEntry(entry) {
     hour12: false,
   });
   const remoteIp = (entry.remote || "").replace(/:\d+$/, "");
+  const isSyslog = entry.protocol === "syslog";
+  const sys = isSyslog ? entry.syslog : null;
+  // 状态列：syslog 解析成功 → severity 徽标；syslog 解析失败 → 灰色 "unparsed" 徽标（spec §8）；
+  // 其他抓包协议 → formatBytes；连接事件 → —
+  const statusHtml = sys
+    ? `<span class="severity-badge" data-level="${syslogSeverityLevel(sys.severity)}">${SYSLOG_SEVERITY_NAMES[sys.severity] || "unparsed"}</span>`
+    : isSyslog
+    ? `<span class="severity-badge" data-level="debug">unparsed</span>`
+    : entry.event ? "—" : formatBytes(entry.bytes);
   row.innerHTML = `
     <span class="log-time">${time}</span>
     <span class="log-method log-proto" data-protocol="${entry.protocol}">${entry.protocol.toUpperCase()}</span>
     <span class="log-path"></span>
     <span class="log-port">${entry.port}</span>
-    <span class="log-status" data-range="">${entry.event ? "—" : formatBytes(entry.bytes)}</span>
+    <span class="log-status" data-range="">${statusHtml}</span>
     <span class="log-duration">—</span>
     <span class="log-ip mono"></span>
     <span class="log-result"></span>
   `;
-  // remote 来自对端地址，只能 textContent 赋值（不进 innerHTML）
-  row.querySelector(".log-path").textContent = entry.remote || "—";
+  // Syslog 结构化：hostname · message 摘要；fallback 同其他抓包 → remote
+  const pathEl = row.querySelector(".log-path");
+  if (sys?.hostname) {
+    pathEl.textContent = `${sys.hostname} · ${syslogMessagePreview(sys.message)}`;
+  } else {
+    pathEl.textContent = entry.remote || "—";
+  }
   row.querySelector(".log-ip").textContent = remoteIp || "—";
   row.querySelector(".log-result").textContent = entry.event
     ? entry.event === "connect"
@@ -899,7 +929,7 @@ function closeLogDetail() {
 }
 
 function renderLogDetail(entry) {
-  if (entry.protocol === "tcp" || entry.protocol === "udp") {
+  if (entry.protocol === "tcp" || entry.protocol === "udp" || entry.protocol === "syslog") {
     renderCaptureLogDetail(entry);
     return;
   }
@@ -1017,15 +1047,29 @@ function renderLogDetail(entry) {
 
 // 抓包条目详情：header 显示协议/远端/字节数或事件；数据区 hex/文本双视图切换（spec 2026-08-22 §7）
 function renderCaptureLogDetail(entry) {
+  const isSyslog = entry.protocol === "syslog";
+  const sys = isSyslog ? entry.syslog : null;
   els.logDetailMethod.textContent = entry.protocol.toUpperCase();
   els.logDetailMethod.dataset.method = "";
-  els.logDetailPath.textContent = entry.remote || "—";
+  // Syslog 解析成功时详情页 path 改为 hostname · message；fallback 同抓包 → remote
+  if (sys?.hostname) {
+    els.logDetailPath.textContent = `${sys.hostname} · ${syslogMessagePreview(sys.message)}`;
+  } else {
+    els.logDetailPath.textContent = entry.remote || "—";
+  }
   els.logDetailStatus.dataset.range = "";
-  els.logDetailStatus.textContent = entry.event
-    ? entry.event === "connect"
-      ? "连接"
-      : "断开"
-    : formatBytes(entry.bytes) || `${entry.bytes} B`;
+  // 详情状态列：syslog 解析成功 → severity 徽标 + bytes；syslog 解析失败 → 灰色 unparsed + bytes
+  if (sys) {
+    els.logDetailStatus.innerHTML = `<span class="severity-badge" data-level="${syslogSeverityLevel(sys.severity)}">${SYSLOG_SEVERITY_NAMES[sys.severity] || "unparsed"}</span> <span class="mono">${formatBytes(entry.bytes) || entry.bytes + " B"}</span>`;
+  } else if (entry.protocol === "syslog") {
+    els.logDetailStatus.innerHTML = `<span class="severity-badge" data-level="debug">unparsed</span> <span class="mono">${formatBytes(entry.bytes) || entry.bytes + " B"}</span>`;
+  } else {
+    els.logDetailStatus.textContent = entry.event
+      ? entry.event === "connect"
+        ? "连接"
+        : "断开"
+      : formatBytes(entry.bytes) || `${entry.bytes} B`;
+  }
 
   const time = new Date(entry.timestamp).toLocaleString("zh-CN", {
     hour12: false,
@@ -1042,6 +1086,20 @@ function renderCaptureLogDetail(entry) {
     rows.push(["字节数", `${entry.bytes} B`]);
   }
   if (entry.connectionId) rows.push(["连接", `${entry.connectionId.slice(0, 8)}…`]);
+  // Syslog 结构化字段表追加（spec 2026-08-22 §8）：facility/severity/hostname/应用/进程 ID/消息 ID/对端时间戳/消息
+  if (sys) {
+    const sevName = SYSLOG_SEVERITY_NAMES[sys.severity] || "unparsed";
+    const facName = SYSLOG_FACILITY_NAMES[sys.facility] || "unparsed";
+    rows.push(["格式", sys.format || "—"]);
+    rows.push(["Facility", `${sys.facility ?? "?"} (${facName})`]);
+    rows.push(["Severity", `${sys.severity ?? "?"} (${sevName})`]);
+    rows.push(["Hostname", sys.hostname || "—"]);
+    if (sys.appName) rows.push(["应用", sys.appName]);
+    if (sys.procId) rows.push(["进程 ID", sys.procId]);
+    if (sys.msgId) rows.push(["消息 ID", sys.msgId]);
+    if (sys.timestamp) rows.push(["对端时间戳", sys.timestamp]);
+    if (sys.message) rows.push(["消息", sys.message]);
+  }
   for (const [k, v] of rows) {
     const dt = document.createElement("dt");
     dt.textContent = k;

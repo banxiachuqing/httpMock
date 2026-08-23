@@ -127,4 +127,38 @@ describe('parseSyslog 兜底（解析失败）', () => {
     expect(r.format).toBe('raw');
     expect(r.message).toBe('');
   });
+
+  it('PRI 越界（如 999999）视为 raw，facility/severity 留 null（M4 防御）', () => {
+    const r = parseSyslog(Buffer.from('<999999>garbage'));
+    expect(r.ok).toBe(false);
+    expect(r.format).toBe('raw');
+    expect(r.facility).toBeNull();
+    expect(r.severity).toBeNull();
+  });
+
+  it('RFC 5424 TIMESTAMP 为 "-" → null（M2 nilvalue 覆盖全部 5 字段）', () => {
+    const r = parseSyslog(Buffer.from(
+      '<13>1 - host app - ID47 - hi'
+    ));
+    expect(r.ok).toBe(true);
+    expect(r.format).toBe('rfc5424');
+    expect(r.timestamp).toBeNull();
+    // 其他字段仍正常 nilvalue
+    expect(r.hostname).toBe('host');
+    expect(r.appName).toBe('app');
+    expect(r.procId).toBeNull();
+    expect(r.msgId).toBe('ID47');
+  });
+
+  it('5424 SD 未闭合 + 3164 不匹配 → 走 raw，message 不残留 "1 " 前缀（L2）', () => {
+    // PRI 后以 "1 " 开头触发 5424 分支；SD 故意未闭合让 5424 失败；
+    // 3164 也匹配不上（无 Mmm dd 时间戳）→ 兜底 raw
+    const r = parseSyslog(Buffer.from('<13>1 2024-01-01T00:00:00Z host app - ID47 [unclosed'));
+    expect(r.ok).toBe(false);
+    expect(r.format).toBe('raw');
+    expect(r.facility).toBe(1);
+    expect(r.severity).toBe(5);
+    // message 应是去除 PRI 后的剩余文本，不含开头 "1 "
+    expect(r.message).not.toMatch(/^1 /);
+  });
 });

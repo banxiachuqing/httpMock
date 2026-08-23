@@ -195,6 +195,8 @@ export function initNewPortDialog({ els, state, api }) {
     els.newPortModal.hidden = false;
     els.newPortNumber.focus();
     els.newPortNumber.select();
+    // L7：跟踪用户是否手改过端口号——type 切换只在未手改时覆写
+    els.newPortNumber.dataset.userEdited = '0';
   };
   const close = () => { els.newPortModal.hidden = true; };
   const fail = (msg) => {
@@ -227,9 +229,15 @@ export function initNewPortDialog({ els, state, api }) {
   els.newPortNumber.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') submit();
   });
-  // 类型切换：按目标类型重算建议端口号，覆盖用户未手改前的占位
+  // L7：手改端口号时打标，避免后续 type 切换覆盖
+  els.newPortNumber.addEventListener('input', () => {
+    els.newPortNumber.dataset.userEdited = '1';
+  });
+  // 类型切换：仅当用户未手改过端口号才覆写
   els.newPortModal.querySelector('#newPortType').addEventListener('change', (e) => {
-    els.newPortNumber.value = suggestedPort(e.target.value);
+    if (els.newPortNumber.dataset.userEdited !== '1') {
+      els.newPortNumber.value = suggestedPort(e.target.value);
+    }
     els.newPortError.hidden = true;
   });
 

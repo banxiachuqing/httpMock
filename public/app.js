@@ -883,9 +883,12 @@ function renderCaptureLogEntry(entry) {
   const remoteIp = (entry.remote || "").replace(/:\d+$/, "");
   const isSyslog = entry.protocol === "syslog";
   const sys = isSyslog ? entry.syslog : null;
-  // Syslog 解析成功时：状态列改成 severity 徽标；其余字节/事件列保持同一 span 但隐藏其文本
+  // 状态列：syslog 解析成功 → severity 徽标；syslog 解析失败 → 灰色 "unparsed" 徽标（spec §8）；
+  // 其他抓包协议 → formatBytes；连接事件 → —
   const statusHtml = sys
     ? `<span class="severity-badge" data-level="${syslogSeverityLevel(sys.severity)}">${SYSLOG_SEVERITY_NAMES[sys.severity] || "unparsed"}</span>`
+    : isSyslog
+    ? `<span class="severity-badge" data-level="debug">unparsed</span>`
     : entry.event ? "—" : formatBytes(entry.bytes);
   row.innerHTML = `
     <span class="log-time">${time}</span>
@@ -1055,9 +1058,11 @@ function renderCaptureLogDetail(entry) {
     els.logDetailPath.textContent = entry.remote || "—";
   }
   els.logDetailStatus.dataset.range = "";
-  // Syslog 解析成功时详情状态列显示 severity 徽标（行级别一致），保留 bytes 提示在括号
+  // 详情状态列：syslog 解析成功 → severity 徽标 + bytes；syslog 解析失败 → 灰色 unparsed + bytes
   if (sys) {
     els.logDetailStatus.innerHTML = `<span class="severity-badge" data-level="${syslogSeverityLevel(sys.severity)}">${SYSLOG_SEVERITY_NAMES[sys.severity] || "unparsed"}</span> <span class="mono">${formatBytes(entry.bytes) || entry.bytes + " B"}</span>`;
+  } else if (entry.protocol === "syslog") {
+    els.logDetailStatus.innerHTML = `<span class="severity-badge" data-level="debug">unparsed</span> <span class="mono">${formatBytes(entry.bytes) || entry.bytes + " B"}</span>`;
   } else {
     els.logDetailStatus.textContent = entry.event
       ? entry.event === "connect"

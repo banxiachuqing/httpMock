@@ -129,7 +129,6 @@ test('Syslog 端口：弹窗预填 514 → 切自定义端口 → dgram 发 RFC 
   await page.waitForSelector('#portHeader:not([hidden])');
   expect(page.url()).toContain('#/port/19514');
 
-  // 启动 runtime 并发一条 RFC 3164 datagram（facility=16 local0 / severity=6 info）
   // 启动 runtime 并发一条 RFC 3164 datagram（PRI<126> = facility 15 local0 / severity 6 info）
   await page.evaluate(async () => {
     await fetch('/api/runtime/start', { method: 'POST' });
@@ -159,7 +158,7 @@ test('Syslog 端口：弹窗预填 514 → 切自定义端口 → dgram 发 RFC 
   // Meta 字段表包含 facility/severity/hostname/应用/进程 ID/对端时间戳/消息
   const metaText = await page.locator('#logDetailMeta').innerText();
   expect(metaText).toContain('Facility');
-  expect(metaText).toContain('16');
+  expect(metaText).toContain('15');
   expect(metaText).toContain('local0');
   expect(metaText).toContain('Severity');
   expect(metaText).toContain('6');
