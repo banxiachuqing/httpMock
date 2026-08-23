@@ -119,7 +119,8 @@ MOCK_READY {"host","port"}，壳解析后 WebView 导航到该地址；关窗隐
 | `server.js` | 进程入口、端口回退（+50 探测）、bind host 解析、自动开浏览器 | `__dirname` 接受 `MOCK_SERVER_DIR`（编译模式用） |
 | `src/config-store.js` | `data.json` 持久化、原子写、损坏文件轮转（max 5）、唯一性校验 | `update(mutator)` 是唯一写入入口；`checkUniqueness(endpoints, excludeId)` 校验 `(port, method, path)` |
 | `src/mock-engine.js` | 每端口 `http.createServer`，按 `port|method|path` 路由；按 `port.type` 派发 http/ws/tcp/udp | `start(endpoints, ports, services)`：ports 列表模式下只绑定启用端口、空端口也绑定（404）；**端口隔离**：一个端口 EADDRINUSE 不影响其他端口；`getStatus()` 返回 `{port: {state, reason?}}` |
-| `src/capture.js` | TCP/UDP 抓包数据平面（`node:net`/`node:dgram`） | TCP 空闲 200ms 聚合成一条日志、断连 flush、`maxBodyBytes` 截断、连接上限 200；UDP 一 datagram 一条；**纯抓包不响应**；connect/disconnect 落事件日志 |
+| `src/capture.js` | TCP/UDP 抓包数据平面（`node:net`/`node:dgram`） | TCP 空闲 200ms 聚合成一条日志、断连 flush、`maxBodyBytes` 截断、连接上限 200；UDP 一 datagram 一条；**纯抓包不响应**；connect/disconnect 落事件日志；可选 `protocol`/`parse` 参数给 syslog 等协议复用（同 socket 不同解析层） |
+| `src/syslog.js` | Syslog 解析器（RFC 3164 / 5424） | 纯函数 `parseSyslog(buf)`；PRI 后 `/^1 /` 判 5424 否则 3164；解析失败兜底 raw；全程 try/catch 不抛错；导出 SEVERITY_NAMES / FACILITY_NAMES（RFC 5424 §6.2.1 表） |
 | `src/log-buffer.js` | 500 条环形 + `subscribe(fn)` fan-out | `push()` 同步通知所有订阅者 |
 | `src/sse.js` | SSE helper + 客户端集合 | `sseMiddleware()` 返回 `{clients, handler}`；不调用 `next()` |
 | `src/errors.js` | `AppError(status, code, message)` + 信封 | 所有 API 错误统一经 `toErrorResponse`/`statusFor` |
@@ -171,7 +172,7 @@ test/
 6. **端口一等实体**：`data.json` v2 含 `ports: [{port, enabled}]`；v1 数据加载时自动迁移。禁用端口不随启动绑定；空端口绑定后全返回 404。
 7. **端点自动补建端口**：`POST/PUT /api/endpoints` 引用未知端口时自动创建 `{port, enabled: true}`，保证不存在"有接口但端口实体缺失"的状态。
 8. **桌面壳只碰进程生命周期**：src-tauri/ 不得引入 mock 业务逻辑；sidecar 协议行（MOCK_READY/MOCK_ERROR）改动必须同步更新 src-tauri/src/sidecar.rs 的 parse_handshake_line。
-9. **端口分类型**：`type: 'http'|'ws'|'tcp'|'udp'` 创建后不可改；资源类型必须与端口类型匹配（`PORT_TYPE_MISMATCH`——`assertHttpPort` 对一切非 http 类型拒挂端点）。tcp/udp 为纯抓包端口：无 endpoints/services 实体，同端口号跨类型也不并存（端口号全局唯一）。
+9. **端口分类型**：`type: 'http'|'ws'|'tcp'|'udp'|'syslog'` 创建后不可改；资源类型必须与端口类型匹配（`PORT_TYPE_MISMATCH`——`assertHttpPort` 对一切非 http 类型拒挂端点）。tcp/udp/syslog 为纯抓包端口：无 endpoints/services 实体，同端口号跨类型也不并存（端口号全局唯一）。syslog 复用 UDP 捕获路径，注入 `protocol:'syslog'` + `parse:parseSyslog` 给 entry 挂 `syslog` 字段；record 仍记 `'udp'`，stop/隔离/状态零改动。
 10. **WS 路由优先级**：`?wsdl` > SOAPAction 精确 > action 末段 > Body localName > Fault；匹配大小写敏感。
 11. **WSDL 分发必须重写地址**：`?wsdl` 返回时 `soap:address location` 重写为 mock 自身地址（含骨架生成场景）。
 12. **`GET /api/config` 不含 `services[].wsdl` 原文**（只有 `hasWsdl`）；存储层完整保留。

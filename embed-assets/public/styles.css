@@ -2105,9 +2105,27 @@ body[data-view='ws-port'] {
 .port-type-badge[data-type='ws'] { color: var(--amber, #f5b84c); }
 .port-type-badge[data-type='tcp'] { color: var(--cyan); }
 .port-type-badge[data-type='udp'] { color: #b48ce8; }
+.port-type-badge[data-type='syslog'] { color: #f08cb4; }
 
 .log-proto[data-protocol='tcp'] { color: var(--cyan); }
 .log-proto[data-protocol='udp'] { color: #b48ce8; }
+.log-proto[data-protocol='syslog'] { color: #f08cb4; }
+
+/* Syslog severity 着色徽标（spec 2026-08-22 §8）：err(≤3) 红 / warning(4) 黄 / notice·info(5-6) 蓝 / debug(7)·未解析 灰 */
+.severity-badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  background: transparent;
+}
+.severity-badge[data-level='error'] { color: #ff5a72; }
+.severity-badge[data-level='warning'] { color: var(--amber, #f5b84c); }
+.severity-badge[data-level='notice'] { color: #6da8ff; }
+.severity-badge[data-level='debug'] { color: var(--text-tertiary); }
 
 .payload-toggle { margin-left: 10px; display: inline-flex; gap: 4px; }
 .payload-toggle .toggle-btn {

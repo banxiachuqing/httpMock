@@ -1,6 +1,7 @@
 // 首页：端口卡片渲染 + 新建端口弹窗
 import { navigate } from '../router.js';
 import { showToast } from '../toast.js';
+import { SYSLOG_SEVERITY_NAMES } from '../syslog-names.js';
 
 function relativeTime(ts) {
   const diff = Date.now() - ts;
@@ -23,6 +24,11 @@ function latestLogByPort(logs) {
 function endpointLabel(entry, endpoints) {
   if (entry.protocol) {
     if (entry.event) return entry.event === 'connect' ? '连接建立' : '连接断开';
+    // Syslog 解析成功时显示 severity 名 · hostname；未解析（raw）走通用形式
+    if (entry.syslog?.hostname) {
+      const sev = SYSLOG_SEVERITY_NAMES[entry.syslog.severity] || 'unparsed';
+      return `${sev} · ${entry.syslog.hostname}`;
+    }
     return `${entry.protocol.toUpperCase()} · ${entry.bytes} B`;
   }
   if (entry.operationName) return entry.operationName === '?wsdl' ? '?wsdl' : entry.operationName;
@@ -34,7 +40,7 @@ function endpointLabel(entry, endpoints) {
 
 function buildCard(p, state, lastEntry, api) {
   const isWs = p.type === 'ws';
-  const isCapture = p.type === 'tcp' || p.type === 'udp';
+  const isCapture = p.type === 'tcp' || p.type === 'udp' || p.type === 'syslog';
   const type = p.type || 'http';
   const card = document.createElement('article');
   card.className = 'port-card';
@@ -99,7 +105,7 @@ function buildCard(p, state, lastEntry, api) {
   const epDd = document.createElement('dd');
   if (isCapture) {
     epDt.textContent = '类型';
-    epDd.textContent = `${type.toUpperCase()} 抓包`;
+    epDd.textContent = type === 'syslog' ? 'Syslog 接收' : `${type.toUpperCase()} 抓包`;
   } else if (isWs) {
     const svcs = (state.services || []).filter((s) => s.port === p.port);
     const opsCount = svcs.reduce((n, s) => n + (s.operations?.length || 0), 0);
@@ -178,10 +184,14 @@ export function nextFreePort(ports, start = 8080) {
 }
 
 export function initNewPortDialog({ els, state, api }) {
+  // Syslog 端口默认预填 514；其他类型按 nextFreePort 从 8080 起（spec 2026-08-22 §8）
+  const suggestedPort = (type) =>
+    String(nextFreePort(state.ports, type === 'syslog' ? 514 : 8080));
+
   const open = () => {
+    els.newPortModal.querySelector('#newPortType').value = 'http';
     els.newPortNumber.value = String(nextFreePort(state.ports));
     els.newPortError.hidden = true;
-    els.newPortModal.querySelector('#newPortType').value = 'http';
     els.newPortModal.hidden = false;
     els.newPortNumber.focus();
     els.newPortNumber.select();
@@ -216,6 +226,11 @@ export function initNewPortDialog({ els, state, api }) {
   els.newPortCreate.addEventListener('click', submit);
   els.newPortNumber.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') submit();
+  });
+  // 类型切换：按目标类型重算建议端口号，覆盖用户未手改前的占位
+  els.newPortModal.querySelector('#newPortType').addEventListener('change', (e) => {
+    els.newPortNumber.value = suggestedPort(e.target.value);
+    els.newPortError.hidden = true;
   });
 
   return { open, close };
