@@ -209,3 +209,40 @@ describe('PUT /api/endpoints/order', () => {
     expect(r.body.code).toBe('INVALID_ORDER');
   });
 });
+
+describe('POST /api/endpoints — 通配 pattern 校验（spec 2026-08-27 §2）', () => {
+  it('合法通配 pattern 创建成功', async () => {
+    const r = await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/api/*/cmd' });
+    expect(r.status).toBe(201);
+    const r2 = await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/api/**' });
+    expect(r2.status).toBe(201);
+  });
+
+  it('段内部分通配 → 400 INVALID_PATH（大声失败）', async () => {
+    for (const path of ['/api/fo*/cmd', '/api/*x/cmd', '/api/***']) {
+      const r = await ctx.request.post('/api/endpoints').send({ ...validBody, path });
+      expect(r.status).toBe(400);
+      expect(r.body.code).toBe('INVALID_PATH');
+      expect(r.body.error).toContain('独占一段');
+    }
+  });
+
+  it('唯一性按字面：/u/* 与 /u/** 可共存', async () => {
+    expect((await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/u/*' })).status).toBe(201);
+    expect((await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/u/**' })).status).toBe(201);
+  });
+
+  it('字面相同的 pattern 仍判重', async () => {
+    await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/u/*' });
+    const r = await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/u/*' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('DUPLICATE_ENDPOINT');
+  });
+
+  it('PUT 更新为非法 pattern 同样拒绝', async () => {
+    const created = await ctx.request.post('/api/endpoints').send({ ...validBody, path: '/put-ok' });
+    const r = await ctx.request.put(`/api/endpoints/${created.body.id}`).send({ ...validBody, path: '/put/fo*' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_PATH');
+  });
+});

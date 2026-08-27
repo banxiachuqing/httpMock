@@ -738,7 +738,7 @@ describe('POST /api/endpoints — 通配 pattern 校验（spec 2026-08-27 §2）
       const r = await ctx.request.post('/api/endpoints').send({ ...validBody, path });
       expect(r.status).toBe(400);
       expect(r.body.code).toBe('INVALID_PATH');
-      expect(r.body.message).toContain('独占一段');
+      expect(r.body.error).toContain('独占一段');
     }
   });
 

@@ -5,6 +5,7 @@ import { AppError, toErrorResponse, statusFor } from './errors.js';
 import { sseMiddleware, broadcast } from './sse.js';
 import { syncMockEngine } from './mock-engine.js';
 import { isValidStoragePath } from './paths.js';
+import { validatePattern } from './path-pattern.js';
 import { registerPreviewRoutes } from './api-preview.js';
 import { registerPortRoutes } from './api-ports.js';
 import { registerServiceRoutes, toPublicService } from './api-services.js';
@@ -78,6 +79,11 @@ function validateEndpointBody(body, { partial = false } = {}) {
     // '?' 会破坏 mock 路由的 query 拆分（pathOnly 永远匹配不到），'#' 不会到达服务端——都在入库前拒绝
     if (typeof body.path !== 'string' || !body.path.startsWith('/') || body.path.includes('?') || body.path.includes('#')) {
       throw new AppError(400, 'INVALID_PATH', 'path must start with / and contain no ? or #');
+    }
+    // 通配 pattern：* / ** 必须独占一段（spec 2026-08-27 §2；段内部分通配不做隐式语义）
+    if (body.path.includes('*')) {
+      const reason = validatePattern(body.path);
+      if (reason) throw new AppError(400, 'INVALID_PATH', reason);
     }
   }
   // statusCode 可选（省略默认 200）：只在显式提供时校验。
