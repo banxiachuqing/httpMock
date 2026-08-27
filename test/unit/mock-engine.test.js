@@ -353,6 +353,9 @@ describe('MockEngine TCP/UDP 抓包端口', () => {
     engine = new MockEngine({ logBuffer });
     await engine.start([], [{ port: 18926, enabled: true, type: 'tcp' }]);
     const s = net.connect(18926, '127.0.0.1');
+    // 服务端 destroy 时客户端可能先收到 RST → ECONNRESET error 事件；
+    // 无 error 监听会变成 uncaught exception 让全量测试 exit 1（既有噪音，非本测试意图）
+    s.on('error', () => {});
     await new Promise((res) => s.once('connect', res));
     const closed = new Promise((res) => s.once('close', res));
     await engine.stop();
