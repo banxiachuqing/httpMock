@@ -226,7 +226,7 @@ export function matchSegments(compiled, pathSegs) {
     }
     if (si >= pathSegs.length) return null;
     if (seg === '*') return walk(pi + 1, si + 1, [...captures, pathSegs[si]]);
-    if (seg === pathSegs[si]) return walk(pi + 1, si, captures);
+    if (seg === pathSegs[si]) return walk(pi + 1, si + 1, captures);
     return null;
   }
   return walk(0, 0, []);
