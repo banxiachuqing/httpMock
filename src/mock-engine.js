@@ -12,6 +12,13 @@ import {
 import { buildSkeletonWsdl, rewriteAddress } from './wsdl.js';
 import { createTcpCaptureServer, createUdpCaptureSocket } from './capture.js';
 import { parseSyslog } from './syslog.js';
+import {
+  isPattern,
+  splitPath,
+  compilePattern,
+  compareSpecificity,
+  matchSegments,
+} from './path-pattern.js';
 
 const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
 
@@ -255,23 +262,48 @@ export class MockEngine {  /**
   }
 }
 
+// 两路路由：字面 path 进 exact Map（精确查找，行为同旧版）；
+// 含 * 的 path 编译后进 patterns，按 method 分桶 + 具体度预排序（spec 2026-08-27 §3.2）
 function buildRouter(endpoints) {
-  const map = new Map();
+  const exact = new Map();
+  const patterns = new Map();
   for (const e of endpoints) {
     if (e.enabled === false) continue;
-    const key = `${e.port}|${e.method}|${e.path}`;
-    map.set(key, e);
+    if (isPattern(e.path)) {
+      const bucket = patterns.get(e.method) || [];
+      bucket.push(compilePattern(e));
+      patterns.set(e.method, bucket);
+    } else {
+      exact.set(`${e.port}|${e.method}|${e.path}`, e);
+    }
   }
-  return map;
+  for (const bucket of patterns.values()) bucket.sort(compareSpecificity);
+  return { exact, patterns };
 }
 
-// HTTP 端口请求处理：port|method|path 路由；resolver 失败 → warn 日志 + 原文兜底
+// HTTP 端口请求处理：精确 > 通配（*单段/**跨段）两级路由；resolver 失败 → warn 日志 + 原文兜底
 function createHttpHandler({ port, router, logBuffer, getMax }) {
   return async (req, res) => {
     const start = Date.now();
     const url = req.url || '/';
     const [pathOnly, queryStr = ''] = url.split('?');
-    const matched = router.get(`${port}|${req.method}|${pathOnly}`);
+    // 优先级：精确 > 具体度 > 配置顺序（通配桶已预排序，第一个命中即赢）
+    let matched = router.exact.get(`${port}|${req.method}|${pathOnly}`);
+    let pathParams = null;
+    if (!matched) {
+      const bucket = router.patterns.get(req.method);
+      if (bucket) {
+        const segs = splitPath(pathOnly);
+        for (const p of bucket) {
+          const caps = matchSegments(p, segs);
+          if (caps) {
+            matched = p.endpoint;
+            pathParams = caps;
+            break;
+          }
+        }
+      }
+    }
 
     const { body, truncated } = await readBody(req, getMax());
 
@@ -310,6 +342,7 @@ function createHttpHandler({ port, router, logBuffer, getMax }) {
       durationMs: Date.now() - start,
       matched: !!matched,
       endpointId: matched?.id || null,
+      ...(pathParams ? { pathParams } : {}),
       requestHeaders: req.headers,
       requestBodyPreview: previewBody(body),
       requestBodyTruncated: truncated,

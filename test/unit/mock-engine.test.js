@@ -399,3 +399,90 @@ describe('MockEngine TCP/UDP 抓包端口', () => {
     expect(failed).toEqual([]);
   });
 });
+
+describe('MockEngine 通配符路由', () => {
+  it('* 单段通配命中', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'w1', port: 18201, method: 'GET', path: '/api/*/cmd', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    const r = await get(18201, '/api/v1/cmd');
+    expect(r.status).toBe(200);
+    expect(JSON.parse(r.body)).toEqual({ ok: 1 });
+  });
+
+  it('* 不匹配零段与多段', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'w2', port: 18202, method: 'GET', path: '/api/*/cmd', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    expect((await get(18202, '/api/cmd')).status).toBe(404);
+    expect((await get(18202, '/api/v1/v2/cmd')).status).toBe(404);
+  });
+
+  it('** 跨段通配：零段与多段均命中', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'w3', port: 18203, method: 'GET', path: '/api/**', statusCode: 200, response: { ok: 3 }, enabled: true },
+    ]);
+    expect((await get(18203, '/api')).status).toBe(200);
+    expect((await get(18203, '/api/v1/deep/x')).status).toBe(200);
+  });
+
+  it('精确端点优先于通配端点', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'wild', port: 18204, method: 'GET', path: '/users/*', statusCode: 200, response: { who: 'wild' }, enabled: true },
+      { id: 'exact', port: 18204, method: 'GET', path: '/users/admin', statusCode: 200, response: { who: 'exact' }, enabled: true },
+    ]);
+    expect(JSON.parse((await get(18204, '/users/admin')).body)).toEqual({ who: 'exact' });
+    expect(JSON.parse((await get(18204, '/users/123')).body)).toEqual({ who: 'wild' });
+  });
+
+  it('具体度：静态段多者优先，与配置顺序无关', async () => {
+    engine = new MockEngine({ logBuffer });
+    // 先配置更泛的 /*/b/c，验证排序生效而非顺序生效
+    await engine.start([
+      { id: 'less', port: 18205, method: 'GET', path: '/*/b/c', statusCode: 200, response: { who: '*-b-c' }, enabled: true },
+      { id: 'more', port: 18205, method: 'GET', path: '/a/*/c', statusCode: 200, response: { who: 'a-*-c' }, enabled: true },
+    ]);
+    expect(JSON.parse((await get(18205, '/a/b/c')).body)).toEqual({ who: 'a-*-c' });
+  });
+
+  it('通配按 method 分桶，不跨 method 命中', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'w7', port: 18207, method: 'POST', path: '/api/*', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    expect((await get(18207, '/api/x')).status).toBe(404);
+    expect((await post(18207, '/api/x')).status).toBe(200);
+  });
+
+  it('命中通配时日志带 pathParams 与 endpointId', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'w8', port: 18208, method: 'GET', path: '/a/*/b/**', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    await get(18208, '/a/x/b/y/z');
+    expect(pushedLogs[0].pathParams).toEqual(['x', 'y/z']);
+    expect(pushedLogs[0].endpointId).toBe('w8');
+    expect(pushedLogs[0].matched).toBe(true);
+  });
+
+  it('精确命中时日志不带 pathParams', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'e9', port: 18209, method: 'GET', path: '/a/b', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    await get(18209, '/a/b');
+    expect(pushedLogs[0].pathParams).toBeUndefined();
+  });
+
+  it('disabled 通配端点不参与匹配', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'w10', port: 18210, method: 'GET', path: '/off/*', statusCode: 200, response: { ok: 1 }, enabled: false },
+    ]);
+    expect((await get(18210, '/off/x')).status).toBe(404);
+  });
+});
