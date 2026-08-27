@@ -225,7 +225,8 @@
 
           <div class="field field-path">
             <label for="path">路径</label>
-            <input type="text" id="path" class="input mono" placeholder="/api/example" autocomplete="off" spellcheck="false" />
+            <input type="text" id="path" class="input mono" placeholder="/api/example 或 /api/*/cmd" autocomplete="off" spellcheck="false" />
+            <div class="field-hint">支持通配：<span class="mono">*</span> 匹配单段、<span class="mono">**</span> 跨段；响应里可用 <span class="mono">{{$path:1}}</span> 回显匹配值</div>
           </div>
 
           <div class="field field-status">

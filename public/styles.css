@@ -2107,6 +2107,18 @@ body[data-view='ws-port'] {
 .port-type-badge[data-type='udp'] { color: #b48ce8; }
 .port-type-badge[data-type='syslog'] { color: #f08cb4; }
 
+/* 通配端点徽标（spec 2026-08-27 §5）：path 含 * 的端点在列表里标识 */
+.wildcard-badge {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  opacity: 0.85;
+  color: var(--cyan);
+}
+
 .log-proto[data-protocol='tcp'] { color: var(--cyan); }
 .log-proto[data-protocol='udp'] { color: #b48ce8; }
 .log-proto[data-protocol='syslog'] { color: #f08cb4; }

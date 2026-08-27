@@ -469,6 +469,7 @@ function renderEndpointList() {
         <span class="endpoint-method" data-method="${ep.method}">${ep.method}</span>
         <span class="endpoint-port">${ep.port}</span>
         <span class="endpoint-path"></span>
+        ${ep.path.includes("*") ? '<span class="wildcard-badge" title="通配符路径：* 匹配单段，** 跨段">通配</span>' : ""}
         <span class="endpoint-status-code">${ep.statusCode || 200}</span>
       </div>
     `;
@@ -2203,6 +2204,12 @@ function updateGeneratorExprAndSample() {
   generatorInsertBtn.disabled = false;
   const expr = buildExprText(id, generatorState.args);
   generatorExprText.textContent = expr;
+  // path 生成器依赖真实请求上下文，无 sample 可取（spec 2026-08-27 §5）
+  if (id === "path") {
+    if (sampleTimer) clearTimeout(sampleTimer);
+    generatorSampleText.textContent = "请求时确定";
+    return;
+  }
   if (sampleTimer) clearTimeout(sampleTimer);
   sampleTimer = setTimeout(async () => {
     const res = await api.getGeneratorSample(
