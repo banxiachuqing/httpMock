@@ -118,7 +118,8 @@ MOCK_READY {"host","port"}，壳解析后 WebView 导航到该地址；关窗隐
 |---|---|---|
 | `server.js` | 进程入口、端口回退（+50 探测）、bind host 解析、自动开浏览器 | `__dirname` 接受 `MOCK_SERVER_DIR`（编译模式用） |
 | `src/config-store.js` | `data.json` 持久化、原子写、损坏文件轮转（max 5）、唯一性校验 | `update(mutator)` 是唯一写入入口；`checkUniqueness(endpoints, excludeId)` 校验 `(port, method, path)` |
-| `src/mock-engine.js` | 每端口 `http.createServer`，按 `port|method|path` 路由；按 `port.type` 派发 http/ws/tcp/udp | `start(endpoints, ports, services)`：ports 列表模式下只绑定启用端口、空端口也绑定（404）；**端口隔离**：一个端口 EADDRINUSE 不影响其他端口；`getStatus()` 返回 `{port: {state, reason?}}` |
+| `src/mock-engine.js` | 每端口 `http.createServer`，按 `port|method|path` 路由（经 `path-pattern.js` 两路分发：字面 path 走 exact Map，通配 path 走预排序通配桶）；按 `port.type` 派发 http/ws/tcp/udp | `start(endpoints, ports, services)`：ports 列表模式下只绑定启用端口、空端口也绑定（404）；**端口隔离**：一个端口 EADDRINUSE 不影响其他端口；`getStatus()` 返回 `{port: {state, reason?}}` |
+| `src/path-pattern.js` | HTTP path 段级通配：编译/匹配（回溯）/具体度排序/pattern 校验 | 纯函数无状态；`*` 单段、`**` 跨段（含零段）；`validatePattern` 供 api.js 抛 `INVALID_PATH` |
 | `src/capture.js` | TCP/UDP 抓包数据平面（`node:net`/`node:dgram`） | TCP 空闲 200ms 聚合成一条日志、断连 flush、`maxBodyBytes` 截断、连接上限 200；UDP 一 datagram 一条；**纯抓包不响应**；connect/disconnect 落事件日志；可选 `protocol`/`parse` 参数给 syslog 等协议复用（同 socket 不同解析层） |
 | `src/syslog.js` | Syslog 解析器（RFC 3164 / 5424） | 纯函数 `parseSyslog(buf)`；PRI 后 `/^1 /` 判 5424 否则 3164；解析失败兜底 raw；全程 try/catch 不抛错；导出 SEVERITY_NAMES / FACILITY_NAMES（RFC 5424 §6.2.1 表） |
 | `src/log-buffer.js` | 500 条环形 + `subscribe(fn)` fan-out | `push()` 同步通知所有订阅者 |
@@ -164,7 +165,7 @@ test/
 
 ## 关键不变量（改前必须理解）
 
-1. **`(port, method, path)` 三元组唯一性**（在 `enabled !== false` 的端点内）。`POST /api/endpoints` 与 `PUT /api/endpoints/:id` 都过 `ConfigStore.checkUniqueness`。
+1. **`(port, method, path)` 三元组唯一性**（在 `enabled !== false` 的端点内）。`POST /api/endpoints` 与 `PUT /api/endpoints/:id` 都过 `ConfigStore.checkUniqueness`。（含通配符的 path 同样按字符串字面参与唯一性；语义重叠如 `/a/*` 与 `/a/**` 允许共存，由运行时优先级裁决）
 2. **mock 端口隔离**：启动时一个端口失败不影响其他端口；UI 通过 `/api/runtime/status` 的 `state: 'failed'` + `reason` 标记。
 3. **`ConfigStore.update(mutator)` 是唯一写入入口**。`mutator` 接收 `structuredClone(this.config)`，返回新对象 —— 不要在外面就地改 `this.config`。
 4. **SSE 客户端订阅**：`LogBuffer.subscribe(fn)` 返回 `unsubscribe`；`api.js` 启动时一次性挂上 broadcast，不要重复挂。
@@ -176,6 +177,7 @@ test/
 10. **WS 路由优先级**：`?wsdl` > SOAPAction 精确 > action 末段 > Body localName > Fault；匹配大小写敏感。
 11. **WSDL 分发必须重写地址**：`?wsdl` 返回时 `soap:address location` 重写为 mock 自身地址（含骨架生成场景）。
 12. **`GET /api/config` 不含 `services[].wsdl` 原文**（只有 `hasWsdl`）；存储层完整保留。
+13. **HTTP path 通配**：`*` 独占一段匹配单段、`**` 独占一段跨段（含零段）；路由优先级 = 精确 > 具体度（逐段从左到右：字面 > `*` > `**`，全同则段数多者胜）> 配置顺序；`{{$path:N}}` 按通配段从左到右编号回显，仅 http 端口有效；非法 pattern（段内部分通配如 `fo*`）入库即 400。
 
 ---
 
