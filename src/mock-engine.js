@@ -315,7 +315,18 @@ function createHttpHandler({ port, router, logBuffer, getMax }) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       let responseBody;
       try {
-        const { value } = resolve(matched.response);
+        // pathParams：通配命中的捕获值；精确命中为空数组，
+        // 此时写 {{$path:N}} 走越界软失败（warn + null/原文），行为一致
+        const { value, errors } = resolve(matched.response, { pathParams: pathParams ?? [] });
+        // 软失败落 warn（与 WS renderXmlResponse 对称）：errors 非空说明有表达式没解析出来
+        for (const e of errors) {
+          logBuffer?.push(buildLogEntry({
+            level: 'warn',
+            source: 'resolver',
+            message: `resolver failed: ${e.message}`,
+            endpointId: matched.id,
+          }));
+        }
         responseBody = JSON.stringify(value);
       } catch (err) {
         logBuffer?.push(buildLogEntry({

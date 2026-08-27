@@ -486,3 +486,46 @@ describe('MockEngine 通配符路由', () => {
     expect((await get(18210, '/off/x')).status).toBe(404);
   });
 });
+
+describe('MockEngine 通配 + $path 回显（spec 2026-08-27 §4）', () => {
+  it('{{$path:1}} 回显单段捕获值（纯表达式注入字符串）', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'p1', port: 18220, method: 'GET', path: '/users/*', statusCode: 200,
+        response: { id: '{{$path:1}}' }, enabled: true },
+    ]);
+    const r = await get(18220, '/users/123');
+    expect(r.body).toBe('{"id":"123"}');
+  });
+
+  it('{{$path:2}} 回显 ** 多段（/ 拼回）', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'p2', port: 18221, method: 'GET', path: '/a/*/b/**', statusCode: 200,
+        response: { first: '{{$path:1}}', rest: '{{$path:2}}' }, enabled: true },
+    ]);
+    const r = await get(18221, '/a/x/b/y/z');
+    expect(JSON.parse(r.body)).toEqual({ first: 'x', rest: 'y/z' });
+  });
+
+  it('混合写法拼接：/prefix/{{$path:1}}', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'p3', port: 18222, method: 'GET', path: '/t/*', statusCode: 200,
+        response: { msg: 'got-{{$path:1}}' }, enabled: true },
+    ]);
+    const r = await get(18222, '/t/abc');
+    expect(r.body).toBe('{"msg":"got-abc"}');
+  });
+
+  it('精确端点写 {{$path:1}} → null + resolver warn（行为一致的软失败）', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'p4', port: 18223, method: 'GET', path: '/exact', statusCode: 200,
+        response: { id: '{{$path:1}}' }, enabled: true },
+    ]);
+    const r = await get(18223, '/exact');
+    expect(r.body).toBe('{"id":null}');
+    expect(pushedLogs.some((e) => e.source === 'resolver' && e.level === 'warn')).toBe(true);
+  });
+});
