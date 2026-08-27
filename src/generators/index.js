@@ -5,7 +5,7 @@ import { faker, fakerEN, fakerZH_CN } from '@faker-js/faker';
 /**
  * @typedef {'string' | 'number' | 'boolean' | 'date'} OutputType
  * @typedef {{ name: string, type: 'int'|'float'|'string'|'locale', default?: any, min?: number, max?: number }} ArgSpec
- * @typedef {{ category: string, label: string, outputType: OutputType, args: ArgSpec[], run: (a: Record<string, any>) => any }} GeneratorDef
+ * @typedef {{ category: string, label: string, outputType: OutputType, args: ArgSpec[], run: (a: Record<string, any>, ctx?: { pathParams?: string[] }) => any }} GeneratorDef
  */
 
 /** @type {Record<string, GeneratorDef>} */
@@ -206,6 +206,20 @@ export const GENERATORS = {
     args: [{ name: 'locale', type: 'locale', default: 'zh_CN' }],
     run: ({ locale }) => pickFaker(locale).location.zipCode(),
   },
+
+  // ─── request（请求上下文，仅真实请求时可用）────────────
+  path: {
+    category: 'request', label: '路径参数（通配段值）', outputType: 'string',
+    args: [{ name: 'index', type: 'int', default: 1, min: 1 }],
+    // ctx.pathParams 由 mock-engine 在通配命中时注入；预览/取样场景无 ctx → 抛错走软失败
+    run: ({ index }, ctx) => {
+      const v = ctx?.pathParams?.[index - 1];
+      if (v === undefined) {
+        throw new Error(`路径参数 {{$path:${index}}} 无对应值（端点通配段不足或非请求上下文）`);
+      }
+      return v;
+    },
+  },
 };
 
 /** @type {{ id: string, label: string, generatorIds: string[] }[]} */
@@ -219,6 +233,7 @@ export const CATEGORIES = [
   { id: 'internet', label: '邮箱/网址/域名/IP/...',   generatorIds: ['internet.email', 'internet.url', 'internet.domainName', 'internet.ip', 'internet.userName', 'internet.password'] },
   { id: 'image',    label: '图像相关',               generatorIds: ['image.url', 'image.avatar', 'image.dataUri'] },
   { id: 'location', label: '地址/区域相关',           generatorIds: ['location.street', 'location.city', 'location.country', 'location.zipCode'] },
+  { id: 'request',  label: '请求上下文',               generatorIds: ['path'] },
 ];
 
 export const LOCALES = ['zh_CN', 'en'];
@@ -253,8 +268,9 @@ function formatLocalDateTime(date) {
  * 校验并合并参数，运行生成器。
  * @param {string} id
  * @param {Record<string, any>} args
+ * @param {{ pathParams?: string[] }} [ctx] 请求上下文（仅 path 生成器使用，其余生成器忽略）
  */
-export function runGenerator(id, args = {}) {
+export function runGenerator(id, args = {}, ctx) {
   const def = GENERATORS[id];
   if (!def) throw new Error(`未知生成器：${id}`);
   const merged = {};
@@ -281,7 +297,7 @@ export function runGenerator(id, args = {}) {
     }
   }
   try {
-    return def.run(merged);
+    return def.run(merged, ctx);
   } catch (err) {
     throw new Error(`生成器 ${id} 执行失败：${err.message}`);
   }

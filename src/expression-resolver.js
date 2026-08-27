@@ -65,23 +65,24 @@ function bindArgs(positional, argSpecs) {
  * 递归解析 value 中的 {{...}} 表达式。
  * 纯表达式按 outputType 原类型注入；混合 → String() 拼接；失败时纯 → null / 混合 → 原字符串。
  * @param {unknown} value
+ * @param {{ pathParams?: string[] }} [ctx] 请求上下文（通配捕获值；仅真实请求时由 mock-engine 注入）
  * @returns {{ value: unknown, errors: ResolverError[] }}
  */
-export function resolve(value) {
+export function resolve(value, ctx) {
   const errors = [];
-  const out = walk(value, errors);
+  const out = walk(value, errors, ctx);
   return { value: out, errors };
 }
 
-function walk(value, errors) {
+function walk(value, errors, ctx) {
   if (Array.isArray(value)) {
-    return value.map((v) => walk(v, errors));
+    return value.map((v) => walk(v, errors, ctx));
   }
   if (value !== null && typeof value === 'object') {
     const out = {};
     for (const [k, v] of Object.entries(value)) {
       // key 不解析（语义：字段名不应动态）
-      out[k] = walk(v, errors);
+      out[k] = walk(v, errors, ctx);
     }
     return out;
   }
@@ -109,7 +110,7 @@ function walk(value, errors) {
 
   // 纯表达式：单条，尝试按 outputType 原类型注入
   if (pure && replacements.length === 1) {
-    return resolvePure(replacements[0], errors);
+    return resolvePure(replacements[0], errors, ctx);
   }
 
   // 混合：替换所有 {{...}}，失败保留原 match 字符串
@@ -117,7 +118,7 @@ function walk(value, errors) {
   let cursor = 0;
   for (const r of replacements) {
     result += value.slice(cursor, r.from);
-    const sub = resolvePure(r, errors, /* mixedMode */ true);
+    const sub = resolvePure(r, errors, ctx);
     result += sub === null ? r.match : String(sub);
     cursor = r.to;
   }
@@ -125,7 +126,7 @@ function walk(value, errors) {
   return result;
 }
 
-function resolvePure(r, errors, mixedMode = false) {
+function resolvePure(r, errors, ctx) {
   const def = GENERATORS[r.id];
   if (!def) {
     errors.push(new ResolverError(`未知生成器：${r.id}`, 'UNKNOWN_GENERATOR', {
@@ -139,7 +140,7 @@ function resolvePure(r, errors, mixedMode = false) {
   }
   const named = bindArgs(positional, def.args);
   try {
-    const out = runGenerator(r.id, named);
+    const out = runGenerator(r.id, named, ctx);
     return out;
   } catch (err) {
     const code = err.message.startsWith('未知生成器') ? 'UNKNOWN_GENERATOR' : 'BAD_ARGS';
@@ -148,6 +149,4 @@ function resolvePure(r, errors, mixedMode = false) {
     }));
     return null;
   }
-  // mixedMode 仅用于语义标注；逻辑同上（成功 → 转换，失败 → null → 上层决定用原 match）
-  void mixedMode;
 }

@@ -5,9 +5,9 @@ import {
 } from '../../src/generators/index.js';
 
 describe('GENERATORS registry', () => {
-  it('contains entries for all 9 categories from spec §4', () => {
+  it('contains entries for all 10 categories from spec §4', () => {
     const cats = new Set(Object.values(GENERATORS).map((g) => g.category));
-    expect(cats).toEqual(new Set(['string', 'lorem', 'number', 'date', 'person', 'phone', 'internet', 'image', 'location']));
+    expect(cats).toEqual(new Set(['string', 'lorem', 'number', 'date', 'person', 'phone', 'internet', 'image', 'location', 'request']));
   });
 
   it('every generator declares outputType', () => {
@@ -25,7 +25,7 @@ describe('GENERATORS registry', () => {
   });
 
   it('CATEGORIES lists each category once with generatorIds', () => {
-    expect(CATEGORIES.length).toBe(9);
+    expect(CATEGORIES.length).toBe(10);
     for (const c of CATEGORIES) {
       expect(c.id).toBeTruthy();
       expect(c.label).toBeTruthy();
@@ -178,5 +178,23 @@ describe('date — new generators (timestamp / now / format)', () => {
   it('format reflects current local time (contains current year)', () => {
     const v = runGenerator('date.format', {});
     expect(v).toContain(String(new Date().getFullYear()));
+  });
+});
+
+describe('path 生成器（请求上下文，仅真实请求可用）', () => {
+  it('取第 N 个通配段值', () => {
+    expect(runGenerator('path', { index: 2 }, { pathParams: ['a', 'b/c'] })).toBe('b/c');
+  });
+  it('index 缺省为 1', () => {
+    expect(runGenerator('path', {}, { pathParams: ['a'] })).toBe('a');
+  });
+  it('越界抛错（消息含「无对应值」）', () => {
+    expect(() => runGenerator('path', { index: 5 }, { pathParams: ['a'] })).toThrow('无对应值');
+  });
+  it('无 ctx 抛错', () => {
+    expect(() => runGenerator('path', { index: 1 })).toThrow('无对应值');
+  });
+  it('index 非整数走既有参数校验', () => {
+    expect(() => runGenerator('path', { index: 'x' }, { pathParams: ['a'] })).toThrow('整数');
   });
 });

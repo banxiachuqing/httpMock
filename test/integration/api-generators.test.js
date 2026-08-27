@@ -27,7 +27,12 @@ describe('GET /api/generators', () => {
     expect(res.status).toBe(200);
     expect(res.body.locale).toBe('zh_CN');
     expect(Array.isArray(res.body.categories)).toBe(true);
-    expect(res.body.categories.length).toBe(9);
+    expect(res.body.categories.length).toBe(10);
+    // request 分类：path 生成器无请求上下文，sample 为 null（spec 2026-08-27 §4）
+    const reqCat = res.body.categories.find((c) => c.id === 'request');
+    expect(reqCat).toBeTruthy();
+    expect(reqCat.generators[0].id).toBe('path');
+    expect(reqCat.generators[0].sample).toBeNull();
     const stringCat = res.body.categories.find((c) => c.id === 'string');
     expect(stringCat).toBeTruthy();
     const uuidGen = stringCat.generators.find((g) => g.id === 'uuid');

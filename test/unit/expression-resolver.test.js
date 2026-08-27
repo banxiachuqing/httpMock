@@ -176,3 +176,34 @@ describe('resolve — whitespace tolerance', () => {
     expect(r.value).toBe(3);
   });
 });
+
+describe('resolve — 请求上下文 $path（spec 2026-08-27 §4）', () => {
+  it('纯表达式取路径参数（字符串原类型注入）', () => {
+    const r = resolve('{{$path:1}}', { pathParams: ['v1'] });
+    expect(r.value).toBe('v1');
+    expect(r.errors).toEqual([]);
+  });
+
+  it('混合表达式拼接（** 多段已用 / 拼回）', () => {
+    const r = resolve('id-{{$path:2}}', { pathParams: ['a', 'b/c'] });
+    expect(r.value).toBe('id-b/c');
+  });
+
+  it('越界 → 纯表达式 null + BAD_ARGS', () => {
+    const r = resolve('{{$path:2}}', { pathParams: ['only'] });
+    expect(r.value).toBeNull();
+    expect(r.errors[0].code).toBe('BAD_ARGS');
+  });
+
+  it('无 ctx → 纯表达式 null + BAD_ARGS', () => {
+    const r = resolve('{{$path:1}}');
+    expect(r.value).toBeNull();
+    expect(r.errors[0].code).toBe('BAD_ARGS');
+  });
+
+  it('无 ctx → 混合表达式保留原文 + error', () => {
+    const r = resolve('pre-{{$path:1}}');
+    expect(r.value).toBe('pre-{{$path:1}}');
+    expect(r.errors.length).toBe(1);
+  });
+});
