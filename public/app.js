@@ -47,22 +47,24 @@ const api = {
     return (await fetch("/api/endpoints")).json();
   },
   async createEndpoint(body) {
-    return (
-      await fetch("/api/endpoints", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      })
-    ).json();
+    const r = await fetch("/api/endpoints", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "创建接口失败");
+    return json;
   },
   async updateEndpoint(id, body) {
-    return (
-      await fetch(`/api/endpoints/${id}`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      })
-    ).json();
+    const r = await fetch(`/api/endpoints/${id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "更新接口失败");
+    return json;
   },
   async deleteEndpoint(id) {
     return await fetch(`/api/endpoints/${id}`, { method: "DELETE" });
