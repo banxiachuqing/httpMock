@@ -2,13 +2,13 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import os from 'node:os';
 import fs from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
 import express from 'express';
 import open from 'open';
 import { ConfigStore } from './src/config-store.js';
 import { LogBuffer } from './src/log-buffer.js';
 import { MockEngine } from './src/mock-engine.js';
 import { createApi } from './src/api.js';
+import { getVersion } from './src/version.js';
 import { defaultStoragePath, ensureDir } from './src/paths.js';
 
 const __dirname = process.env.MOCK_SERVER_DIR || path.dirname(fileURLToPath(import.meta.url));
@@ -62,18 +62,7 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
     app.use(`/vendor/${route}`, express.static(path.join(__dirname, 'node_modules', pkg)));
   }
 
-  // 版本号单源：优先最近 git tag（发版即打 tag，软件顶部栏版本自动跟随，见 CLAUDE.md「发版流程」）；
-  // 无 tag 回落 package.json；编译产物（无 .git、无 package.json）由 build.mjs 注入，此处保持 'unknown' 无操作。
-  let pkgVersion = 'unknown';
-  try {
-    const gitVer = spawnSync('git', ['describe', '--tags', '--abbrev=0'], { encoding: 'utf8' });
-    if (gitVer.status === 0 && gitVer.stdout?.trim()) {
-      pkgVersion = gitVer.stdout.trim().replace(/^v/, '');
-    } else {
-      const pkgPath = path.join(__dirname, 'package.json');
-      pkgVersion = JSON.parse(await fs.readFile(pkgPath, 'utf8')).version;
-    }
-  } catch { /* keep 'unknown' — packaged mode already has version baked in by build.mjs */ }
+  const pkgVersion = await getVersion();
   const indexHtmlTemplate = await fs.readFile(path.join(finalPublicPath, 'index.html'), 'utf8');
   const indexHtml = indexHtmlTemplate.replaceAll('{{VERSION}}', pkgVersion);
 
@@ -163,9 +152,19 @@ const isMain =
   !!process.env.MOCK_SERVER_DIR;
 if (isMain) {
   const desktop = !!process.env.MOCK_DESKTOP;
-  startServer({ openBrowser: !desktop, desktop }).catch((e) => {
-    if (desktop) process.stdout.write(`MOCK_ERROR ${JSON.stringify({ message: e.message })}\n`);
-    console.error('Failed to start:', e.message);
-    process.exit(1);
-  });
+  // MCP 模式：stdio 归 JSON-RPC 协议专用，进程不跑 WebUI（自动拉起链路见 src/mcp-server.js）
+  if (process.argv[2] === 'mcp') {
+    import('./src/mcp-server.js')
+      .then((m) => m.startMcpCli())
+      .catch((e) => {
+        console.error('Failed to start MCP server:', e.message);
+        process.exit(1);
+      });
+  } else {
+    startServer({ openBrowser: !desktop && !process.env.MOCK_HEADLESS, desktop }).catch((e) => {
+      if (desktop) process.stdout.write(`MOCK_ERROR ${JSON.stringify({ message: e.message })}\n`);
+      console.error('Failed to start:', e.message);
+      process.exit(1);
+    });
+  }
 }

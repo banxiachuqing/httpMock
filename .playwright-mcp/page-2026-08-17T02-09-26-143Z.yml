@@ -1,0 +1,60 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]: MOCK//SERVER
+      - generic [ref=e5]: v1.1.0 · 本地开发工具
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e10]: 已停止
+        - generic [ref=e11]: 所有端口空闲
+      - button "启动" [ref=e12] [cursor=pointer]
+      - button "设置" [ref=e15] [cursor=pointer]
+  - main [ref=e19]:
+    - complementary [ref=e20]:
+      - generic [ref=e21]:
+        - heading "接口列表" [level=2] [ref=e22]
+        - generic [ref=e23]: "0"
+        - button "+ 新建" [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]: +
+          - text: 新建
+      - listbox "接口列表" [ref=e26]
+      - generic [ref=e28]:
+        - generic [ref=e29]: 端口
+        - generic [ref=e30]: —
+    - generic [ref=e33]:
+      - generic [ref=e34]: //
+      - heading "尚未选择接口" [level=3] [ref=e35]
+      - paragraph [ref=e36]: 从左侧选择一个，或新建一个 mock 接口开始。
+      - button "+ 创建第一个接口" [ref=e37] [cursor=pointer]:
+        - generic [ref=e38]: +
+        - text: 创建第一个接口
+  - generic [ref=e39]:
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - heading "请求日志" [level=2] [ref=e42]
+        - generic [ref=e43]: 空闲
+      - generic [ref=e46]:
+        - generic [ref=e47]: 0 条 · 最多 500
+        - generic [ref=e48] [cursor=pointer]:
+          - checkbox "自动滚动" [checked]
+          - generic [ref=e49]: 自动滚动
+        - generic [ref=e50] [cursor=pointer]:
+          - checkbox "模拟请求"
+          - generic [ref=e51]: 模拟请求
+        - button "清空" [ref=e52] [cursor=pointer]
+    - generic [ref=e53]:
+      - generic [ref=e54]:
+        - generic [ref=e55]: 时间
+        - generic [ref=e56]: 方法
+        - generic [ref=e57]: 路径
+        - generic [ref=e58]: 端口
+        - generic [ref=e59]: 状态
+        - generic [ref=e60]: 耗时
+        - generic [ref=e61]: 来源 IP
+        - generic [ref=e62]: 结果
+      - generic [ref=e64]:
+        - generic [ref=e65]: //
+        - generic [ref=e66]:
+          - text: 暂无请求。点击
+          - strong [ref=e67]: 启动
+          - text: 开启 mock 引擎。

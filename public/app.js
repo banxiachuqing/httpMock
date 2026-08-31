@@ -279,6 +279,11 @@ const els = {
   storagePath: $("#storagePath"),
   uiPort: $("#uiPort"),
   maxBody: $("#settingsMaxBody"),
+  mcpToggle: $("#settingsMcp"),
+  mcpExample: $("#settingsMcpExample"),
+  mcpUrl: $("#settingsMcpUrl"),
+  mcpSnippet: $("#settingsMcpSnippet"),
+  mcpCopy: $("#settingsMcpCopy"),
   maxBodyHint: $("#settingsMaxBodyHint"),
   theme: $("#settingsTheme"),
 
@@ -1460,10 +1465,26 @@ function openSettings() {
   els.theme.value = state.config.settings.theme ?? "system";
   els.maxBody.value = state.config.settings.maxBodyBytes ?? 4194304;
   els.maxBodyHint.textContent = formatBytes(Number(els.maxBody.value));
+  els.mcpToggle.checked = state.config.settings.mcpEnabled === true;
+  syncMcpExample();
   els.settingsModal.hidden = false;
 }
 function closeSettings() {
   els.settingsModal.hidden = true;
+}
+// 勾选启用后在开关下方展示具体接入参数：地址取当前浏览器访问的 host:port（与 /mcp
+// 端点自 fetch 的 Host 语义一致，从局域网 IP 访问即显示 http://10.x.x.x:5050/mcp）
+function syncMcpExample() {
+  const on = els.mcpToggle.checked;
+  els.mcpExample.hidden = !on;
+  if (!on) return;
+  const url = `http://${window.location.host}/mcp`;
+  els.mcpUrl.textContent = url;
+  els.mcpSnippet.textContent = JSON.stringify(
+    { mcpServers: { "mock-tools": { url } } },
+    null,
+    2,
+  );
 }
 async function saveSettings() {
   const newMax = Number(els.maxBody.value);
@@ -1481,6 +1502,7 @@ async function saveSettings() {
     uiPort: newUiPort,
     maxBodyBytes: newMax,
     theme: els.theme.value,
+    mcpEnabled: els.mcpToggle.checked,
   });
   state.config = await api.getConfig();
   applyTheme(state.config.settings.theme ?? "system");
@@ -1527,6 +1549,13 @@ els.settingsBackdrop.addEventListener("click", closeSettings);
 els.settingsClose.addEventListener("click", closeSettings);
 els.settingsCancel.addEventListener("click", closeSettings);
 els.settingsSave.addEventListener("click", saveSettings);
+els.mcpToggle.addEventListener("change", syncMcpExample);
+els.mcpCopy.addEventListener("click", () => {
+  navigator.clipboard
+    .writeText(els.mcpSnippet.textContent)
+    .then(() => flash("MCP 配置已复制", "green"))
+    .catch(() => flash("复制失败，请手动选中复制", "red"));
+});
 els.maxBody.addEventListener("input", () => {
   els.maxBodyHint.textContent = formatBytes(Number(els.maxBody.value)) || "—";
 });

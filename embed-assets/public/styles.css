@@ -1309,6 +1309,9 @@ body.resizing {
   position: relative;
   width: 480px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px); /* 内容多时面板不超出视口，滚动交给 modal-body */
+  display: flex;
+  flex-direction: column;
   background: var(--modal-bg);
   backdrop-filter: blur(24px) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(24px) saturate(var(--glass-saturate));
@@ -1334,6 +1337,8 @@ body.resizing {
   display: flex;
   flex-direction: column;
   gap: var(--s-4);
+  overflow-y: auto;
+  min-height: 0;
 }
 .modal-footer {
   display: flex;

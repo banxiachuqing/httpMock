@@ -9,6 +9,7 @@ import { validatePattern } from './path-pattern.js';
 import { registerPreviewRoutes } from './api-preview.js';
 import { registerPortRoutes } from './api-ports.js';
 import { registerServiceRoutes, toPublicService } from './api-services.js';
+import { registerMcpHttpRoutes } from './mcp-http.js';
 
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
@@ -39,6 +40,7 @@ function applyConfigSettings(cfg, settings) {
   if (settings.storagePath !== undefined) cfg.settings.storagePath = settings.storagePath;
   if (settings.maxBodyBytes !== undefined) cfg.settings.maxBodyBytes = settings.maxBodyBytes;
   if (settings.theme !== undefined) cfg.settings.theme = settings.theme;
+  if (settings.mcpEnabled !== undefined) cfg.settings.mcpEnabled = settings.mcpEnabled === true;
   return cfg;
 }
 
@@ -131,6 +133,9 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
         if (!['system', 'light', 'dark'].includes(settings.theme)) {
           throw new AppError(400, 'INVALID_VALUE', "theme must be one of 'system' | 'light' | 'dark'");
         }
+      }
+      if (settings.mcpEnabled !== undefined && typeof settings.mcpEnabled !== 'boolean') {
+        throw new AppError(400, 'INVALID_VALUE', 'mcpEnabled must be a boolean');
       }
       if (settings.uiPort !== undefined) {
         const up = Number(settings.uiPort);
@@ -309,6 +314,9 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
 
   // Preview & generators (dynamic response values) —挂 createApi 末尾、错误中间件之前
   registerPreviewRoutes(app);
+
+  // MCP over HTTP（设置页开关门控，默认关闭）——/mcp 非法方法/关闭态在此收口，避免落入下方 404/SPA fallback
+  registerMcpHttpRoutes(app, { configStore });
 
   // Error handler (must be last in createApi so API errors are formatted)
   app.use((err, _req, res, _next) => {
