@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ConfigStore } from '../../src/config-store.js';
 import { buildApp } from '../helpers/test-server.js';
 import { tempDir } from '../helpers/temp-dir.js';
+import http from 'node:http';
 
 let dir, store, ctx;
 
@@ -54,6 +55,43 @@ describe('POST /api/ports', () => {
     const r = await ctx.request.post('/api/ports').send({ port: 8080 });
     expect(r.status).toBe(400);
     expect(r.body.code).toBe('DUPLICATE_PORT');
+  });
+});
+
+describe('SSE config 广播', () => {
+  // MCP/curl 等非页面来源修改配置后，页面靠 /events 的 config 事件自动刷新
+  it('POST /api/ports 后向 /events 广播 config 事件', async () => {
+    const server = ctx.app.listen(0);
+    const port = server.address().port;
+    try {
+      let buf = '';
+      let received = false;
+      await new Promise((resolve, reject) => {
+        const req = http.request({ host: '127.0.0.1', port, path: '/events', method: 'GET' }, (res) => {
+          res.setEncoding('utf8');
+          res.on('data', (c) => {
+            if (received) return;
+            buf += c;
+            const idx = buf.indexOf('event: config');
+            if (idx === -1) return;
+            const end = buf.indexOf('\n\n', idx);
+            if (end === -1) return;
+            received = true;
+            req.destroy();
+            resolve();
+          });
+        });
+        req.on('error', () => {}); // destroy 主动断开时触发，忽略
+        req.end();
+        setTimeout(() => {
+          ctx.request.post('/api/ports').send({ port: 18080 }).then(() => {}, reject);
+        }, 100);
+        setTimeout(() => reject(new Error('等待 config 事件超时')), 5000);
+      });
+      expect(received).toBe(true);
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
   });
 });
 

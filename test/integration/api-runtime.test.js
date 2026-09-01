@@ -63,6 +63,27 @@ describe('POST /api/runtime/stop', () => {
     expect(r.status).toBe(200);
     expect(r.body.stopped).toContain(19094);
   });
+
+  it('stop 与配置写并发：stop 语义不被联动重启翻转（竞态修复）', async () => {
+    await ctx.request.post('/api/ports').send({ port: 19114 });
+    await ctx.request.post('/api/endpoints').send({ port: 19114, method: 'GET', path: '/a', statusCode: 200, response: { ok: 1 } });
+    await ctx.request.post('/api/runtime/start');
+    expect((await httpGet('http://127.0.0.1:19114/a')).status).toBe(200);
+
+    // 页面点停止（stop 在途）+ 同瞬间 MCP 建端口（写操作走 syncMockEngine）：
+    // 无论锁序如何，终态必须是全停——联动写不得把刚停止的引擎重新拉起
+    await Promise.all([
+      ctx.request.post('/api/runtime/stop'),
+      ctx.request.post('/api/ports').send({ port: 19115 }),
+    ]);
+
+    const status = await ctx.request.get('/api/runtime/status');
+    for (const v of Object.values(status.body)) {
+      expect(v.state).not.toBe('running');
+    }
+    await expect(httpGet('http://127.0.0.1:19114/a')).rejects.toThrow();
+    await expect(httpGet('http://127.0.0.1:19115/')).rejects.toThrow();
+  });
 });
 
 // 直连 mock 端口探测（supertest 的 request 绑定 app，不能发外部 URL）

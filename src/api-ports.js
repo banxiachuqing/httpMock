@@ -18,7 +18,7 @@ function sorted(ports) {
  * @param {import('express').Express} app
  * @param {{ configStore: import('./config-store.js').ConfigStore }} deps
  */
-export function registerPortRoutes(app, { configStore, mockEngine }) {
+export function registerPortRoutes(app, { configStore, mockEngine, notifyConfigChange }) {
   app.get('/api/ports', (_req, res) => res.json(configStore.config.ports));
 
   app.post('/api/ports', async (req, res, next) => {
@@ -38,6 +38,7 @@ export function registerPortRoutes(app, { configStore, mockEngine }) {
       });
       // 引擎运行中：新建端口立即绑定（空端口也监听，全 404）
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.status(201).json(entity);
     } catch (e) { next(e); }
   });
@@ -78,6 +79,7 @@ export function registerPortRoutes(app, { configStore, mockEngine }) {
       // 门控用 running（而非 servers.size）：上次全端口绑定失败时 servers 为空，
       // 用户的改号/停用仍应触发一次重建重试
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.json(updated);
     } catch (e) { next(e); }
   });
@@ -96,6 +98,7 @@ export function registerPortRoutes(app, { configStore, mockEngine }) {
       });
       // 引擎运行中：删除端口立即释放旧监听（否则旧 http.Server 泄漏并继续响应已删端点）
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.status(204).end();
     } catch (e) { next(e); }
   });

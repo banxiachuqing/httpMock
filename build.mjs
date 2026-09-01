@@ -7,10 +7,11 @@
 //
 // 改动要求：
 //   1. server.js 第 11 行 __dirname 接受 MOCK_SERVER_DIR 环境变量
-//   2. 把 public/ 复制到 ./embed-assets/public/
-//   3. 把需要嵌入的 vendor 资源复制到 ./embed-assets/vendor/
+//   2/3. public/ 与 vendor → embed-assets/ 的复制已在下方自动完成，
+//        embed-assets/public/ 视为纯构建产物，不要手工编辑（曾因手工同步遗漏
+//        导致产物带旧前端：外部改配置后 desktop 页面不刷新，2026-09-01）
 
-import { readdirSync, writeFileSync, mkdirSync, existsSync, rmSync, copyFileSync } from 'node:fs';
+import { readdirSync, writeFileSync, mkdirSync, existsSync, rmSync, copyFileSync, cpSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ALLOW_EXT = new Set(['.js', '.css', '.html', '.svg', '.json']);
@@ -36,6 +37,15 @@ function scan(dir, base = dir) {
 
 const target = process.argv[2] || 'bun-darwin-arm64';
 const outfile = process.argv[3] || 'mockserver';
+
+// 单一事实源同步：public/ → embed-assets/public/（整树覆盖，含删除已移除文件）。
+// 嵌入永远用最新前端；vendor/ 仍为独立管理（仅 CodeMirror 相关，无自动同步需求）
+{
+  const dest = './embed-assets/public';
+  if (existsSync(dest)) rmSync(dest, { recursive: true });
+  cpSync('./public', dest, { recursive: true });
+  console.log('Synced public/ → embed-assets/public/');
+}
 
 const files = scan('./embed-assets');
 console.log(`Embedding ${files.length} files...`);

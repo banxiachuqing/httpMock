@@ -40,11 +40,15 @@ function previewBody(body) {
  * 重建各 mock 端口，让新配置立即生效。引擎未运行（running=false）时静默跳过。
  */
 export async function syncMockEngine(mockEngine, configStore) {
+  // 锁外快速路径：引擎明确停止时零开销跳过（不排队）。
+  // 但注意检查与执行之间有间隙——stop 可能恰好在此刻在途，所以真正
+  // 的意图复核在 start 的锁内（onlyIfRunning），见 MockEngine.start
   if (!mockEngine?.running) return;
   await mockEngine.start(
     configStore.config.endpoints,
     configStore.config.ports,
     configStore.config.services || [],
+    { onlyIfRunning: true },
   );
 }
 
@@ -118,19 +122,37 @@ export class MockEngine {  /**
     this.servers = new Map();
     this.statuses = new Map();
     this.running = false;  // 引擎是否处于运行意图（start 置真 / stop 置假；供 API 门控即时同步）
-    this._starting = null; // 串行化：进行中的 start promise
+    this._op = Promise.resolve(); // start/stop 互斥队列：后到者排队，先到者完全结束后才执行
   }
 
-  async start(endpoints, ports = null, services = []) {
-    // 并发 start 串行化（快速双击、请求与 5s 轮询交错）：后者等前者结束后再执行
-    if (this._starting) await this._starting.catch(() => {});
-    const run = this._doStart(endpoints, ports, services);
-    this._starting = run;
-    try {
-      return await run;
-    } finally {
-      if (this._starting === run) this._starting = null;
-    }
+  // 引擎操作（start/stop）互斥串行。背景：runtime/stop 与配置变更触发的
+  // syncMockEngine 并发时，stop 未结束前 running 仍为 true，联动 start 会
+  // 在 stop 返回后把端口重新拉起（页面显示已停止但端口复活监听）。
+  // 串行化后：若 stop 先获锁，联动 start 在锁内复核 onlyIfRunning 即放弃。
+  _enqueue(fn) {
+    const prev = this._op;
+    let release;
+    this._op = new Promise((r) => { release = r; });
+    return (async () => {
+      await prev; // _op 只 resolve 不 reject，这里永不抛
+      try {
+        return await fn();
+      } finally {
+        release(); // 异常也放行队列，不卡死后来者
+      }
+    })();
+  }
+
+  /**
+   * @param {boolean} [opts.onlyIfRunning] 配置变更联动模式：等锁期间引擎
+   *   被 runtime/stop 停掉则放弃（联动写操作不得翻转用户的停止意图）；
+   *   显式启动（runtime/start）不传，总是执行
+   */
+  async start(endpoints, ports = null, services = [], { onlyIfRunning = false } = {}) {
+    return this._enqueue(async () => {
+      if (onlyIfRunning && !this.running) return { running: [], failed: [], skipped: true };
+      return this._doStart(endpoints, ports, services);
+    });
   }
 
   async _doStart(endpoints, ports = null, services = []) {
@@ -152,7 +174,7 @@ export class MockEngine {  /**
       }
     }
 
-    await this.stop();
+    await this._doStop();
     // statuses 重建：清除已删除/停用端口的陈旧状态，只保留本次绑定集合
     this.statuses = new Map();
     this.running = true;
@@ -219,6 +241,10 @@ export class MockEngine {  /**
   }
 
   async stop() {
+    return this._enqueue(() => this._doStop());
+  }
+
+  _doStop() {
     const promises = [];
     for (const entry of this.servers.values()) {
       if (entry.kind === 'udp') {
@@ -241,16 +267,17 @@ export class MockEngine {  /**
         }));
       }
     }
-    await Promise.all(promises);
-    // 端口可能立刻被重新绑定（api.js 每次配置变更都会 stop→start 同端口）：
-    // 等一轮事件循环，让同一进程内客户端 keep-alive 池收到 FIN 并移除旧连接
-    // （Node ≥19 默认池化 keepAlive；旧连接残留会让池中死 socket 毒化下一次请求）
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    this.servers.clear();
-    for (const port of this.statuses.keys()) {
-      this.statuses.set(port, { state: 'stopped' });
-    }
-    this.running = false;
+    return Promise.all(promises).then(async () => {
+      // 端口可能立刻被重新绑定（api.js 每次配置变更都会 stop→start 同端口）：
+      // 等一轮事件循环，让同一进程内客户端 keep-alive 池收到 FIN 并移除旧连接
+      // （Node ≥19 默认池化 keepAlive；旧连接残留会让池中死 socket 毒化下一次请求）
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      this.servers.clear();
+      for (const port of this.statuses.keys()) {
+        this.statuses.set(port, { state: 'stopped' });
+      }
+      this.running = false;
+    });
   }
 
   getStatus() {

@@ -76,7 +76,7 @@ function ensureWsPortEntity(cfg, port) {
   cfg.ports = [...cfg.ports, { port, enabled: true, type: 'ws' }].sort((a, b) => a.port - b.port);
 }
 
-export function registerServiceRoutes(app, { configStore, mockEngine }) {
+export function registerServiceRoutes(app, { configStore, mockEngine, notifyConfigChange }) {
   // WSDL 解析预览（不落库，导入弹窗第一步）
   app.post('/api/wsdl/parse', (req, res, next) => {
     try {
@@ -124,6 +124,7 @@ export function registerServiceRoutes(app, { configStore, mockEngine }) {
       });
       // 引擎运行中：服务变更即时同步（新建 ws 端点/更新路由）
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.status(201).json(toPublicService(service));
     } catch (e) { next(e); }
   });
@@ -161,6 +162,7 @@ export function registerServiceRoutes(app, { configStore, mockEngine }) {
         return cfg;
       });
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.json(toPublicService(updated));
     } catch (e) { next(e); }
   });
@@ -176,6 +178,7 @@ export function registerServiceRoutes(app, { configStore, mockEngine }) {
         return cfg;
       });
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.status(204).end();
     } catch (e) { next(e); }
   });
@@ -205,6 +208,7 @@ export function registerServiceRoutes(app, { configStore, mockEngine }) {
         return cfg;
       });
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.json(toPublicService(updated));
     } catch (e) { next(e); }
   });
@@ -228,6 +232,7 @@ export function registerServiceRoutes(app, { configStore, mockEngine }) {
         return cfg;
       });
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.status(201).json(toPublicService(updated));
     } catch (e) { next(e); }
   });
@@ -282,6 +287,7 @@ export function registerServiceRoutes(app, { configStore, mockEngine }) {
         return cfg;
       });
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.json(toPublicService(updated));
     } catch (e) { next(e); }
   });
@@ -299,6 +305,7 @@ export function registerServiceRoutes(app, { configStore, mockEngine }) {
         return cfg;
       });
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.json(toPublicService(updated));
     } catch (e) { next(e); }
   });

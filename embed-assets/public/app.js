@@ -1197,6 +1197,7 @@ async function refreshAll() {
     state.dirty = false;
   }
   render();
+  if (state.route.view === "home") renderHome();
   if (state.route.view === "port" || state.route.view === "ws-port" || state.route.view === "capture-port") {
     renderPortHeader(state, els);
   }
@@ -1378,6 +1379,10 @@ async function refreshRuntimeStatus() {
   try {
     state.runtimeStatus = await api.runtimeStatus();
   } catch {}
+  // 全局 pill/按钮跟随服务端真实状态：外部来源（MCP runtime_start、另一标签页）
+  // 改变引擎后不再停留在旧文案（此前仅 loadAll/toggleRuntime 会重算 state.runtime）
+  deriveGlobalRuntime();
+  renderStatus();
   renderEndpointList();
   if (state.route.view === "home") renderHome();
 }
@@ -1452,6 +1457,17 @@ function connectSSE() {
   es.addEventListener("log", (e) => {
     const entry = JSON.parse(e.data);
     appendLog(entry);
+  });
+  // 配置变更（端口/端点/WS 服务/设置/运行时，可来自 MCP、curl、另一标签页）→
+  // 防抖合并后全量刷新。refreshAll/renderEditor 自带 dirty 与选中保护，不打断未保存的编辑。
+  let configTimer = null;
+  es.addEventListener("config", () => {
+    if (state.draggingId) return; // 拖拽中不重渲染（spec 2026-08-17 §4.3）
+    clearTimeout(configTimer);
+    configTimer = setTimeout(() => {
+      refreshAll();
+      refreshRuntimeStatus();
+    }, 250);
   });
   return es;
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import http from 'node:http';
 import net from 'node:net';
 import dgram from 'node:dgram';
-import { MockEngine } from '../../src/mock-engine.js';
+import { MockEngine, syncMockEngine } from '../../src/mock-engine.js';
 
 function get(port, path) {
   return new Promise((resolve, reject) => {
@@ -487,6 +487,73 @@ describe('MockEngine 通配符路由', () => {
       { id: 'w10', port: 18210, method: 'GET', path: '/off/*', statusCode: 200, response: { ok: 1 }, enabled: false },
     ]);
     expect((await get(18210, '/off/x')).status).toBe(404);
+  });
+});
+
+describe('start/stop 互斥与联动意图（竞态修复）', () => {
+  const EP = { id: 'a', port: 18095, method: 'GET', path: '/x', statusCode: 200, response: { ok: 1 }, enabled: true };
+  const PORTS = [{ port: 18095, enabled: true, type: 'http' }];
+  const fakeStore = () => ({ config: { endpoints: [EP], ports: PORTS, services: [] } });
+
+  it('stop 在途时 syncMockEngine 不得把引擎重新拉起（stop 已返回但端口复活监听）', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([EP], PORTS);
+    expect(engine.running).toBe(true);
+
+    // 用户点停止按钮（stop 在途）+ 同瞬间 MCP 写配置触发 syncMockEngine
+    await Promise.all([
+      engine.stop(),
+      syncMockEngine(engine, fakeStore()),
+    ]);
+
+    expect(engine.running).toBe(false);
+    expect(engine.getStatus()).toEqual({ 18095: { state: 'stopped' } });
+    // 端口必须真正释放（不再响应）
+    await expect(get(18095, '/x')).rejects.toThrow();
+  });
+
+  it('引擎已停止时 syncMockEngine 零开销跳过（skipped）', async () => {
+    engine = new MockEngine({ logBuffer });
+    const r = await syncMockEngine(engine, fakeStore());
+    expect(engine.running).toBe(false);
+    expect(r).toBeUndefined(); // 锁外快速路径直接 return，未进 start
+  });
+
+  it('stop 后的联动 start（onlyIfRunning）锁内复核放弃，返回 skipped', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([EP], PORTS);
+    await engine.stop();
+    const r = await engine.start([EP], PORTS, [], { onlyIfRunning: true });
+    expect(r.skipped).toBe(true);
+    expect(engine.running).toBe(false);
+  });
+
+  it('显式 start 不受 onlyIfRunning 影响（runtime/start 总是执行）', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.stop();
+    const r = await engine.start([EP], PORTS); // 无 onlyIfRunning
+    expect(r.running.map((x) => x.port)).toEqual([18095]);
+    expect(engine.running).toBe(true);
+  });
+
+  it('并发显式 start 与 stop：串行执行不炸，终态与事实不撕裂', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([EP], PORTS);
+    // 两个都是显式意图，后获锁者胜出：start 后→运行；stop 后→全停。
+    // 不变量是不撕裂：running 标志必须与端口真实监听状态一致
+    await Promise.all([
+      engine.stop(),
+      engine.start([EP], PORTS),
+    ]);
+    if (engine.running) {
+      // start 后执行：端口真实在监听
+      const r = await get(18095, '/x');
+      expect(r.status).toBe(200);
+    } else {
+      // stop 后执行：端口真实释放，statuses 全 stopped
+      expect(engine.getStatus()).toEqual({ 18095: { state: 'stopped' } });
+      await expect(get(18095, '/x')).rejects.toThrow();
+    }
   });
 });
 

@@ -111,6 +111,9 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
   if (logBuffer && typeof logBuffer.subscribe === 'function') {
     logBuffer.subscribe((entry) => broadcast(sse.clients, 'log', entry));
   }
+  // 配置/运行时变更广播：MCP、curl、另一标签页等非页面来源的修改也通知所有 WebUI
+  // 刷新（前端监听 'config' 事件后重拉数据；payload 仅时间戳，前端全量重拉避免半同步）
+  const notifyConfigChange = () => broadcast(sse.clients, 'config', { at: Date.now() });
 
   // Health
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -180,6 +183,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
       } else {
         await configStore.update((cfg) => applyConfigSettings(cfg, settings));
       }
+      notifyConfigChange();
       res.json(publicConfig(configStore.config));
     } catch (e) { next(e); }
   });
@@ -210,6 +214,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
         return cfg;
       });
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.status(201).json(ep);
     } catch (e) { next(e); }
   });
@@ -234,6 +239,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
         cfg.endpoints = reordered;
         return cfg;
       });
+      notifyConfigChange();
       res.json(configStore.config.endpoints);
     } catch (e) { next(e); }
   });
@@ -262,6 +268,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
         return cfg;
       });
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.json(updated);
     } catch (e) { next(e); }
   });
@@ -273,6 +280,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
       if (next.length === list.length) throw new AppError(404, 'NOT_FOUND', 'endpoint not found');
       await configStore.update((cfg) => { cfg.endpoints = next; return cfg; });
       await syncMockEngine(mockEngine, configStore);
+      notifyConfigChange();
       res.status(204).end();
     } catch (e) { next(e); }
   });
@@ -281,6 +289,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
   app.post('/api/runtime/start', async (req, res, next) => {
     try {
       const result = await mockEngine.start(configStore.config.endpoints, configStore.config.ports, configStore.config.services || []);
+      notifyConfigChange();
       res.json(result);
     } catch (e) { next(e); }
   });
@@ -289,6 +298,7 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
     try {
       const ports = [...(mockEngine.servers?.keys?.() || [])];
       await mockEngine.stop();
+      notifyConfigChange();
       res.json({ stopped: ports });
     } catch (e) { next(e); }
   });
@@ -307,10 +317,10 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
   });
 
   // Ports CRUD（端口一等实体）
-  registerPortRoutes(app, { configStore, mockEngine });
+  registerPortRoutes(app, { configStore, mockEngine, notifyConfigChange });
 
   // WebService services CRUD + WSDL 解析（spec §5）
-  registerServiceRoutes(app, { configStore, mockEngine });
+  registerServiceRoutes(app, { configStore, mockEngine, notifyConfigChange });
 
   // Preview & generators (dynamic response values) —挂 createApi 末尾、错误中间件之前
   registerPreviewRoutes(app);

@@ -10,6 +10,7 @@ import { MockEngine } from './src/mock-engine.js';
 import { createApi } from './src/api.js';
 import { getVersion } from './src/version.js';
 import { defaultStoragePath, ensureDir } from './src/paths.js';
+import { startParentWatchdog } from './src/parent-watchdog.js';
 
 const __dirname = process.env.MOCK_SERVER_DIR || path.dirname(fileURLToPath(import.meta.url));
 
@@ -86,6 +87,12 @@ export async function startServer({ storagePath, uiPort, openBrowser = true, hos
   // 桌面壳握手协议（spec: docs/superpowers/specs/2026-08-14-tauri-desktop-design.md §4）
   // 必须打在 hints 之前，壳拿到就绪行即可导航，其余输出进入壳的 tail 缓冲
   if (desktop) {
+    // 壳被 SIGKILL（tauri dev Ctrl+C / 崩溃 / 强退）时壳侧 kill_sidecar 不会执行，
+    // 看门狗检测父进程死亡并自杀，避免孤儿 sidecar 占住端口
+    startParentWatchdog({
+      onOrphaned: () => process.exit(0),
+      log: (m) => console.log(`[mock-server] ${m}`),
+    });
     process.stdout.write(`MOCK_READY ${JSON.stringify({ host: finalHost, port })}\n`);
   }
 
