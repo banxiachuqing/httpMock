@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="78%">
+      <stop offset="0%" stop-color="#2b3060"/><stop offset="46%" stop-color="#171b36"/><stop offset="100%" stop-color="#0b0e1f"/>
+    </radialGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/><stop offset="38%" stop-color="#ffffff" stop-opacity="0.03"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ind" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9aa8ff"/><stop offset="55%" stop-color="#6f7bf7"/><stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#c6cdf2"/>
+    </linearGradient>
+    <filter id="bloom" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="30"/></filter>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="228" fill="url(#sheen)"/>
+  <rect x="7" y="7" width="1010" height="1010" rx="221" fill="none" stroke="#8b9cff" stroke-opacity="0.20" stroke-width="2"/>
+  <g stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M 498 528 C 562 610 628 668 704 696" stroke="url(#ind)" stroke-width="50" filter="url(#bloom)"/>
+    <line x1="246" y1="442" x2="402" y2="442" stroke="url(#ind)" stroke-width="50"/>
+    <line x1="596" y1="442" x2="762" y2="442" stroke="#4b5288" stroke-width="44" opacity="0.5"/>
+    <path d="M 498 528 C 562 610 628 668 704 696" stroke="url(#ind)" stroke-width="46"/>
+    <circle cx="498" cy="442" r="86" fill="#171b36" stroke="url(#glass)" stroke-width="46"/>
+    <circle cx="498" cy="442" r="17" fill="url(#ind)"/>
+    <circle cx="704" cy="696" r="34" fill="url(#ind)"/>
+    <circle cx="246" cy="442" r="26" fill="url(#ind)"/>
+  </g>
+</svg>

@@ -1,6 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="10" fill="#0c0d10"/>
-  <text x="32" y="42" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="22" font-weight="700" fill="#e8e6e0">M</text>
-  <text x="32" y="42" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="22" font-weight="700" fill="#7cffaf" dx="-1">//</text>
-  <text x="32" y="42" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="22" font-weight="700" fill="#e8e6e0">S</text>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="80%">
+      <stop offset="0%" stop-color="#262b52"/><stop offset="55%" stop-color="#151830"/><stop offset="100%" stop-color="#0b0e1f"/>
+    </radialGradient>
+    <linearGradient id="ind" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9aa8ff"/><stop offset="55%" stop-color="#6f7bf7"/><stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="9" y1="26" x2="15" y2="26" stroke="url(#ind)" stroke-width="6"/>
+    <circle cx="27" cy="26" r="11" stroke="#eef0fa" stroke-width="6"/>
+    <path d="M 27 37 C 35 46 41 50 49 53" stroke="url(#ind)" stroke-width="6"/>
+  </g>
+  <circle cx="27" cy="26" r="2.4" fill="url(#ind)"/>
+  <circle cx="52" cy="55" r="4.4" fill="url(#ind)"/>
+  <circle cx="9" cy="26" r="3.4" fill="url(#ind)"/>
 </svg>
