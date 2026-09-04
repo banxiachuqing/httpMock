@@ -88,30 +88,32 @@ export function createMcpTools({ call }) {
         properties: {
           port: PORT_SCHEMA,
           type: { enum: ['http', 'ws', 'tcp', 'udp', 'syslog'], description: '端口类型，默认 http' },
+          name: { type: 'string', description: '端口名称（可选，≤50 字符，留空按类型自动生成默认名）' },
         },
         required: ['port'],
         additionalProperties: false,
       },
-      handler: (_c, a) => call('POST', '/api/ports', pick(a, ['port', 'type'])),
+      handler: (_c, a) => call('POST', '/api/ports', pick(a, ['port', 'type', 'name'])),
     },
     {
       name: 'update_port',
-      description: '更新端口：改号（级联迁移其下端点与 WS 服务）或启用/停用；type 不可改',
+      description: '更新端口：改号（级联迁移其下端点与 WS 服务）、改名或启用/停用；type 不可改',
       inputSchema: {
         type: 'object',
         properties: {
           port: PORT_SCHEMA,
           newPort: { ...PORT_SCHEMA, description: '新端口号（改号时提供，1-65535）' },
+          name: { type: 'string', description: '端口名称（改名时提供；传空字符串则重新生成默认名）' },
           enabled: { type: 'boolean', description: '启用/停用该端口' },
         },
         required: ['port'],
         additionalProperties: false,
       },
       handler: (_c, a) => {
-        // newPort 映射为 REST body.port（改号）；仅启停时 body 只带 enabled
+        // newPort 映射为 REST body.port（改号）；name/enabled 透传（省略时不带键）
         const body = a.newPort !== undefined
-          ? { port: a.newPort, ...(a.enabled !== undefined ? { enabled: a.enabled } : {}) }
-          : pick(a, ['enabled']);
+          ? { port: a.newPort, ...pick(a, ['name', 'enabled']) }
+          : pick(a, ['name', 'enabled']);
         return call('PUT', `/api/ports/${a.port}`, body);
       },
     },

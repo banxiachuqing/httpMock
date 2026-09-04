@@ -32,9 +32,9 @@ describe('POST /api/ports', () => {
   it('创建端口，默认启用', async () => {
     const r = await ctx.request.post('/api/ports').send({ port: 8080 });
     expect(r.status).toBe(201);
-    expect(r.body).toEqual({ port: 8080, enabled: true, type: 'http' });
+    expect(r.body).toEqual({ port: 8080, enabled: true, type: 'http', name: 'API-1' });
     const list = await ctx.request.get('/api/ports');
-    expect(list.body).toEqual([{ port: 8080, enabled: true, type: 'http' }]);
+    expect(list.body).toEqual([{ port: 8080, enabled: true, type: 'http', name: 'API-1' }]);
   });
 
   it('按端口号升序保存', async () => {
@@ -100,7 +100,7 @@ describe('PUT /api/ports/:port', () => {
     await ctx.request.post('/api/ports').send({ port: 8080 });
     const r = await ctx.request.put('/api/ports/8080').send({ enabled: false });
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ port: 8080, enabled: false, type: 'http' });
+    expect(r.body).toEqual({ port: 8080, enabled: false, type: 'http', name: 'API-1' });
   });
 
   it('改号级联更新端点的 port 字段', async () => {
@@ -108,7 +108,7 @@ describe('PUT /api/ports/:port', () => {
     await ctx.request.post('/api/endpoints').send({ port: 8080, method: 'GET', path: '/a', statusCode: 200, response: {} });
     const r = await ctx.request.put('/api/ports/8080').send({ port: 9090 });
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ port: 9090, enabled: true, type: 'http' });
+    expect(r.body).toEqual({ port: 9090, enabled: true, type: 'http', name: 'API-1' });
     const eps = await ctx.request.get('/api/endpoints');
     expect(eps.body.map((e) => e.port)).toEqual([9090]);
     const ports = await ctx.request.get('/api/ports');
@@ -153,7 +153,7 @@ describe('端点自动补建端口实体', () => {
   it('POST /api/endpoints 为未知端口补建 port', async () => {
     await ctx.request.post('/api/endpoints').send({ port: 7777, method: 'GET', path: '/x', statusCode: 200, response: {} });
     const r = await ctx.request.get('/api/ports');
-    expect(r.body).toEqual([{ port: 7777, enabled: true, type: 'http' }]);
+    expect(r.body).toEqual([{ port: 7777, enabled: true, type: 'http', name: 'API-1' }]);
   });
 
   it('PUT /api/endpoints 改到未知端口时补建', async () => {
@@ -169,7 +169,7 @@ describe('端口类型（v3）', () => {
   it('POST 显式 type=ws', async () => {
     const r = await ctx.request.post('/api/ports').send({ port: 8090, type: 'ws' });
     expect(r.status).toBe(201);
-    expect(r.body).toEqual({ port: 8090, enabled: true, type: 'ws' });
+    expect(r.body).toEqual({ port: 8090, enabled: true, type: 'ws', name: 'WS-1' });
   });
 
   it('POST 非法 type → INVALID_VALUE', async () => {
@@ -212,16 +212,16 @@ describe('端口类型（v3）', () => {
     await ctx.request.post('/api/ports').send({ port: 8096, type: 'ws' });
     await ctx.request.put('/api/ports/8096').send({ enabled: false });
     const r = await ctx.request.get('/api/ports');
-    expect(r.body).toEqual([{ port: 8096, enabled: false, type: 'ws' }]);
+    expect(r.body).toEqual([{ port: 8096, enabled: false, type: 'ws', name: 'WS-1' }]);
   });
 
   it('ws 端口改号后 type 保留', async () => {
     await ctx.request.post('/api/ports').send({ port: 8097, type: 'ws' });
     const r = await ctx.request.put('/api/ports/8097').send({ port: 8098 });
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ port: 8098, enabled: true, type: 'ws' });
+    expect(r.body).toEqual({ port: 8098, enabled: true, type: 'ws', name: 'WS-1' });
     const list = await ctx.request.get('/api/ports');
-    expect(list.body).toEqual([{ port: 8098, enabled: true, type: 'ws' }]);
+    expect(list.body).toEqual([{ port: 8098, enabled: true, type: 'ws', name: 'WS-1' }]);
   });
 });
 
@@ -229,10 +229,10 @@ describe('TCP/UDP 端口类型（spec 2026-08-22 §3/§6）', () => {
   it('创建 tcp/udp 端口', async () => {
     const tcp = await ctx.request.post('/api/ports').send({ port: 9500, type: 'tcp' });
     expect(tcp.status).toBe(201);
-    expect(tcp.body).toEqual({ port: 9500, enabled: true, type: 'tcp' });
+    expect(tcp.body).toEqual({ port: 9500, enabled: true, type: 'tcp', name: 'TCP-1' });
     const udp = await ctx.request.post('/api/ports').send({ port: 9501, type: 'udp' });
     expect(udp.status).toBe(201);
-    expect(udp.body).toEqual({ port: 9501, enabled: true, type: 'udp' });
+    expect(udp.body).toEqual({ port: 9501, enabled: true, type: 'udp', name: 'UDP-1' });
   });
 
   it('拒绝非法 type', async () => {
@@ -267,12 +267,12 @@ describe('Syslog 端口类型（spec 2026-08-22 §7）', () => {
   it('创建 syslog 端口', async () => {
     const r = await ctx.request.post('/api/ports').send({ port: 5514, type: 'syslog' });
     expect(r.status).toBe(201);
-    expect(r.body).toEqual({ port: 5514, enabled: true, type: 'syslog' });
+    expect(r.body).toEqual({ port: 5514, enabled: true, type: 'syslog', name: 'SYSLOG-1' });
   });
 
   it('默认 type 仍为 http（不影响）', async () => {
     const r = await ctx.request.post('/api/ports').send({ port: 5515 });
-    expect(r.body).toEqual({ port: 5515, enabled: true, type: 'http' });
+    expect(r.body).toEqual({ port: 5515, enabled: true, type: 'http', name: 'API-1' });
   });
 
   it('PUT 传 type=syslog → FIELD_IMMUTABLE', async () => {
@@ -301,5 +301,98 @@ describe('Syslog 端口类型（spec 2026-08-22 §7）', () => {
     const r = await ctx.request.post('/api/ports').send({ port: 5519, type: 'snmp' });
     expect(r.status).toBe(400);
     expect(r.body.code).toBe('INVALID_VALUE');
+  });
+});
+
+describe('端口名称（name）', () => {
+  it('POST 未提供 name：按类型自动生成默认名（http→API-1）', async () => {
+    const r = await ctx.request.post('/api/ports').send({ port: 8080 });
+    expect(r.status).toBe(201);
+    expect(r.body).toEqual({ port: 8080, enabled: true, type: 'http', name: 'API-1' });
+  });
+
+  it('POST 各类型默认名前缀不同', async () => {
+    const http = await ctx.request.post('/api/ports').send({ port: 8001 });
+    const ws = await ctx.request.post('/api/ports').send({ port: 8002, type: 'ws' });
+    const tcp = await ctx.request.post('/api/ports').send({ port: 8003, type: 'tcp' });
+    const udp = await ctx.request.post('/api/ports').send({ port: 8004, type: 'udp' });
+    const syslog = await ctx.request.post('/api/ports').send({ port: 8005, type: 'syslog' });
+    expect(http.body.name).toBe('API-1');
+    expect(ws.body.name).toBe('WS-1');
+    expect(tcp.body.name).toBe('TCP-1');
+    expect(udp.body.name).toBe('UDP-1');
+    expect(syslog.body.name).toBe('SYSLOG-1');
+  });
+
+  it('POST 同类型序号递增，各前缀序号相互独立', async () => {
+    await ctx.request.post('/api/ports').send({ port: 8010 }); // API-1
+    await ctx.request.post('/api/ports').send({ port: 8011 }); // API-2
+    const ws = await ctx.request.post('/api/ports').send({ port: 8012, type: 'ws' }); // WS-1（独立）
+    const third = await ctx.request.post('/api/ports').send({ port: 8013 }); // API-3
+    expect(ws.body.name).toBe('WS-1');
+    expect(third.body.name).toBe('API-3');
+  });
+
+  it('POST 显式 name 被采用（去首尾空白）', async () => {
+    const r = await ctx.request.post('/api/ports').send({ port: 8020, name: '  订单服务  ' });
+    expect(r.status).toBe(201);
+    expect(r.body.name).toBe('订单服务');
+  });
+
+  it('POST name 为空白时自动生成默认名', async () => {
+    const r = await ctx.request.post('/api/ports').send({ port: 8021, name: '   ' });
+    expect(r.status).toBe(201);
+    expect(r.body.name).toBe('API-1');
+  });
+
+  it('POST name 非字符串 → INVALID_VALUE', async () => {
+    const r = await ctx.request.post('/api/ports').send({ port: 8022, name: 123 });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_VALUE');
+  });
+
+  it('POST name 超过 50 字符 → INVALID_VALUE', async () => {
+    const r = await ctx.request.post('/api/ports').send({ port: 8023, name: 'x'.repeat(51) });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('INVALID_VALUE');
+  });
+
+  it('PUT 改名：设置新名称', async () => {
+    await ctx.request.post('/api/ports').send({ port: 8030 });
+    const r = await ctx.request.put('/api/ports/8030').send({ name: '网关' });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ port: 8030, enabled: true, type: 'http', name: '网关' });
+  });
+
+  it('PUT 改名：name 空白 → 重新生成默认名', async () => {
+    await ctx.request.post('/api/ports').send({ port: 8031, name: '旧名' });
+    const r = await ctx.request.put('/api/ports/8031').send({ name: '   ' });
+    expect(r.status).toBe(200);
+    expect(r.body.name).toBe('API-1');
+  });
+
+  it('PUT 不传 name：名称保持不变', async () => {
+    await ctx.request.post('/api/ports').send({ port: 8032, name: '保持' });
+    const r = await ctx.request.put('/api/ports/8032').send({ enabled: false });
+    expect(r.status).toBe(200);
+    expect(r.body.name).toBe('保持');
+  });
+
+  it('改号后名称保留', async () => {
+    await ctx.request.post('/api/ports').send({ port: 8033, name: '支付' });
+    const r = await ctx.request.put('/api/ports/8033').send({ port: 8034 });
+    expect(r.body).toEqual({ port: 8034, enabled: true, type: 'http', name: '支付' });
+  });
+
+  it('端点自动补建端口时生成默认名', async () => {
+    await ctx.request.post('/api/endpoints').send({ port: 7777, method: 'GET', path: '/x', statusCode: 200, response: {} });
+    const r = await ctx.request.get('/api/ports');
+    expect(r.body).toEqual([{ port: 7777, enabled: true, type: 'http', name: 'API-1' }]);
+  });
+
+  it('WS 服务补建端口时生成默认名', async () => {
+    await ctx.request.post('/api/services').send({ port: 9600, path: '/ws/S', name: 'S' });
+    const r = await ctx.request.get('/api/ports');
+    expect(r.body).toEqual([{ port: 9600, enabled: true, type: 'ws', name: 'WS-1' }]);
   });
 });

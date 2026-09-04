@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { AppError } from './errors.js';
 import { parseWsdl, escapeXml } from './wsdl.js';
 import { syncMockEngine } from './mock-engine.js';
+import { nextPortName } from './port-name.js';
 
 const MAX_NAME_LENGTH = 50;
 
@@ -73,7 +74,7 @@ function ensureWsPortEntity(cfg, port) {
     }
     return;
   }
-  cfg.ports = [...cfg.ports, { port, enabled: true, type: 'ws' }].sort((a, b) => a.port - b.port);
+  cfg.ports = [...cfg.ports, { port, enabled: true, type: 'ws', name: nextPortName(cfg.ports, 'ws') }].sort((a, b) => a.port - b.port);
 }
 
 export function registerServiceRoutes(app, { configStore, mockEngine, notifyConfigChange }) {

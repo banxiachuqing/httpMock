@@ -222,3 +222,40 @@ test('拖拽排序：换序即时生效且刷新后保持', async ({ page }) => 
   await enterPortDetail(page, server.baseURL, 17511);
   await expect.poll(orderFlipped).toBe(true);
 });
+
+test('详情页改名：设置新名称并在页头显示、持久化', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await page.evaluate(async () => {
+    await fetch('/api/ports', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ port: 17701, name: '原名' }),
+    });
+  });
+  await enterPortDetail(page, server.baseURL, 17701);
+  await expect(page.locator('#portHeaderName')).toHaveText('原名');
+  // 改名输入框预填当前名
+  await expect(page.locator('#portNameInput')).toHaveValue('原名');
+
+  await page.fill('#portNameInput', '订单网关');
+  await page.click('#portNameRenameBtn');
+  await expect(page.locator('#portHeaderName')).toHaveText('订单网关');
+  const ports = await page.evaluate(async () => (await fetch('/api/ports')).json());
+  expect(ports.find((p) => p.port === 17701).name).toBe('订单网关');
+});
+
+test('详情页改名：名称留空则重新生成默认名', async ({ page }) => {
+  await page.goto(server.baseURL, { waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  await page.evaluate(async () => {
+    await fetch('/api/ports', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ port: 17702, name: '旧' }),
+    });
+  });
+  await enterPortDetail(page, server.baseURL, 17702);
+
+  await page.fill('#portNameInput', '');
+  await page.click('#portNameRenameBtn');
+  await expect(page.locator('#portHeaderName')).toHaveText(/^API-\d+$/);
+});

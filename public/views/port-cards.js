@@ -100,6 +100,18 @@ function buildCard(p, state, lastEntry, api) {
   const stats = document.createElement('dl');
   stats.className = 'port-card-stats';
 
+  // 名称行：置于「接口/服务/类型」行之上；无名的旧端口（未清理的历史数据）不渲染此行
+  let nameRow = null;
+  if (p.name) {
+    nameRow = document.createElement('div');
+    const nameDt = document.createElement('dt');
+    nameDt.textContent = '名称';
+    const nameDd = document.createElement('dd');
+    nameDd.className = 'port-card-name';
+    nameDd.textContent = p.name;
+    nameRow.append(nameDt, nameDd);
+  }
+
   const epRow = document.createElement('div');
   const epDt = document.createElement('dt');
   const epDd = document.createElement('dd');
@@ -138,7 +150,7 @@ function buildCard(p, state, lastEntry, api) {
   }
   lastRow.append(lastDt, lastDd);
 
-  stats.append(epRow, lastRow);
+  stats.append(...(nameRow ? [nameRow] : []), epRow, lastRow);
   card.append(head, stats);
 
   const open = () => navigate(`#/port/${p.port}`);
@@ -190,6 +202,7 @@ export function initNewPortDialog({ els, state, api }) {
 
   const open = () => {
     els.newPortModal.querySelector('#newPortType').value = 'http';
+    els.newPortName.value = '';
     els.newPortNumber.value = String(nextFreePort(state.ports));
     els.newPortError.hidden = true;
     els.newPortModal.hidden = false;
@@ -213,7 +226,8 @@ export function initNewPortDialog({ els, state, api }) {
     }
     const type = els.newPortModal.querySelector('#newPortType').value || 'http';
     try {
-      await api.createPort(port, type);
+      // 名称选填：传去除空白后的值，空串由服务端按类型生成默认名
+      await api.createPort(port, type, els.newPortName.value.trim());
       state.ports = await api.listPorts();
       close();
       navigate(`#/port/${port}`);
@@ -227,6 +241,9 @@ export function initNewPortDialog({ els, state, api }) {
   els.newPortCancel.addEventListener('click', close);
   els.newPortCreate.addEventListener('click', submit);
   els.newPortNumber.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submit();
+  });
+  els.newPortName.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') submit();
   });
   // L7：手改端口号时打标，避免后续 type 切换覆盖

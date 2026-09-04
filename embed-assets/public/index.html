@@ -104,10 +104,15 @@
   <header class="port-header" id="portHeader" hidden>
     <button class="btn btn-ghost btn-sm" id="backToHomeBtn">← 返回端口列表</button>
     <span class="port-header-number mono" id="portHeaderNumber">:—</span>
+    <span class="port-header-name" id="portHeaderName"></span>
     <label class="toggle">
       <input type="checkbox" id="portEnabledToggle" />
       <span class="toggle-label">启用</span>
     </label>
+    <span class="port-rename">
+      <input type="text" id="portNameInput" class="input" maxlength="50" placeholder="名称" autocomplete="off" />
+      <button class="btn btn-ghost btn-sm" id="portNameRenameBtn">改名</button>
+    </span>
     <span class="port-rename">
       <input type="number" id="portNumberInput" class="input mono port-rename-input" min="1" max="65535" />
       <button class="btn btn-ghost btn-sm" id="portRenameBtn">改号</button>
@@ -622,6 +627,11 @@
             <option value="syslog">Syslog 接收 (UDP)</option>
           </select>
           <p class="field-hint">创建后类型不可更改。抓包/Syslog 端口只接收并记录数据，不返回响应。</p>
+        </div>
+        <div class="field field-wide">
+          <label for="newPortName">名称</label>
+          <input type="text" id="newPortName" class="input" maxlength="50" placeholder="可选，留空自动生成（如 API-1）" autocomplete="off" />
+          <p class="field-hint">选填。仅作展示标签，用于卡片与详情页头；留空按类型自动生成。</p>
         </div>
         <div class="field field-wide">
           <label for="newPortNumber">端口号</label>

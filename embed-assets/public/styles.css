@@ -1935,6 +1935,12 @@ dialog.log-detail::backdrop {
   font-size: 12px;
 }
 
+/* 端口名称行：卡片上用主色稍突出（它是端口的展示名） */
+.port-card-name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
 .port-card-new {
   align-items: center;
   justify-content: center;
@@ -1971,6 +1977,19 @@ dialog.log-detail::backdrop {
 
 .port-rename-input {
   width: 90px;
+  padding: var(--s-1) var(--s-2);
+}
+
+/* 详情页头：端口名称显示 + 改名输入框（名称比端口号长，给更宽） */
+.port-header-name {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+#portNameInput {
+  width: 150px;
   padding: var(--s-1) var(--s-2);
 }
 

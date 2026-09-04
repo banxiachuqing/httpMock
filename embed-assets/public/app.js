@@ -85,11 +85,11 @@ const api = {
   async listPorts() {
     return (await fetch("/api/ports")).json();
   },
-  async createPort(port, type = "http") {
+  async createPort(port, type = "http", name = "") {
     const r = await fetch("/api/ports", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ port, type }),
+      body: JSON.stringify({ port, type, name }),
     });
     const body = await r.json();
     if (!r.ok) throw new Error(body.error || "创建端口失败");
@@ -322,6 +322,7 @@ const els = {
   portHeader: $("#portHeader"),
   backToHomeBtn: $("#backToHomeBtn"),
   portHeaderNumber: $("#portHeaderNumber"),
+  portHeaderName: $("#portHeaderName"),
   portStatusLed: $("#portStatusLed"),
   portNotFound: $("#portNotFound"),
   portNotFoundBack: $("#portNotFoundBack"),
@@ -335,12 +336,15 @@ const els = {
   newPortCancel: $("#newPortCancel"),
   newPortCreate: $("#newPortCreate"),
   newPortNumber: $("#newPortNumber"),
+  newPortName: $("#newPortName"),
   newPortError: $("#newPortError"),
 
   // 详情页端口操作
   portEnabledToggle: $("#portEnabledToggle"),
   portNumberInput: $("#portNumberInput"),
   portRenameBtn: $("#portRenameBtn"),
+  portNameInput: $("#portNameInput"),
+  portNameRenameBtn: $("#portNameRenameBtn"),
   deletePortBtn: $("#deletePortBtn"),
   endpointName: $("#endpointName"),
 
