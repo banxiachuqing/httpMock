@@ -1,6 +1,7 @@
 // /api/ports CRUD —— 端口一等实体
 import { AppError } from './errors.js';
 import { syncMockEngine } from './mock-engine.js';
+import { nextPortName } from './port-name.js';
 
 function parsePortNumber(value) {
   const port = Number(value);
@@ -12,6 +13,17 @@ function parsePortNumber(value) {
 
 function sorted(ports) {
   return [...ports].sort((a, b) => a.port - b.port);
+}
+
+// 解析请求里的 name：返回 undefined=未提供；null=空白（需自动生成默认名）；string=合法自定义名。
+// 非法输入（非字符串 / 超 50 字符）抛 INVALID_VALUE。名称仅作展示标签，不要求唯一。
+function resolvePortNameInput(value) {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw new AppError(400, 'INVALID_VALUE', 'name must be a string');
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  if (trimmed.length > 50) throw new AppError(400, 'INVALID_VALUE', 'name too long (max 50)');
+  return trimmed;
 }
 
 /**
@@ -31,7 +43,9 @@ export function registerPortRoutes(app, { configStore, mockEngine, notifyConfigC
       if (configStore.config.ports.some((p) => p.port === port)) {
         throw new AppError(400, 'DUPLICATE_PORT', `port ${port} already exists`);
       }
-      const entity = { port, enabled: true, type };
+      const inputName = resolvePortNameInput(req.body?.name);
+      // 名称选填：未提供或空白 → 按类型生成默认名（API-N / WS-N / …）
+      const entity = { port, enabled: true, type, name: inputName ?? nextPortName(configStore.config.ports, type) };
       await configStore.update((cfg) => {
         cfg.ports = sorted([...cfg.ports, entity]);
         return cfg;
@@ -49,7 +63,7 @@ export function registerPortRoutes(app, { configStore, mockEngine, notifyConfigC
       const current = configStore.config.ports.find((p) => p.port === oldPort);
       if (!current) throw new AppError(404, 'NOT_FOUND', 'port not found');
 
-      const { port: newPortRaw, enabled, type } = req.body || {};
+      const { port: newPortRaw, enabled, type, name: nameRaw } = req.body || {};
       if (type !== undefined) {
         throw new AppError(400, 'FIELD_IMMUTABLE', 'port type cannot be changed');
       }
@@ -61,11 +75,20 @@ export function registerPortRoutes(app, { configStore, mockEngine, notifyConfigC
         }
       }
       const newEnabled = enabled === undefined ? current.enabled : enabled !== false;
+      // 改名：undefined=保持不变；空白→按当前类型重新生成默认名；否则采用所给值
+      const inputName = resolvePortNameInput(nameRaw);
+      let renamedTo; // undefined = 不变
+      if (inputName === null) renamedTo = nextPortName(configStore.config.ports, current.type);
+      else if (inputName !== undefined) renamedTo = inputName;
 
       let updated;
       await configStore.update((cfg) => {
-        cfg.ports = sorted(cfg.ports.map((p) =>
-          p.port === oldPort ? { ...p, port: newPort, enabled: newEnabled } : p));
+        cfg.ports = sorted(cfg.ports.map((p) => {
+          if (p.port !== oldPort) return p;
+          const next = { ...p, port: newPort, enabled: newEnabled };
+          if (renamedTo !== undefined) next.name = renamedTo;
+          return next;
+        }));
         if (newPort !== oldPort) {
           cfg.endpoints = cfg.endpoints.map((e) =>
             e.port === oldPort ? { ...e, port: newPort } : e);

@@ -57,6 +57,18 @@ describe('MCP 工具集', () => {
     expect(calls[2].body).toEqual({ port: 9101, enabled: true });
   });
 
+  it('create_port / update_port 透传可选 name（省略时不带键）', async () => {
+    const { tools, calls } = setup();
+    await tools.callTool('create_port', { port: 9005, name: '订单服务' });
+    await tools.callTool('create_port', { port: 9006 });
+    await tools.callTool('update_port', { port: 9005, name: '改名' });
+    await tools.callTool('update_port', { port: 9006, newPort: 9600, name: '网关' });
+    expect(calls[0].body).toEqual({ port: 9005, name: '订单服务' });
+    expect(calls[1].body).toEqual({ port: 9006 });
+    expect(calls[2].body).toEqual({ name: '改名' });
+    expect(calls[3].body).toEqual({ port: 9600, name: '网关' });
+  });
+
   it('delete_port → DELETE /api/ports/:port', async () => {
     const { tools, calls } = setup();
     await tools.callTool('delete_port', { port: 9001 });

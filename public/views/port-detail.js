@@ -7,6 +7,8 @@ export function renderPortHeader(state, els) {
   const p = state.ports.find((x) => x.port === state.route.port);
   if (!p) return;
   els.portHeaderNumber.textContent = `:${p.port}`;
+  els.portHeaderName.textContent = p.name || '';
+  els.portNameInput.value = p.name || '';
   els.portEnabledToggle.checked = p.enabled !== false;
   els.portNumberInput.value = String(p.port);
   const st = state.runtimeStatus[String(p.port)];
@@ -15,6 +17,24 @@ export function renderPortHeader(state, els) {
 }
 
 export function initPortDetail({ els, state, api, refreshAll }) {
+  // 改名：只动端口名称，不涉及其下接口，无需「放弃未保存修改」确认
+  els.portNameRenameBtn.addEventListener('click', async () => {
+    const port = state.route.port;
+    try {
+      // 传当前输入值；空串由服务端按当前类型重新生成默认名
+      const updated = await api.updatePort(port, { name: els.portNameInput.value });
+      const local = state.ports.find((p) => p.port === port);
+      if (local) Object.assign(local, updated);
+      renderPortHeader(state, els); // 回显改名/重生成后的名称
+      showToast({ type: 'success', message: `已改名为 ${updated.name}` });
+    } catch (e) {
+      showToast({ type: 'error', message: '改名失败：' + (e?.message || '未知错误') });
+    }
+  });
+  els.portNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') els.portNameRenameBtn.click();
+  });
+
   els.portEnabledToggle.addEventListener('change', async () => {
     const port = state.route.port;
     try {

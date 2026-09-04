@@ -6,6 +6,7 @@ import { sseMiddleware, broadcast } from './sse.js';
 import { syncMockEngine } from './mock-engine.js';
 import { isValidStoragePath } from './paths.js';
 import { validatePattern } from './path-pattern.js';
+import { nextPortName } from './port-name.js';
 import { registerPreviewRoutes } from './api-preview.js';
 import { registerPortRoutes } from './api-ports.js';
 import { registerServiceRoutes, toPublicService } from './api-services.js';
@@ -49,10 +50,10 @@ function publicConfig(cfg) {
   return { ...cfg, services: (cfg.services || []).map(toPublicService) };
 }
 
-// 端点引用的端口不在 ports 列表时自动补建（避免运行时静默跳过）
+// 端点引用的端口不在 ports 列表时自动补建（避免运行时静默跳过）；补建的端口按类型生成默认名
 function ensurePortEntity(cfg, port) {
   if (!cfg.ports.some((p) => p.port === port)) {
-    cfg.ports = [...cfg.ports, { port, enabled: true, type: 'http' }].sort((a, b) => a.port - b.port);
+    cfg.ports = [...cfg.ports, { port, enabled: true, type: 'http', name: nextPortName(cfg.ports, 'http') }].sort((a, b) => a.port - b.port);
   }
 }
 

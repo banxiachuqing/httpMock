@@ -170,7 +170,7 @@ test/
 3. **`ConfigStore.update(mutator)` 是唯一写入入口**。`mutator` 接收 `structuredClone(this.config)`，返回新对象 —— 不要在外面就地改 `this.config`。
 4. **SSE 客户端订阅**：`LogBuffer.subscribe(fn)` 返回 `unsubscribe`；`api.js` 启动时一次性挂上 broadcast，不要重复挂。
 5. **`embed-assets/` 是 `build.mjs` 的输入**，内容是 `public/` 的副本（vendor 文件）。改 `public/` 必须同步到 `embed-assets/`，否则编译产物不一致。
-6. **端口一等实体**：`data.json` v2 含 `ports: [{port, enabled}]`；v1 数据加载时自动迁移。禁用端口不随启动绑定；空端口绑定后全返回 404。
+6. **端口一等实体**：`data.json` v2 含 `ports: [{port, enabled}]`（v3 起加 `type`；另有可选 `name` 展示名——创建/补建时留空则按类型自动生成 `API-N`/`WS-N`/`TCP-N`/`UDP-N`/`SYSLOG-N`，规则见 `src/port-name.js`，名称非唯一、非标识符）；v1 数据加载时自动迁移。禁用端口不随启动绑定；空端口绑定后全返回 404。
 7. **端点自动补建端口**：`POST/PUT /api/endpoints` 引用未知端口时自动创建 `{port, enabled: true}`，保证不存在"有接口但端口实体缺失"的状态。
 8. **桌面壳只碰进程生命周期**：src-tauri/ 不得引入 mock 业务逻辑；sidecar 协议行（MOCK_READY/MOCK_ERROR）改动必须同步更新 src-tauri/src/sidecar.rs 的 parse_handshake_line。
 9. **端口分类型**：`type: 'http'|'ws'|'tcp'|'udp'|'syslog'` 创建后不可改；资源类型必须与端口类型匹配（`PORT_TYPE_MISMATCH`——`assertHttpPort` 对一切非 http 类型拒挂端点）。tcp/udp/syslog 为纯抓包端口：无 endpoints/services 实体，同端口号跨类型也不并存（端口号全局唯一）。syslog 复用 UDP 捕获路径，注入 `protocol:'syslog'` + `parse:parseSyslog` 给 entry 挂 `syslog` 字段；record 仍记 `'udp'`，stop/隔离/状态零改动。

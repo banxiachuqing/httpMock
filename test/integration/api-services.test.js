@@ -43,7 +43,7 @@ describe('POST /api/services', () => {
     expect(r.body.wsdl).toBeUndefined();
     expect(r.body.targetNamespace).toBe('urn:UserService');
     expect(r.body.operations).toEqual([]);
-    expect(store.config.ports).toEqual([{ port: 8082, enabled: true, type: 'ws' }]);
+    expect(store.config.ports).toEqual([{ port: 8082, enabled: true, type: 'ws', name: 'WS-1' }]);
   });
 
   it('往 http 端口建服务 → PORT_TYPE_MISMATCH', async () => {

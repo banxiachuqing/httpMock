@@ -28,7 +28,13 @@ test('新建 TCP 抓包端口：弹窗选型 + 卡片徽标与统计', async ({ 
   const card = page.locator('.port-card[data-port="19100"]');
   await expect(card).toBeVisible();
   await expect(card.locator('.port-type-badge')).toHaveText('TCP');
-  await expect(card.locator('.port-card-stats dd').first()).toHaveText('TCP 抓包');
+  // 名称行是第一行（自动默认名 TCP-N，覆盖非 http 前缀）；「类型」行显示 TCP 抓包
+  await expect(card.locator('.port-card-name')).toHaveText(/^TCP-\d+$/);
+  const typeVal = card
+    .locator('.port-card-stats > div')
+    .filter({ has: page.locator('dt', { hasText: '类型' }) })
+    .locator('dd');
+  await expect(typeVal).toHaveText('TCP 抓包');
 });
 
 test('UDP 端口详情页为抓包视图：无接口侧栏/编辑器，日志区可见', async ({ page }) => {
