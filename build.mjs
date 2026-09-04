@@ -50,7 +50,8 @@ const outfile = process.argv[3] || 'mockserver';
 const files = scan('./embed-assets');
 console.log(`Embedding ${files.length} files...`);
 
-// 版本号单源：优先最近 git tag（发版即打 tag，产物版本自动跟随）；无 tag 回落 package.json
+// 版本号单源：CI 注入 MOCK_VERSION 优先（release 流水线 prepare job 解析后注入，保证二进制版本 == release tag）；
+// 本地则优先最近 git tag（发版即打 tag，产物版本自动跟随）；无 tag 回落 package.json
 function gitDescribeVersion() {
   try {
     const out = Bun.spawnSync(['git', 'describe', '--tags', '--abbrev=0'], { stdout: 'pipe' });
@@ -62,7 +63,7 @@ function gitDescribeVersion() {
   return null;
 }
 const pkg = JSON.parse(await Bun.file('./package.json').text());
-const VERSION = gitDescribeVersion() ?? pkg.version;
+const VERSION = process.env.MOCK_VERSION ?? gitDescribeVersion() ?? pkg.version;
 console.log(`Version: ${VERSION}`);
 
 const STAGING = './embed-staging';

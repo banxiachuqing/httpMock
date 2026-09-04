@@ -4,7 +4,8 @@
 # 跳过：tag push（v* 不再触发，避免与 main 重复）
 # 手动：Actions 页 Run workflow + 输入版本号可发指定版本
 #
-# 版本：默认 v{YYYYMMDD}-{run}（如 v20260623-5），也可手动指定
+# 版本：prepare job 统一解析（手动输入优先，否则 package.json patch +1），经 MOCK_VERSION 注入
+#       各构建腿，保证二进制/安装包内版本号与 release tag 一致（修复 CI 浅克隆无 tag 导致的版本偏移）
 name: Build & Release
 
 on:
@@ -22,8 +23,36 @@ permissions:
   contents: write
 
 jobs:
+  prepare:
+    name: 解析版本号
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 决定版本号
+        id: meta
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ inputs.version }}" ]]; then
+            # 手动触发 + 输入版本号（跳过 auto-bump）
+            VER="${{ inputs.version }}"
+          else
+            # 自动：读 package.json → bump patch
+            CUR=$(node -p "require('./package.json').version")
+            MAJOR=$(echo "$CUR" | cut -d. -f1)
+            MINOR=$(echo "$CUR" | cut -d. -f2)
+            PATCH=$(echo "$CUR" | cut -d. -f3)
+            VER="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VER}" >> "$GITHUB_OUTPUT"
+          echo "Resolved: tag=v${VER}"
+
   build:
     name: 构建 (${{ matrix.target }})
+    needs: prepare
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -52,6 +81,8 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: 构建 (${{ matrix.target }})
+        env:
+          MOCK_VERSION: ${{ needs.prepare.outputs.version }}
         run: bun build.mjs ${{ matrix.target }} ${{ matrix.outfile }}
 
       - name: 上传构建产物
@@ -63,7 +94,7 @@ jobs:
 
   desktop:
     name: 桌面安装包 (${{ matrix.asset_name }})
-    needs: build
+    needs: [prepare, build]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -130,8 +161,10 @@ jobs:
           ls -la src-tauri/binaries
 
       - name: 同步版本号到 tauri.conf.json
+        env:
+          APP_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync('package.json','utf8')).version;const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.version=v;fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n')"
+          node -e "const fs=require('fs');const v=process.env.APP_VERSION;const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.version=v;fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n')"
 
       - name: 壳单元测试
         # 交叉编译腿的 sidecar 与主机架构不一致时，cargo test 编译 build.rs 会因
@@ -153,29 +186,10 @@ jobs:
 
   release:
     name: 发布 Release
-    needs: [build, desktop]
+    needs: [prepare, build, desktop]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: 决定版本号
-        id: meta
-        run: |
-          set -euo pipefail
-          if [[ -n "${{ inputs.version }}" ]]; then
-            # 手动触发 + 输入版本号（跳过 auto-bump）
-            VER="${{ inputs.version }}"
-          else
-            # 自动：读 package.json → bump patch
-            CUR=$(node -p "require('./package.json').version")
-            MAJOR=$(echo "$CUR" | cut -d. -f1)
-            MINOR=$(echo "$CUR" | cut -d. -f2)
-            PATCH=$(echo "$CUR" | cut -d. -f3)
-            VER="${MAJOR}.${MINOR}.$((PATCH + 1))"
-          fi
-          echo "version=${VER}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${VER}" >> "$GITHUB_OUTPUT"
-          echo "Resolved: tag=v${VER}"
 
       - name: 下载所有构建产物
         uses: actions/download-artifact@v4
@@ -193,8 +207,8 @@ jobs:
       - name: 创建 Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: ${{ steps.meta.outputs.tag }}
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: ${{ needs.prepare.outputs.tag }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
