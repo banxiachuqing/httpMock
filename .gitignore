@@ -8,6 +8,9 @@ playwright/.cache/
 .playwright-mcp/
 coverage/
 
+# 并行开发隔离工作区
+.worktrees/
+
 # Local dev tooling
 .codegraph/
 .idea/
