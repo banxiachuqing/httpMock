@@ -22,6 +22,7 @@ import { initImportWsdlDialog } from "./views/ws-import.js";
 import { initServiceDetail, renderServiceDetail } from "./views/ws-detail.js";
 import { showToast } from "./toast.js";
 import { confirmDialog } from "./confirm-dialog.js";
+import { mergePortOrder } from "./port-order.js";
 import { SYSLOG_SEVERITY_NAMES, SYSLOG_FACILITY_NAMES } from "./syslog-names.js";
 
 const $ = (s) => document.querySelector(s);
@@ -418,6 +419,13 @@ let logDetailCM = null;
 // ============================================================
 // Render
 // ============================================================
+// 当前端口的接口子集：state.endpoints 是跨端口全量（API 语义），详情页侧栏/计数/
+// 自动选中都必须只看当前端口（与 visibleLogs、首页卡片统计同口径）。
+// 首页 home 视图 route.port 为 undefined，过滤结果为空（侧栏本就隐藏，无影响）。
+function currentPortEndpoints() {
+  return state.endpoints.filter((e) => e.port === state.route.port);
+}
+
 function render() {
   renderEndpointList();
   renderEditor();
@@ -427,9 +435,10 @@ function render() {
 function renderEndpointList() {
   // 拖拽期间不重建列表：5s 轮询会整体重渲染 DOM，抽走拖动中的元素（spec 2026-08-17 §4.3）
   if (state.draggingId) return;
-  els.endpointCount.textContent = state.endpoints.length;
+  const portEndpoints = currentPortEndpoints();
+  els.endpointCount.textContent = portEndpoints.length;
   els.endpointList.innerHTML = "";
-  for (const ep of state.endpoints) {
+  for (const ep of portEndpoints) {
     const li = document.createElement("li");
     li.className =
       "endpoint-item" + (ep.id === state.selectedId ? " selected" : "");
@@ -556,7 +565,7 @@ async function deleteEndpointById(id) {
   const wasSelected = state.selectedId === id;
   state.endpoints = state.endpoints.filter((e) => e.id !== id);
   if (wasSelected) {
-    state.selectedId = state.endpoints[0]?.id || null;
+    state.selectedId = currentPortEndpoints()[0]?.id || null;
     state.dirty = false;
   }
   renderEndpointList();
@@ -595,6 +604,7 @@ function flipListMove(container, draggedEl, targetEl, before) {
 
 // 拖拽落点提交：预览已把 DOM 排成目标顺序，读取后持久化。
 // 挂在列表容器上（li 的 drop 会冒泡到这里），项间 2px 缝隙与列表空白区也可落点。
+// DOM 只有当前端口子集，必须合并回全量数组再提交（服务端校验全量排列）。
 function commitDragOrder() {
   const fromId = state.draggingId;
   state.draggingId = null;
@@ -602,18 +612,19 @@ function commitDragOrder() {
     renderEndpointList();
     return;
   }
-  const ids = [...els.endpointList.querySelectorAll(".endpoint-item")].map(
+  const portIds = [...els.endpointList.querySelectorAll(".endpoint-item")].map(
     (el) => el.dataset.id,
   );
-  const unchanged = ids.every((x, i) => x === state.endpoints[i].id);
+  const current = currentPortEndpoints();
+  const unchanged = portIds.every((x, i) => x === current[i]?.id);
   if (unchanged) {
     renderEndpointList();
     return;
   }
-  const byId = new Map(state.endpoints.map((x) => [x.id, x]));
-  state.endpoints = ids.map((x) => byId.get(x));
+  state.endpoints = mergePortOrder(state.endpoints, state.route.port, portIds);
+  const allIds = state.endpoints.map((e) => e.id);
   renderEndpointList();
-  api.reorderEndpoints(ids).catch(async (err) => {
+  api.reorderEndpoints(allIds).catch(async (err) => {
     showToast({ type: "error", message: "排序失败：" + (err?.message || "未知错误") });
     state.endpoints = await api.listEndpoints();
     renderEndpointList();
@@ -796,9 +807,19 @@ async function applyRoute(route) {
   if (ev === "port") {
     // CodeMirror 在 hidden 容器里挂载过，显示后需要重新测量
     getEditorView()?.requestMeasure();
+    // 进入 / 切换端口时，若当前选中不属于本端口（含直接进入时 loadAll 未选中），
+    // 自动选中当前端口第一个接口——不得残留其他端口的接口在编辑器里
+    const portEndpoints = currentPortEndpoints();
+    if (!portEndpoints.some((e) => e.id === state.selectedId)) {
+      state.selectedId = portEndpoints[0]?.id || null;
+      state.dirty = false;
+    }
     renderEndpointList();
     renderEditor();
     renderLogsInitial();
+    // 程序化 setValue 不触发 onChange，进入端口页后需主动刷新一次预览
+    // （原由 boot 里基于全局选中的 setTimeout 承担，loadAll 改按端口选中后移交到这里）
+    schedulePreviewRefresh();
   }
   if (ev === "ws-port") {
     renderWsPortPage();
@@ -1192,8 +1213,8 @@ async function refreshAll() {
   state.endpoints = await api.listEndpoints();
   state.config = await api.getConfig();
   state.services = state.config.services || [];
-  if (!state.endpoints.some((e) => e.id === state.selectedId)) {
-    state.selectedId = state.endpoints[0]?.id || null;
+  if (!currentPortEndpoints().some((e) => e.id === state.selectedId)) {
+    state.selectedId = currentPortEndpoints()[0]?.id || null;
     state.dirty = false;
   }
   render();
@@ -1212,7 +1233,7 @@ async function loadAll() {
   state.ports = await api.listPorts();
   state.endpoints = await api.listEndpoints();
   state.services = state.config.services || [];
-  state.selectedId = state.endpoints[0]?.id || null;
+  state.selectedId = currentPortEndpoints()[0]?.id || null;
   state.logs = await api.recentLogs(500);
   // Also fetch runtime status so the global toggle reflects the real state
   // after a page refresh (the mock servers may still be bound to their ports).
@@ -1347,7 +1368,7 @@ async function deleteEndpoint() {
   try {
     await api.deleteEndpoint(ep.id);
     state.endpoints = state.endpoints.filter((e) => e.id !== ep.id);
-    state.selectedId = state.endpoints[0]?.id || null;
+    state.selectedId = currentPortEndpoints()[0]?.id || null;
     state.dirty = false;
     renderEndpointList();
     renderEditor();
@@ -1698,8 +1719,7 @@ loadAll().then(() => {
     },
     onSelectionChange: (state) => updateDynamicValueBtnState(state),
   });
-  // onChange 在 initial mount 时不触发；手动跑一次预览刷新
-  if (ep) setTimeout(refreshPreview, 100);
+  // onChange 在 initial mount 时不触发；预览刷新由 applyRoute 进入端口页时统一调度
   window.__editorMounted = true;
   connectSSE();
   // Fetch initial runtime status so list LEDs reflect failed/running per port
