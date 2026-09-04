@@ -1282,6 +1282,14 @@ body.resizing {
 .log-entry.missed .log-result { color: var(--amber); }
 .log-entry.error .log-result { color: var(--red); }
 
+/* 引擎/解析器告警行（无请求字段的 system 条目）：不可点开详情，琥珀色标识 */
+.log-entry.system { cursor: default; }
+.log-entry.system::before { background: var(--amber-dim); }
+.log-entry.system .log-result { color: var(--amber); }
+.log-level { color: var(--text-secondary); }
+.log-level[data-level="warn"] { color: var(--amber); }
+.log-level[data-level="error"] { color: var(--red); }
+
 /* ============================================================
    Modal
    ============================================================ */

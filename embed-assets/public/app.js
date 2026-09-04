@@ -858,6 +858,11 @@ function renderLogEntry(entry) {
   if (entry.protocol === "tcp" || entry.protocol === "udp" || entry.protocol === "syslog") {
     return renderCaptureLogEntry(entry);
   }
+  // 引擎/解析器告警等无请求条目（无 method/protocol，如 bind 失败、表达式解析失败）：
+  // 安全分流——否则会落到下面对 entry.method.toLowerCase() 求值而抛错，拖垮整个 loadAll
+  if (!entry.method) {
+    return renderSystemLogEntry(entry);
+  }
   const row = document.createElement("div");
   row.className = `log-entry ${entry.matched ? "matched" : "missed"}`;
   const range = `${Math.floor(entry.status / 100)}xx`;
@@ -888,6 +893,31 @@ function renderLogEntry(entry) {
   if (entry.method) {
     row.addEventListener("click", () => openLogDetail(entry.id));
   }
+  return row;
+}
+
+// 引擎/解析器等无请求告警条目（无 method/protocol/port，如 bind 失败、表达式解析失败）。
+// 不假定请求字段存在；无可展开的请求详情，故不挂点击（openLogDetail 对无 method/protocol 本就直接 return）。
+function renderSystemLogEntry(entry) {
+  const row = document.createElement("div");
+  row.className = "log-entry system";
+  const time = new Date(entry.timestamp).toLocaleTimeString("zh-CN", {
+    hour12: false,
+  });
+  const level = (entry.level || "info").toUpperCase();
+  row.innerHTML = `
+    <span class="log-time">${time}</span>
+    <span class="log-method log-level" data-level="${entry.level || "info"}">${level}</span>
+    <span class="log-path"></span>
+    <span class="log-port">—</span>
+    <span class="log-status" data-range="">—</span>
+    <span class="log-duration">—</span>
+    <span class="log-ip mono"></span>
+    <span class="log-result"></span>
+  `;
+  row.querySelector(".log-path").textContent = entry.message || "—";
+  row.querySelector(".log-ip").textContent = entry.source || "—";
+  row.querySelector(".log-result").textContent = "告警";
   return row;
 }
 
