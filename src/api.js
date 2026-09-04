@@ -7,6 +7,7 @@ import { syncMockEngine } from './mock-engine.js';
 import { isValidStoragePath } from './paths.js';
 import { validatePattern } from './path-pattern.js';
 import { nextPortName } from './port-name.js';
+import { findOccupier, forceFreePort } from './port-occupier.js';
 import { registerPreviewRoutes } from './api-preview.js';
 import { registerPortRoutes } from './api-ports.js';
 import { registerServiceRoutes, toPublicService } from './api-services.js';
@@ -305,6 +306,29 @@ export function createApi({ configStore, logBuffer, mockEngine }) {
   });
 
   app.get('/api/runtime/status', (_req, res) => res.json(mockEngine.getStatus()));
+
+  // 端口占用排查：查监听该端口的进程（供「启动失败」对话框展示占用者）；win32 返回 supported:false
+  app.get('/api/ports/:port/occupier', async (req, res, next) => {
+    try {
+      const occ = await findOccupier(Number(req.params.port));
+      res.json({ occupied: occ.pids.length > 0, supported: occ.supported, pids: occ.pids });
+    } catch (e) { next(e); }
+  });
+
+  // 强制启动：kill 占用该端口的进程后全量重绑引擎。仅对 EADDRINUSE（被占用）有意义；
+  // EACCES（特权端口权限不足）无进程可 kill，前端只给改号。win32 抛 UNSUPPORTED → 400。
+  app.post('/api/ports/:port/force-start', async (req, res, next) => {
+    try {
+      const port = Number(req.params.port);
+      if (!configStore.config.ports.some((p) => p.port === port)) {
+        throw new AppError(404, 'NOT_FOUND', 'port not found');
+      }
+      await forceFreePort(port);
+      const result = await mockEngine.start(configStore.config.endpoints, configStore.config.ports, configStore.config.services || []);
+      notifyConfigChange();
+      res.json(result);
+    } catch (e) { next(e); }
+  });
 
   // Logs
   app.get('/api/logs', (req, res) => {

@@ -5,6 +5,7 @@ import { LogBuffer } from '../../src/log-buffer.js';
 import { buildApp } from '../helpers/test-server.js';
 import { tempDir } from '../helpers/temp-dir.js';
 import http from 'node:http';
+import { spawn } from 'node:child_process';
 
 let dir, store, engine, logBuffer, ctx;
 
@@ -189,5 +190,65 @@ describe('GET /api/runtime/status', () => {
     const r = await ctx.request.get('/api/runtime/status');
     expect(r.status).toBe(200);
     expect(r.body).toEqual({});
+  });
+});
+
+// 占用必须从独立 spawn 的子进程绑定——若用同进程 blocker，force-start 的 kill 会误杀测试 runner 自身
+function spawnBlocker(port) {
+  return spawn(process.execPath, ['-e', `require('net').createServer().listen(${port},'127.0.0.1')`], { stdio: 'ignore' });
+}
+async function waitOccupied(port) {
+  for (let i = 0; i < 50; i++) {
+    const r = await ctx.request.get(`/api/ports/${port}/occupier`);
+    if (r.body.occupied && r.body.pids.length > 0) return r.body;
+    await new Promise((res) => setTimeout(res, 100));
+  }
+  throw new Error('子进程未及时占用端口 ' + port);
+}
+
+describe('端口占用：占用查询与强制启动', () => {
+  it('GET occupier：返回占用进程；无占用时 occupied:false', async () => {
+    const free = await ctx.request.get('/api/ports/19950/occupier');
+    expect(free.status).toBe(200);
+    expect(free.body.occupied).toBe(false);
+    expect(free.body.pids).toEqual([]);
+
+    const child = spawnBlocker(19951);
+    try {
+      const occ = await waitOccupied(19951);
+      expect(occ.occupied).toBe(true);
+      expect(occ.pids[0].pid).toBe(child.pid);
+      expect(occ.pids[0].command).toBeTruthy();
+    } finally {
+      child.kill('SIGKILL');
+    }
+  });
+
+  it('POST force-start：kill 占用子进程并把 mock 端口绑上', async () => {
+    const child = spawnBlocker(19952);
+    let childExited = false;
+    child.on('exit', () => { childExited = true; });
+    try {
+      await waitOccupied(19952);
+      await ctx.request.post('/api/ports').send({ port: 19952 }); // 空 http 端口
+      const start = await ctx.request.post('/api/runtime/start');
+      expect(start.body.failed.find((f) => f.port === 19952)).toBeTruthy(); // 占用 → failed
+
+      const r = await ctx.request.post('/api/ports/19952/force-start');
+      expect(r.status).toBe(200);
+      // 占用子进程被 kill（vitest 1.x 无 expect.poll，用手动轮询等退出）
+      for (let i = 0; i < 30 && !childExited; i++) await new Promise((res) => setTimeout(res, 100));
+      expect(childExited).toBe(true);
+      // mock 端口已绑上（running）
+      const status = await ctx.request.get('/api/runtime/status');
+      expect(status.body['19952']?.state).toBe('running');
+    } finally {
+      if (!childExited) child.kill('SIGKILL');
+    }
+  });
+
+  it('POST force-start：未配置的端口 → 404', async () => {
+    const r = await ctx.request.post('/api/ports/19999/force-start');
+    expect(r.status).toBe(404);
   });
 });

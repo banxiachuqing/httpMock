@@ -647,6 +647,24 @@
     </div>
   </div>
 
+  <!-- 端口启动失败对话框：改号 / 强制启动（kill 占用进程） -->
+  <div class="modal" id="portStartFailModal" hidden>
+    <div class="modal-backdrop" id="portStartFailBackdrop"></div>
+    <div class="modal-panel" role="dialog" aria-labelledby="portStartFailTitle" aria-modal="true">
+      <div class="modal-header">
+        <h2 class="section-label" id="portStartFailTitle">端口启动失败</h2>
+        <button class="btn btn-icon" id="portStartFailClose" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="field-hint">以下端口启动失败。被占用的端口可「改号」或「强制启动」（结束后台占用进程，支持 macOS/Linux）；特权端口（&lt;1024）只能改号。</p>
+        <div id="portStartFailList" class="start-fail-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="portStartFailOk">完成</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Log detail dialog -->
   <dialog id="log-detail" class="log-detail" aria-labelledby="log-detail-title">
     <header class="log-detail-header">

@@ -13,6 +13,7 @@ import { applyTheme, onThemeChange } from "./theme.js";
 import { startRouter, navigate } from "./router.js";
 import { renderPortCards, initNewPortDialog } from "./views/port-cards.js";
 import { renderPortHeader, initPortDetail } from "./views/port-detail.js";
+import { initPortStartFailDialog } from "./views/port-start-fail.js";
 import {
   renderServiceCards,
   initNewServiceDialog,
@@ -108,6 +109,17 @@ const api = {
   async deletePort(port) {
     const r = await fetch(`/api/ports/${port}`, { method: "DELETE" });
     if (!r.ok && r.status !== 204) throw new Error("删除端口失败");
+  },
+  // 查监听某端口的进程（占用排查）
+  async getOccupier(port) {
+    return (await fetch(`/api/ports/${port}/occupier`)).json();
+  },
+  // 强制启动：kill 占用进程后重绑引擎
+  async forceStartPort(port) {
+    const r = await fetch(`/api/ports/${port}/force-start`, { method: "POST" });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || "强制启动失败");
+    return json;
   },
   async runtimeStart() {
     return (await fetch("/api/runtime/start", { method: "POST" })).json();
@@ -338,6 +350,11 @@ const els = {
   newPortNumber: $("#newPortNumber"),
   newPortName: $("#newPortName"),
   newPortError: $("#newPortError"),
+  portStartFailModal: $("#portStartFailModal"),
+  portStartFailBackdrop: $("#portStartFailBackdrop"),
+  portStartFailClose: $("#portStartFailClose"),
+  portStartFailOk: $("#portStartFailOk"),
+  portStartFailList: $("#portStartFailList"),
 
   // 详情页端口操作
   portEnabledToggle: $("#portEnabledToggle"),
@@ -729,6 +746,7 @@ function renderStatus() {
 // ============================================================
 let suppressHash = false;
 let newPortDialog = null;
+let startFailDialog = null;
 let newServiceDialog = null;
 let importWsdlDialog = null;
 
@@ -1425,6 +1443,8 @@ async function toggleRuntime() {
     state.runtime =
       result.failed && result.failed.length > 0 ? "failed" : "running";
     render();
+    // 有端口启动失败（被占用/特权端口）→ 弹窗提供 改号 / 强制启动
+    if (result.failed && result.failed.length > 0) startFailDialog?.open(result.failed);
   }
   await refreshRuntimeStatus();
   renderEndpointList();
@@ -1763,6 +1783,7 @@ loadAll().then(() => {
   newPortDialog = initNewPortDialog({ els, state, api });
   initLayoutResizers();
   initPortDetail({ els, state, api, refreshAll });
+  startFailDialog = initPortStartFailDialog({ els, state, api, onResolved: refreshRuntimeStatus });
   newServiceDialog = initNewServiceDialog({
     els,
     state,

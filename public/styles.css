@@ -1977,6 +1977,22 @@ dialog.log-detail::backdrop {
   color: var(--red);
 }
 
+/* 端口启动失败对话框 */
+.start-fail-list { display: flex; flex-direction: column; gap: var(--s-3); }
+.start-fail-row {
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  padding: var(--s-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.start-fail-head { display: flex; align-items: center; gap: var(--s-2); }
+.start-fail-port { font-weight: 700; }
+.fail-reason { color: var(--amber); }
+.start-fail-ops { display: flex; align-items: center; gap: var(--s-2); }
+.start-fail-ops .rename-input { width: 110px; padding: var(--s-1) var(--s-2); }
+
 .port-rename {
   display: flex;
   align-items: center;
