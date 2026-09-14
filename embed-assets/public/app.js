@@ -11,7 +11,7 @@ import {
 } from "./editor.js";
 import { applyTheme, onThemeChange } from "./theme.js";
 import { startRouter, navigate } from "./router.js";
-import { renderPortCards, initNewPortDialog } from "./views/port-cards.js";
+import { renderPortCards, initNewPortDialog, initEditPortDialog } from "./views/port-cards.js";
 import { renderPortHeader, initPortDetail } from "./views/port-detail.js";
 import { initPortStartFailDialog } from "./views/port-start-fail.js";
 import {
@@ -350,19 +350,22 @@ const els = {
   newPortNumber: $("#newPortNumber"),
   newPortName: $("#newPortName"),
   newPortError: $("#newPortError"),
+  editPortModal: $("#editPortModal"),
+  editPortBackdrop: $("#editPortBackdrop"),
+  editPortClose: $("#editPortClose"),
+  editPortCancel: $("#editPortCancel"),
+  editPortSave: $("#editPortSave"),
+  editPortName: $("#editPortName"),
+  editPortNumber: $("#editPortNumber"),
+  editPortError: $("#editPortError"),
   portStartFailModal: $("#portStartFailModal"),
   portStartFailBackdrop: $("#portStartFailBackdrop"),
   portStartFailClose: $("#portStartFailClose"),
   portStartFailOk: $("#portStartFailOk"),
   portStartFailList: $("#portStartFailList"),
 
-  // 详情页端口操作
+  // 详情页端口操作（改号/改名/删除已移至首页卡片）
   portEnabledToggle: $("#portEnabledToggle"),
-  portNumberInput: $("#portNumberInput"),
-  portRenameBtn: $("#portRenameBtn"),
-  portNameInput: $("#portNameInput"),
-  portNameRenameBtn: $("#portNameRenameBtn"),
-  deletePortBtn: $("#deletePortBtn"),
   endpointName: $("#endpointName"),
 
   // WS 视图
@@ -731,7 +734,9 @@ function renderStatus() {
     running: {
       text: "运行中",
       label: "停止",
-      detail: `${new Set(state.endpoints.map((e) => e.port)).size} 个端口已上线`,
+      // 按真实运行状态计数（与 deriveGlobalRuntime/卡片 LED 同源）：
+      // 禁用端口不在 runtimeStatus 中，bind 失败记 failed，均已启用的空端口计入
+      detail: `${Object.values(state.runtimeStatus).filter((s) => s.state === "running").length} 个端口已上线`,
     },
     failed: { text: "启动失败", label: "重试", detail: "见接口列表" },
   };
@@ -746,6 +751,7 @@ function renderStatus() {
 // ============================================================
 let suppressHash = false;
 let newPortDialog = null;
+let editPortDialog = null;
 let startFailDialog = null;
 let newServiceDialog = null;
 let importWsdlDialog = null;
@@ -756,7 +762,34 @@ function renderHome() {
     countEl: els.portCardCount,
     api,
     onNewPort: () => newPortDialog.open(),
+    onEditPort: (p) => editPortDialog?.open(p),
+    onDeletePort: deletePortFromCard,
   });
+}
+
+// 卡片 ✕ 删除端口：确认弹窗按端口类型提示级联内容（http→接口、ws→服务），确认后连带删除
+async function deletePortFromCard(p) {
+  const eps = state.endpoints.filter((e) => e.port === p.port).length;
+  const svcs = (state.services || []).filter((s) => s.port === p.port).length;
+  let extra = '';
+  if (eps > 0) extra = `将连同 ${eps} 个接口一起删除。`;
+  else if (svcs > 0) extra = `将连同 ${svcs} 个服务一起删除。`;
+  if (
+    !(await confirmDialog({
+      title: "删除端口",
+      message: `确认删除端口 ${p.port}？${extra}`.trim(),
+      danger: true,
+      confirmText: "删除端口",
+    }))
+  )
+    return;
+  try {
+    await api.deletePort(p.port);
+    await refreshAll();
+    showToast({ type: "success", message: `已删除端口 ${p.port}` });
+  } catch (e) {
+    showToast({ type: "error", message: "删除失败：" + (e?.message || "未知错误") });
+  }
 }
 
 function currentPortEntity(route) {
@@ -1781,8 +1814,9 @@ loadAll().then(() => {
   // Poll every 5s to catch external changes (e.g. someone else binds the port)
   setInterval(refreshRuntimeStatus, 5000);
   newPortDialog = initNewPortDialog({ els, state, api });
+  editPortDialog = initEditPortDialog({ els, state, api, refreshAll });
   initLayoutResizers();
-  initPortDetail({ els, state, api, refreshAll });
+  initPortDetail({ els, state, api });
   startFailDialog = initPortStartFailDialog({ els, state, api, onResolved: refreshRuntimeStatus });
   newServiceDialog = initNewServiceDialog({
     els,

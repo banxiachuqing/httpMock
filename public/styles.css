@@ -1904,8 +1904,27 @@ dialog.log-detail::backdrop {
   letter-spacing: -0.02em;
 }
 
-.port-card-toggle {
+/* 卡片操作按钮（✎ 编辑 / ✕ 删除）：比通用 .btn-icon 紧凑，删除 hover 转红警示；
+   开关已移到卡片最左，编辑按钮负责把操作区推到右侧 */
+.port-card-edit,
+.port-card-delete {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.port-card-edit {
   margin-left: auto;
+  /* 铅笔尖默认朝左下，水平镜像后朝右下，视觉上指向卡片内容区 */
+  transform: scaleX(-1);
+}
+
+.port-card-delete:hover {
+  color: var(--red);
+  border-color: var(--danger-fill-border);
+  background: var(--danger-wash);
 }
 
 .port-card-stats {
@@ -1993,28 +2012,12 @@ dialog.log-detail::backdrop {
 .start-fail-ops { display: flex; align-items: center; gap: var(--s-2); }
 .start-fail-ops .rename-input { width: 110px; padding: var(--s-1) var(--s-2); }
 
-.port-rename {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-}
-
-.port-rename-input {
-  width: 90px;
-  padding: var(--s-1) var(--s-2);
-}
-
-/* 详情页头：端口名称显示 + 改名输入框（名称比端口号长，给更宽） */
+/* 详情页头：端口名称展示（改号/改名/删除入口已移至首页卡片） */
 .port-header-name {
   color: var(--text-secondary);
   font-size: 14px;
   font-weight: 500;
   overflow-wrap: anywhere;
-}
-
-#portNameInput {
-  width: 150px;
-  padding: var(--s-1) var(--s-2);
 }
 
 #port:disabled {

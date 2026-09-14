@@ -83,44 +83,6 @@ test('详情页日志只显示本端口', async ({ page }) => {
   await expect(page.locator('#logsCount')).toContainText('1 条 / 共 2 条');
 });
 
-test('改端口号级联更新接口并更新 hash', async ({ page }) => {
-  await page.goto(server.baseURL, { waitUntil: 'load' });
-  await page.waitForTimeout(1000);
-  await setup(page, 17505);
-  await enterPortDetail(page, server.baseURL, 17505);
-
-  await page.fill('#portNumberInput', '17506');
-  await page.click('#portRenameBtn');
-
-  // 改号是异步的；header 本来就可见，等 URL 变化而不是 header
-  await page.waitForURL(/#\/port\/17506/, { timeout: 5000 });
-  expect(page.url()).toContain('#/port/17506');
-  const ports = await page.evaluate(async () => (await fetch('/api/ports')).json());
-  expect(ports.map((p) => p.port)).toContain(17506);
-  const eps = await page.evaluate(async () => (await fetch('/api/endpoints')).json());
-  // 共享服务器下其它测试的端点仍在；只断言改号端口的级联结果
-  expect(eps.some((e) => e.port === 17506)).toBe(true);
-  expect(eps.every((e) => e.port !== 17505)).toBe(true);
-});
-
-test('删除端口连带删除接口并回到首页', async ({ page }) => {
-  await page.goto(server.baseURL, { waitUntil: 'load' });
-  await page.waitForTimeout(1000);
-  await setup(page, 17507);
-  await enterPortDetail(page, server.baseURL, 17507);
-
-  await page.click('#deletePortBtn');
-  // 自定义确认弹窗替代系统 confirm()（2026-08-17）：断言文案并点红色确认按钮
-  await expect(page.locator('.modal-confirm-body')).toContainText('1 个接口');
-  await page.click('.modal-confirm .btn-danger');
-
-  await page.waitForSelector('#viewHome:not([hidden])');
-  const ports = await page.evaluate(async () => (await fetch('/api/ports')).json());
-  expect(ports.map((p) => p.port)).not.toContain(17507);
-  const eps = await page.evaluate(async () => (await fetch('/api/endpoints')).json());
-  expect(eps.filter((e) => e.port === 17507)).toHaveLength(0);
-});
-
 test('操作按钮在编辑区顶部，删除在最右', async ({ page }) => {
   await page.goto(server.baseURL, { waitUntil: 'load' });
   await page.waitForTimeout(1000);
@@ -221,41 +183,4 @@ test('拖拽排序：换序即时生效且刷新后保持', async ({ page }) => 
   // 刷新后顺序保持（持久化意图）
   await enterPortDetail(page, server.baseURL, 17511);
   await expect.poll(orderFlipped).toBe(true);
-});
-
-test('详情页改名：设置新名称并在页头显示、持久化', async ({ page }) => {
-  await page.goto(server.baseURL, { waitUntil: 'load' });
-  await page.waitForTimeout(1000);
-  await page.evaluate(async () => {
-    await fetch('/api/ports', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ port: 17701, name: '原名' }),
-    });
-  });
-  await enterPortDetail(page, server.baseURL, 17701);
-  await expect(page.locator('#portHeaderName')).toHaveText('原名');
-  // 改名输入框预填当前名
-  await expect(page.locator('#portNameInput')).toHaveValue('原名');
-
-  await page.fill('#portNameInput', '订单网关');
-  await page.click('#portNameRenameBtn');
-  await expect(page.locator('#portHeaderName')).toHaveText('订单网关');
-  const ports = await page.evaluate(async () => (await fetch('/api/ports')).json());
-  expect(ports.find((p) => p.port === 17701).name).toBe('订单网关');
-});
-
-test('详情页改名：名称留空则重新生成默认名', async ({ page }) => {
-  await page.goto(server.baseURL, { waitUntil: 'load' });
-  await page.waitForTimeout(1000);
-  await page.evaluate(async () => {
-    await fetch('/api/ports', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ port: 17702, name: '旧' }),
-    });
-  });
-  await enterPortDetail(page, server.baseURL, 17702);
-
-  await page.fill('#portNameInput', '');
-  await page.click('#portNameRenameBtn');
-  await expect(page.locator('#portHeaderName')).toHaveText(/^API-\d+$/);
 });

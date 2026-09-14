@@ -38,7 +38,7 @@ function endpointLabel(entry, endpoints) {
   return ep ? `${ep.method} ${ep.path}` : entry.path;
 }
 
-function buildCard(p, state, lastEntry, api) {
+function buildCard(p, state, lastEntry, api, { onEdit, onDelete } = {}) {
   const isWs = p.type === 'ws';
   const isCapture = p.type === 'tcp' || p.type === 'udp' || p.type === 'syslog';
   const type = p.type || 'http';
@@ -70,6 +70,23 @@ function buildCard(p, state, lastEntry, api) {
   led.className = 'led led-mini';
   led.dataset.state = ledState;
 
+  // 编辑 / 删除：融合自端口详情页的操作入口；stopPropagation 防触发卡片跳转
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'btn btn-icon port-card-edit';
+  editBtn.title = '编辑端口';
+  editBtn.setAttribute('aria-label', `编辑端口 ${p.port}`);
+  editBtn.textContent = '✎';
+  editBtn.addEventListener('click', (e) => { e.stopPropagation(); onEdit(p); });
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'btn btn-icon port-card-delete';
+  deleteBtn.title = '删除端口';
+  deleteBtn.setAttribute('aria-label', `删除端口 ${p.port}`);
+  deleteBtn.textContent = '✕';
+  deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); onDelete(p); });
+
   const toggle = document.createElement('label');
   toggle.className = 'toggle port-card-toggle';
   toggle.addEventListener('click', (e) => e.stopPropagation());
@@ -90,12 +107,15 @@ function buildCard(p, state, lastEntry, api) {
       checkbox.disabled = false;
     }
   });
+  // 卡片空间紧凑：不渲染「启用」文字，悬浮提示走 title。
+  // 勾选框由 .toggle-label::before 绘制（input 本身隐藏），label 元素不能省
+  toggle.title = '启用';
   const toggleLabel = document.createElement('span');
   toggleLabel.className = 'toggle-label';
-  toggleLabel.textContent = '启用';
   toggle.append(checkbox, toggleLabel);
 
-  head.append(num, badge, led, toggle);
+  // 开关放最左（端口号前），操作按钮靠右
+  head.append(toggle, num, badge, led, editBtn, deleteBtn);
 
   const stats = document.createElement('dl');
   stats.className = 'port-card-stats';
@@ -170,7 +190,7 @@ function buildNewCard() {
   return card;
 }
 
-export function renderPortCards(state, { grid, countEl, api, onNewPort }) {
+export function renderPortCards(state, { grid, countEl, api, onNewPort, onEditPort, onDeletePort }) {
   grid.innerHTML = '';
   countEl.textContent = String(state.ports.length);
   if (state.ports.length === 0) {
@@ -181,7 +201,10 @@ export function renderPortCards(state, { grid, countEl, api, onNewPort }) {
   }
   const latest = latestLogByPort(state.logs);
   for (const p of state.ports) {
-    grid.appendChild(buildCard(p, state, latest.get(p.port), api));
+    grid.appendChild(buildCard(p, state, latest.get(p.port), api, {
+      onEdit: onEditPort || (() => {}),
+      onDelete: onDeletePort || (() => {}),
+    }));
   }
   const newCard = buildNewCard();
   newCard.addEventListener('click', onNewPort);
@@ -256,6 +279,59 @@ export function initNewPortDialog({ els, state, api }) {
       els.newPortNumber.value = suggestedPort(e.target.value);
     }
     els.newPortError.hidden = true;
+  });
+
+  return { open, close };
+}
+
+// 端口卡片 ✎ 的编辑弹窗：一次提交改号 + 改名（后端 PUT 同时支持，改号级联接口/服务）
+export function initEditPortDialog({ els, state, api, refreshAll }) {
+  let editing = null; // 当前编辑的端口实体（旧值）
+
+  const open = (p) => {
+    editing = p;
+    els.editPortName.value = p.name || '';
+    els.editPortNumber.value = String(p.port);
+    els.editPortError.hidden = true;
+    els.editPortModal.hidden = false;
+    els.editPortName.focus();
+    els.editPortName.select();
+  };
+  const close = () => { els.editPortModal.hidden = true; editing = null; };
+  const fail = (msg) => {
+    els.editPortError.textContent = msg;
+    els.editPortError.hidden = false;
+  };
+  const submit = async () => {
+    if (!editing) return;
+    const port = Number(els.editPortNumber.value);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      return fail('端口号必须是 1–65535 的整数');
+    }
+    if (port !== editing.port && state.ports.some((p) => p.port === port)) {
+      return fail(`端口 ${port} 已存在`);
+    }
+    try {
+      // 一次 PUT 同时改号改名；名称留空（空白）由服务端按类型重新生成默认名
+      await api.updatePort(editing.port, { port, name: els.editPortName.value.trim() });
+      const renamed = port !== editing.port;
+      close();
+      await refreshAll(); // 改号级联 endpoints/services，全量重拉
+      showToast({ type: 'success', message: renamed ? `端口已改为 ${port}` : '已保存' });
+    } catch (e) {
+      fail(e?.message || '保存失败');
+    }
+  };
+
+  els.editPortClose.addEventListener('click', close);
+  els.editPortBackdrop.addEventListener('click', close);
+  els.editPortCancel.addEventListener('click', close);
+  els.editPortSave.addEventListener('click', submit);
+  els.editPortName.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submit();
+  });
+  els.editPortNumber.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submit();
   });
 
   return { open, close };
