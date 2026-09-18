@@ -36,6 +36,28 @@ function previewBody(body) {
 }
 
 /**
+ * 日志用请求头：req.headers 会把头名统一转小写（Node 内置行为），
+ * 改走 req.rawHeaders 还原客户端发送的原始大小写与顺序；
+ * 重复头（含同名不同大小写）按大小写不敏感合并、值 ", " 拼接——
+ * 对齐 req.headers 的合并语义，避免详情里出现重复条目。
+ * 注意：Bun ≤1.3.x 的 node:http 兼容层会把 rawHeaders 也小写化，
+ * 忠实展示需 Bun ≥1.4（本机已升级 1.4.2，CI 需同步）。
+ */
+function rawHeadersToLogObject(rawHeaders) {
+  const out = {};
+  const keyByLower = new Map();
+  for (let i = 0; i + 1 < rawHeaders.length; i += 2) {
+    const name = rawHeaders[i];
+    const value = rawHeaders[i + 1];
+    const lower = name.toLowerCase();
+    const key = keyByLower.get(lower) || name;
+    keyByLower.set(lower, key);
+    out[key] = key in out ? `${out[key]}, ${value}` : value;
+  }
+  return out;
+}
+
+/**
  * 引擎运行中：配置变更（端点/端口/服务 CRUD、改号、启停）即时同步——
  * 重建各 mock 端口，让新配置立即生效。引擎未运行（running=false）时静默跳过。
  */
@@ -381,7 +403,7 @@ function createHttpHandler({ port, router, logBuffer, getMax }) {
       matched: !!matched,
       endpointId: matched?.id || null,
       ...(pathParams ? { pathParams } : {}),
-      requestHeaders: req.headers,
+      requestHeaders: rawHeadersToLogObject(req.rawHeaders),
       requestBodyPreview: previewBody(body),
       requestBodyTruncated: truncated,
       // Prefer X-Forwarded-For if behind a proxy, else socket remote address
@@ -482,7 +504,7 @@ function createWsHandler({ port, services, logBuffer, getMax }) {
       matched,
       serviceId: service?.id || null,
       operationName,
-      requestHeaders: req.headers,
+      requestHeaders: rawHeadersToLogObject(req.rawHeaders),
       requestBodyPreview: previewBody(body),
       requestBodyTruncated: truncated,
       ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim()

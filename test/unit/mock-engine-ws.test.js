@@ -238,3 +238,17 @@ describe('MockEngine WS：日志', () => {
     expect(miss.operationName).toBe('noSuchOp');
   });
 });
+describe('MockEngine WS：请求头日志', () => {
+  // WS 端口与 HTTP 端口共用"保留客户端原始头大小写"语义：SOAPAction 不得变 soapaction
+  it('日志保留客户端发送的原始头大小写', async () => {
+    await startWs();
+    await req({
+      port: 18094, path: '/ws/UserService', method: 'POST',
+      headers: { 'Content-Type': 'text/xml', SOAPAction: '"urn:getUser"' },
+      body: SOAP11_ENV('<getUser/>'),
+    });
+    const hit = pushedLogs.find((l) => l.matched === true);
+    expect(hit.requestHeaders['Content-Type']).toMatch(/text\/xml/);
+    expect(hit.requestHeaders['SOAPAction']).toBe('"urn:getUser"');
+  });
+});

@@ -118,6 +118,39 @@ describe('MockEngine', () => {
     expect(pushedLogs[0].path).toBe('/x');
     expect(pushedLogs[0].matched).toBe(true);
   });
+
+  // 请求详情要忠实还原客户端报文：req.headers 会把头名统一转小写（Node 内置行为），
+  // 日志必须改走 rawHeaders 保留原始大小写（如 X-Custom-Header 不得变 x-custom-header）
+  it('logs request headers with the original casing sent by the client', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'a', port: 18230, method: 'GET', path: '/x', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    await new Promise((resolve, reject) => {
+      const req = http.request(
+        { host: '127.0.0.1', port: 18230, path: '/x', method: 'GET', headers: { 'X-Custom-Header': 'v1' } },
+        (res) => { res.resume(); res.on('end', resolve); },
+      );
+      req.on('error', reject);
+      req.end();
+    });
+    expect(pushedLogs[0].requestHeaders['X-Custom-Header']).toBe('v1');
+  });
+
+  // 重复头（含同名不同大小写）按大小写不敏感合并、值 ", " 拼接——对齐 req.headers 语义，避免重复条目
+  it('merges duplicate headers case-insensitively with ", "', async () => {
+    engine = new MockEngine({ logBuffer });
+    await engine.start([
+      { id: 'a', port: 18231, method: 'GET', path: '/x', statusCode: 200, response: { ok: 1 }, enabled: true },
+    ]);
+    const s = net.connect(18231, '127.0.0.1');
+    s.on('error', () => {}); // 无 error 监听时 RST 会变 uncaught exception
+    await new Promise((res) => s.once('connect', res));
+    s.write('GET /x HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Tag: a\r\nx-tag: b\r\nConnection: close\r\n\r\n');
+    s.resume(); // 消费响应数据，确保 close 事件及时触发
+    await new Promise((res) => s.once('close', res));
+    expect(pushedLogs[0].requestHeaders['X-Tag']).toBe('a, b');
+  });
 });
 
 describe('mock-engine with dynamic response', () => {
