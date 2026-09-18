@@ -39,8 +39,15 @@ jobs:
             # 手动触发 + 输入版本号（跳过 auto-bump）
             VER="${{ inputs.version }}"
           else
-            # 自动：读 package.json → bump patch
-            CUR=$(node -p "require('./package.json').version")
+            # 自动：远端最新 v* tag bump patch（package.json 仅作无 tag 时兜底）。
+            # 不能只看 package.json：发版流程不回写它，若两次 push 之间没人手工 bump，
+            # 会与上次 tag 撞号并静默覆盖旧 release 的产物（2026-09-18 实际发生）。
+            # 浅克隆拿不到 tag，须显式 fetch
+            git fetch --tags
+            CUR=$(git tag --list | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -V | tail -1)
+            if [[ -z "$CUR" ]]; then
+              CUR=$(node -p "require('./package.json').version")
+            fi
             MAJOR=$(echo "$CUR" | cut -d. -f1)
             MINOR=$(echo "$CUR" | cut -d. -f2)
             PATCH=$(echo "$CUR" | cut -d. -f3)
